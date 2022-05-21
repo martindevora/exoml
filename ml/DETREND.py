@@ -293,9 +293,13 @@ class BatchAwareCsvLogger(CSVLogger):
     def __init__(self, filename, steps_per_epoch, separator=',', append=False):
         super().__init__(filename, separator, append)
         self.steps_per_epoch = steps_per_epoch
+        self.current_epoch = 0
 
     def on_epoch_end(self, epoch, logs=None):
         pass
+
+    def on_epoch_begin(self, epoch, logs=None):
+        self.current_epoch = epoch
 
     def on_batch_end(self, batch, logs=None):
         logs = logs or {}
@@ -330,7 +334,7 @@ class BatchAwareCsvLogger(CSVLogger):
             if self.append_header:
                 self.writer.writeheader()
 
-        row_dict = collections.OrderedDict({'epoch': batch // self.steps_per_epoch, 'batch': batch})
+        row_dict = collections.OrderedDict({'epoch': self.current_epoch, 'batch': batch})
         row_dict.update((key, handle_value(logs[key])) for key in self.keys)
         self.writer.writerow(row_dict)
         self.csv_file.flush()
@@ -371,11 +375,11 @@ class ModelWeightsLogger:
                 nan_bias_indexes = np.argwhere(np.isnan(w)).flatten()
                 nan_weight_indexes_count = len(nan_weight_indexes)
                 nan_bias_indexes_count = len(nan_bias_indexes)
-                print('Layer max weight is ' + str(np.nanmax(w)) + ' and min weight is ' + str(np.nanmin(w)), 'debug')
-                print('Layer max bias is ' + str(np.nanmax(b)) + ' and min bias is ' + str(np.nanmin(b)), 'debug')
+                log('Layer max weight is ' + str(np.nanmax(w)) + ' and min weight is ' + str(np.nanmin(w)), 'debug')
+                log('Layer max bias is ' + str(np.nanmax(b)) + ' and min bias is ' + str(np.nanmin(b)), 'debug')
                 if nan_weight_indexes_count > 0 or nan_bias_indexes_count > 0:
-                    print('Layer ' + str(layer_i) + ' has ' + str(nan_weight_indexes_count) +
-                          ' nan weights and ' + str(nan_bias_indexes_count) + ' nan biases', 'debug')
+                    log('Layer ' + str(layer_i) + ' has ' + str(nan_weight_indexes_count) +
+                          ' nan weights and ' + str(nan_bias_indexes_count) + ' nan biases', 'warn')
 
 
 def log(message, level="info"):
