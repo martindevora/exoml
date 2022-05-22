@@ -63,6 +63,7 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
             #['ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k'])
             batch_data_array[i][0] = star_df.iloc[0].to_numpy()
             time = lc_df['#time']
+            #TODO we need to bin the data to match input sizes yet
             # Global flux
             lc_df['#time_folded'] = foldedleastsquares.fold(time, period, epoch)
             lc_df_sorted_fold = lc_df.sort_values(by=['#time_folded'])
