@@ -15,6 +15,7 @@ from tensorflow.python.keras.utils.vis_utils import plot_model
 from ml import thread_config
 from ml.callback.batch_aware_csvlogger import BatchAwareCsvLogger
 from ml.callback.get_weights import GetWeights
+from ml.encoding.time_position import value_encode_times
 from ml.logging.get_weights_logger import ModelWeightsLogger
 from ml.logging.with_logging import WithLogging
 from ml.metrics.fixed_mean import FixedMean
@@ -24,12 +25,12 @@ thread_config.setup_threads(5)
 
 
 class AutoEncoder(WithLogging):
-    def __init__(self, input_size=(20610, 7)):
+    def __init__(self, input_size=(20610, 8)):
         super().__init__()
         self.input_size = input_size
 
     def build(self):
-        # (flux, flux_err, centroidx, centroidy, motionx, motiony, bck)
+        # (time, flux, flux_err, centroidx, centroidy, motionx, motiony, bck)
         autoencoder_layer1_strides = 10
         autoencoder_layer1_filters = 5000
         autoencoder_layer1_ks = 100
@@ -245,7 +246,6 @@ class AutoencoderGenerator(tf.keras.utils.Sequence):
             values_df = pd.read_csv(file, usecols=['eb_model', 'bckeb_model', 'planet_model'],
                                     low_memory=True)
             input_df = self.__prepare_input_data(input_df)
-            input_df = input_df.drop('#time', axis=1)
             batch_data_array[i] = input_df.to_numpy()
             assert not np.isnan(batch_data_array[i]).any() and not np.isinf(batch_data_array[i]).any()
             values_df['model'] = 1 - ((1 - values_df['eb_model']) + (1 - values_df['bckeb_model']) + (1 - values_df['planet_model']))
@@ -261,6 +261,7 @@ class AutoencoderGenerator(tf.keras.utils.Sequence):
 
     def __prepare_input_data(self, input_df):
         time = input_df["#time"].to_numpy()
+        input_df["#time"] = value_encode_times(time)
         dif = time[1:] - time[:-1]
         jumps = np.where(np.abs(dif) > 0.25)[0]
         jumps = np.append(jumps, len(input_df))
