@@ -1,14 +1,14 @@
 import keras
 
 
-class MLModelBuilder:
+class WATSON:
     def __init__(self) -> None:
         super().__init__()
 
     def get_flux_branch(self, name):
-        # (flux, detrended_flux1... detrended_flux5, flux_model, centroidx, centroidy, motionx, motiony, bck)
+        # (time, flux, detrended_flux1 ... detrended_flux5, flux_model, centroidx, centroidy, motionx, motiony, bck)
         # flux model by transit params and stellar params
-        flux_input = keras.Input(shape=(2500, 12), name=name)
+        flux_input = keras.Input(shape=(2500, 13), name=name)
         flux_branch = keras.layers.SpatialDropout1D(rate=0.2)(flux_input)
         flux_branch = keras.layers.Conv1D(filters=128, kernel_size=9, padding="same", activation="relu")(flux_branch)
         flux_branch = keras.layers.MaxPooling1D(pool_size=10, strides=6)(flux_branch)
@@ -28,8 +28,8 @@ class MLModelBuilder:
         return flux_centroids_branch
 
     def get_focus_flux_branch(self, name):
-        focus_flux_input = keras.Input(shape=(500, 12), name=name)
-        # (flux, detrended_flux1... detrended_flux5, flux_model, centroidx, centroidy, motionx, motiony, bck)
+        focus_flux_input = keras.Input(shape=(500, 13), name=name)
+        # (time, flux, detrended_flux1... detrended_flux5, flux_model, centroidx, centroidy, motionx, motiony, bck)
         # flux model by transit params and stellar params
         focus_flux_branch = keras.layers.SpatialDropout1D(rate=0.2)(focus_flux_input)
         focus_flux_branch = keras.layers.Conv1D(filters=64, kernel_size=5, padding="same", activation="relu", use_bias=True)(
@@ -149,15 +149,6 @@ class MLModelBuilder:
         keras.utils.vis_utils.plot_model(model, "multi_input_and_output_model.png", show_shapes=True)
 
     def get_model(self):
-        # model = Sequential()
-        # model.add(Conv1D(filters=64, kernel_size=3, activation='relu', use_bias=True, input_shape=(n_timesteps, n_features)))
-        # model.add(Conv1D(filters=64, kernel_size=3, activation='relu', use_bias=True))
-        # model.add(Dropout(0.2))
-        # model.add(MaxPooling1D(pool_size=2))
-        # model.add(Flatten())
-        # model.add(Dense(100, activation='relu'))
-        # model.add(Dense(3, activation='softmax'))
-        # model.compile(loss='categoricald_crossentropy', optimizer='adam', metrics=['accuracy'])
         stellar_model_input = keras.Input(shape=(11, 1), name="stellar_model")
         stellar_model_branch = keras.layers.Dense(16, activation="relu", name="stellar-first")(stellar_model_input)
         stellar_model_branch = keras.layers.Dropout(rate=0.1, name="stellar-first-dropout-0.1")(stellar_model_branch)
