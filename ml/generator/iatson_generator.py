@@ -1,6 +1,7 @@
 import logging
 
 import foldedleastsquares
+import wotan
 from numpy.random import default_rng
 
 from ml.encoding.time_position import value_encode_times
@@ -10,13 +11,13 @@ import numpy as np
 import pandas as pd
 
 
-class WatsonModelGenerator(tf.keras.utils.Sequence):
+class IatsonModelGenerator(tf.keras.utils.Sequence):
     TYPE_TO_LABEL = {'bckEB': [1, 0, 0], 'EB': [0, 1, 0], 'planet': [0, 0, 1], 'none': [0, 0, 0]}
 
-    def __init__(self, injected_objects_file, batch_size, input_size, zero_epsilon, min_period=0.5, max_period=20):
+    def __init__(self, injected_objects_file, batch_size, input_size=8, zero_epsilon=1e-7, min_period=0.5, max_period=20):
         self.injected_objects_file = injected_objects_file
         self.batch_size = batch_size
-        self.input_size = input_size
+        self.input_size = 8
         self.zero_epsilon = zero_epsilon
         self.injected_objects_df = pd.read_csv(injected_objects_file)
         self.random_number_generator = default_rng()
@@ -25,6 +26,11 @@ class WatsonModelGenerator(tf.keras.utils.Sequence):
 
     def __len__(self):
         return (np.ceil(len(self.injected_objects_df) / float(self.batch_size))).astype(int)
+
+    def rebin(self, arr, new_shape):
+        shape = (new_shape[0], arr.shape[0] // new_shape[0],
+                 new_shape[1], arr.shape[1] // new_shape[1])
+        return arr.reshape(shape).mean(-1).mean(1)
 
     def __getitem__(self, idx):
         target_indexes = np.arange(idx * self.batch_size, (idx + 1) * self.batch_size, 1)
@@ -48,27 +54,67 @@ class WatsonModelGenerator(tf.keras.utils.Sequence):
                 period = self.random_number_generator.uniform(self.min_period, self.max_period)
                 min_lc_time = lc_df['#time'].min()
                 epoch = self.random_number_generator.uniform(min_lc_time, min_lc_time + period)
+                duration = wotan.t14(star_df.iloc[0]['radius'], star_df.iloc[0]['mass'], period)
             else:
-                period = self.random_number_generator.uniform(self.min_period, self.max_period)
-                min_lc_time = lc_df['#time'].min()
-                epoch = self.random_number_generator.uniform(min_lc_time, min_lc_time + period)
-            time = target_row['#time']
-            target_row['#time_folded'] = foldedleastsquares.fold(time, period, epoch)
-            target_row_sorted_fold = target_row.sort_values(by=['#time_folded'])
-            #TODO append a quarter of the initial time to the end and shift to quarter
-            # target_row_sorted_fold.iloc[0:len(target_row_sorted_fold) // 4]
+                period = target_row['period(h)']
+                epoch = target_row['epoch']
+                duration = target_row['duration(h)'] / 24
+            duration_to_period = duration / period
             #['ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k'])
             batch_data_array[i][0] = star_df.iloc[0].to_numpy()
-            batch_data_array[i][1] = target_row_sorted_fold.to_numpy()
+            time = lc_df['#time']
+            # Global flux
+            lc_df['#time_folded'] = foldedleastsquares.fold(time, period, epoch)
+            lc_df_sorted_fold = lc_df.sort_values(by=['#time_folded'])
+            # Shifting data 1/4 so that main transit and possible occultation don't get cut by the borders
+            lc_df_sorted_fold['#time_folded'] = lc_df_sorted_fold['#time_folded'] + 0.25
+            lc_df_sorted_fold = lc_df_sorted_fold.sort_values(by=['#time_folded'])
+            lc_df_sorted_fold.drop('#time', inplace=True, axis=1)
+            batch_data_array[i][1] = lc_df_sorted_fold.to_numpy()
+            # Focus flux even
+            lc_df['#time_folded'] = foldedleastsquares.fold(time, period, epoch)
+            lc_df_focus = lc_df.sort_values(by=['#time_folded'])
+            lc_df_focus = lc_df_focus[(lc_df_focus['#time_folded'] > 0.5 - duration_to_period * 3) &
+                                      (lc_df_focus['#time_folded'] < 0.5 + duration_to_period * 3)]
+            lc_df_focus.drop('#time', inplace=True, axis=1)
+            batch_data_array[i][2] = lc_df_focus.to_numpy()
+            # Focus flux odd
+            lc_df['#time_folded'] = foldedleastsquares.fold(time, period, epoch + period / 2)
+            lc_df_focus = lc_df.sort_values(by=['#time_folded'])
+            lc_df_focus = lc_df_focus[(lc_df_focus['#time_folded'] > 0.5 - duration_to_period * 3) &
+                                      (lc_df_focus['#time_folded'] < 0.5 + duration_to_period * 3)]
+            lc_df_focus.drop('#time', inplace=True, axis=1)
+            batch_data_array[i][3] = lc_df_focus.to_numpy()
+            # Focus flux sub-harmonic even
+            lc_df['#time_folded'] = foldedleastsquares.fold(time, period / 2, epoch)
+            lc_df_focus = lc_df.sort_values(by=['#time_folded'])
+            lc_df_focus = lc_df_focus[(lc_df_focus['#time_folded'] > 0.5 - duration_to_period * 3) &
+                                      (lc_df_focus['#time_folded'] < 0.5 + duration_to_period * 3)]
+            lc_df_focus.drop('#time', inplace=True, axis=1)
+            batch_data_array[i][4] = lc_df_focus.to_numpy()
+            # Focus flux sub-harmonic odd
+            lc_df['#time_folded'] = foldedleastsquares.fold(time, period / 2, epoch + period / 4)
+            lc_df_focus = lc_df.sort_values(by=['#time_folded'])
+            lc_df_focus = lc_df_focus[(lc_df_focus['#time_folded'] > 0.5 - duration_to_period * 3) &
+                                      (lc_df_focus['#time_folded'] < 0.5 + duration_to_period * 3)]
+            lc_df_focus.drop('#time', inplace=True, axis=1)
+            batch_data_array[i][5] = lc_df_focus.to_numpy()
+            # Focus flux harmonic even
+            lc_df['#time_folded'] = foldedleastsquares.fold(time, period * 2, epoch)
+            lc_df_focus = lc_df.sort_values(by=['#time_folded'])
+            lc_df_focus = lc_df_focus[(lc_df_focus['#time_folded'] > 0.5 - duration_to_period * 3) &
+                                      (lc_df_focus['#time_folded'] < 0.5 + duration_to_period * 3)]
+            lc_df_focus.drop('#time', inplace=True, axis=1)
+            batch_data_array[i][6] = lc_df_focus.to_numpy()
+            # Focus flux harmonic odd
+            lc_df['#time_folded'] = foldedleastsquares.fold(time, period * 2, epoch + period * 3 / 2)
+            lc_df_focus = lc_df.sort_values(by=['#time_folded'])
+            lc_df_focus = lc_df_focus[(lc_df_focus['#time_folded'] > 0.5 - duration_to_period * 3) &
+                                      (lc_df_focus['#time_folded'] < 0.5 + duration_to_period * 3)]
+            lc_df_focus.drop('#time', inplace=True, axis=1)
+            batch_data_array[i][7] = lc_df_focus.to_numpy()
             assert not np.isnan(batch_data_array[i]).any() and not np.isinf(batch_data_array[i]).any()
-            values_df['model'] = 1 - ((1 - values_df['eb_model']) + (1 - values_df['bckeb_model']) + (1 - values_df['planet_model']))
-            batch_data_values[i] = values_df['model'].to_numpy()
-            batch_data_values[i] = np.nan_to_num(batch_data_values[i], nan=self.zero_epsilon)
-            negative_values_args = np.argwhere(batch_data_values[i] <= 0).flatten()
-            batch_data_values[i][negative_values_args] = self.zero_epsilon
-            assert not np.isnan(batch_data_values[i]).any() and not np.isinf(batch_data_values[i]).any()
             logging.info("GENERATOR Inputs max " + str(np.max(batch_data_array[i])) + " and min " + str(np.min(batch_data_array[i])))
-            logging.info("GENERATOR Values max " + str(np.max(batch_data_values[i])) + " and min " + str(np.min(batch_data_values[i])))
             i = i + 1
         return [batch_data_array], batch_data_values
 
@@ -95,3 +141,5 @@ class WatsonModelGenerator(tf.keras.utils.Sequence):
         input_df = input_df.replace(0.0, self.zero_epsilon)
         input_df = input_df.replace(0, self.zero_epsilon)
         return input_df
+
+IatsonModelGenerator("/mnt/DATA-2/ete6/injected_objects.csv", 20, )

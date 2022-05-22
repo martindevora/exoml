@@ -7,10 +7,10 @@ class IATSON:
         super().__init__()
 
     def get_flux_conv_branch(self, name):
-        # (time, flux, detrended_flux1 ... detrended_flux5, flux_model, centroidx, centroidy, motionx, motiony, bck)
+        # (time, flux, [detrended_flux1 ... detrended_flux5], flux_model, centroidx, centroidy, motionx, motiony, bck)
         # flux model by transit params and stellar params
         leaky_relu_alpha = 0.01
-        flux_input = keras.Input(shape=(2500, 13), name=name)
+        flux_input = keras.Input(shape=(2500, 8), name=name)
         flux_branch = keras.layers.SpatialDropout1D(rate=0.2)(flux_input)
         flux_branch = keras.layers.Conv1D(filters=128, kernel_size=9, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
@@ -82,8 +82,8 @@ class IATSON:
         focus_flux_branch = keras.layers.Add()([odd_flux_branch, even_flux_branch])
         focus_flux_branch = keras.layers.Dense(24, activation=LeakyReLU(leaky_relu_alpha))(focus_flux_branch)
         focus_flux_branch = keras.layers.Dense(16, activation='linear')(focus_flux_branch)
-        input = [odd_flux_input, even_flux_input, harmonic_odd_flux_input, harmonic_even_flux_input,
-                 subharmonic_odd_flux_input, subharmonic_even_flux_input]
+        input = [even_flux_input, odd_flux_input, subharmonic_even_flux_input, subharmonic_odd_flux_input,
+                 harmonic_even_flux_input, harmonic_odd_flux_input]
         focus_flux_branch = keras.Model(inputs=input, outputs=focus_flux_branch)
         return focus_flux_branch
 
