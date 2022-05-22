@@ -2,10 +2,8 @@ import logging
 import os
 import pathlib
 
-import numpy as np
 import keras
 import tensorflow as tf
-import pandas as pd
 from keras import Model
 from keras.optimizer_v2.learning_rate_schedule import ExponentialDecay
 from keras.utils import losses_utils
@@ -15,7 +13,7 @@ from tensorflow.python.keras.utils.vis_utils import plot_model
 from ml import thread_config
 from ml.callback.batch_aware_csvlogger import BatchAwareCsvLogger
 from ml.callback.get_weights import GetWeights
-from ml.encoding.time_position import value_encode_times
+from ml.generator.detrend_generator import DetrendModelGenerator
 from ml.logging.get_weights_logger import ModelWeightsLogger
 from ml.logging.with_logging import WithLogging
 from ml.metrics.fixed_mean import FixedMean
@@ -190,8 +188,8 @@ class AutoEncoder(WithLogging):
                 ") (self.input_size," + str(self.input_size) +
                 ") (zero_epsilon," + str(zero_epsilon) +
                 ")")
-            training_batch_generator = AutoencoderGenerator(train_filenames, batch_size, self.input_size, zero_epsilon)
-            validation_batch_generator = AutoencoderGenerator(test_filenames, batch_size, self.input_size, zero_epsilon)
+            training_batch_generator = DetrendModelGenerator(train_filenames, batch_size, self.input_size, zero_epsilon)
+            validation_batch_generator = DetrendModelGenerator(test_filenames, batch_size, self.input_size, zero_epsilon)
             csv_log = output_dir + '/training_log.csv'
             logging.info("Initializing csv logger with (csv_log," + str(csv_log) +
                 ") (steps_per_epoch," + str(steps_per_epoch) +
@@ -223,65 +221,6 @@ class AutoEncoder(WithLogging):
         else:
             logging.info("dry_run was activated and 'training' will not be launched", 'warn')
 
-
-class AutoencoderGenerator(tf.keras.utils.Sequence):
-    def __init__(self, lc_filenames, batch_size, input_size, zero_epsilon):
-        self.lc_filenames = lc_filenames
-        self.batch_size = batch_size
-        self.input_size = input_size
-        self.zero_epsilon = zero_epsilon
-
-    def __len__(self):
-        return (np.ceil(len(self.lc_filenames) / float(self.batch_size))).astype(int)
-
-    def __getitem__(self, idx):
-        batch_filenames = self.lc_filenames[idx * self.batch_size: (idx + 1) * self.batch_size]
-        filenames_shuffled = shuffle(batch_filenames)
-        batch_data_array = np.empty((len(filenames_shuffled), self.input_size[0], self.input_size[1]))
-        batch_data_values = np.empty((len(filenames_shuffled), self.input_size[0]))
-        i = 0
-        for file in filenames_shuffled:
-            input_df = pd.read_csv(file, usecols=['#time', 'flux', 'flux_err', 'centroid_x', 'centroid_y',
-                                                                'motion_x', 'motion_y', 'bck_flux'], low_memory=True)
-            values_df = pd.read_csv(file, usecols=['eb_model', 'bckeb_model', 'planet_model'],
-                                    low_memory=True)
-            input_df = self.__prepare_input_data(input_df)
-            batch_data_array[i] = input_df.to_numpy()
-            assert not np.isnan(batch_data_array[i]).any() and not np.isinf(batch_data_array[i]).any()
-            values_df['model'] = 1 - ((1 - values_df['eb_model']) + (1 - values_df['bckeb_model']) + (1 - values_df['planet_model']))
-            batch_data_values[i] = values_df['model'].to_numpy()
-            batch_data_values[i] = np.nan_to_num(batch_data_values[i], nan=self.zero_epsilon)
-            negative_values_args = np.argwhere(batch_data_values[i] <= 0).flatten()
-            batch_data_values[i][negative_values_args] = self.zero_epsilon
-            assert not np.isnan(batch_data_values[i]).any() and not np.isinf(batch_data_values[i]).any()
-            logging.info("GENERATOR Inputs max " + str(np.max(batch_data_array[i])) + " and min " + str(np.min(batch_data_array[i])))
-            logging.info("GENERATOR Values max " + str(np.max(batch_data_values[i])) + " and min " + str(np.min(batch_data_values[i])))
-            i = i + 1
-        return batch_data_array, batch_data_values
-
-    def __prepare_input_data(self, input_df):
-        time = input_df["#time"].to_numpy()
-        input_df["#time"] = value_encode_times(time - time[0])
-        dif = time[1:] - time[:-1]
-        jumps = np.where(np.abs(dif) > 0.25)[0]
-        jumps = np.append(jumps, len(input_df))
-        previous_jump_index = 0
-        for jumpIndex in jumps:
-            token = input_df["centroid_x"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["centroid_x"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 2
-            token = input_df["centroid_y"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["centroid_y"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 2
-            token = input_df["motion_x"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["motion_x"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 2
-            token = input_df["motion_y"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["motion_y"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 2
-            token = input_df["bck_flux"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["bck_flux"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 3
-            previous_jump_index = jumpIndex
-        input_df = input_df.fillna(self.zero_epsilon)
-        input_df = input_df.replace(0.0, self.zero_epsilon)
-        input_df = input_df.replace(0, self.zero_epsilon)
-        return input_df
 
 
 auto_encoder = AutoEncoder().build()
