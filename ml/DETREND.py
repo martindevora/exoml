@@ -5,6 +5,7 @@ import pathlib
 import keras
 import tensorflow as tf
 from keras import Model
+from keras.layers import LeakyReLU
 from keras.optimizer_v2.learning_rate_schedule import ExponentialDecay
 from keras.utils import losses_utils
 from sklearn.utils import shuffle
@@ -14,8 +15,8 @@ from ml import thread_config
 from ml.callback.batch_aware_csvlogger import BatchAwareCsvLogger
 from ml.callback.get_weights import GetWeights
 from ml.generator.detrend_generator import DetrendModelGenerator
-from ml.logging.get_weights_logger import ModelWeightsLogger
-from ml.logging.with_logging import WithLogging
+from ml.log.get_weights_logger import ModelWeightsLogger
+from ml.log.with_logging import WithLogging
 from ml.metrics.fixed_mean import FixedMean
 
 
@@ -47,63 +48,79 @@ class AutoEncoder(WithLogging):
         autoencoder_layer6_strides = 1
         autoencoder_layer6_filters = 32
         autoencoder_layer6_ks = 5
-        leaky_relu = lambda alpha: tf.keras.layers.LeakyReLU(alpha=alpha)
         input = keras.Input(shape=(self.input_size))
         self.batch_norm_input = keras.layers.normalization.batch_normalization.BatchNormalization()(input)
         self.enc_layer1 = keras.layers.SpatialDropout1D(rate=0.1)(input)
-        self.enc_layer1_r = keras.layers.Conv1D(filters=autoencoder_layer1_filters, kernel_size=autoencoder_layer1_ks, padding="same", activation=leaky_relu(0.01))(self.enc_layer1)
+        self.enc_layer1_r = keras.layers.Conv1D(filters=autoencoder_layer1_filters, kernel_size=autoencoder_layer1_ks,
+                                                padding="same", activation=LeakyReLU(0.01))(self.enc_layer1)
         self.enc_layer1 = keras.layers.normalization.batch_normalization.BatchNormalization()(self.enc_layer1_r)
         self.enc_layer1 = keras.layers.MaxPooling1D(pool_size=50, strides=autoencoder_layer1_strides, padding="same")(self.enc_layer1)
         self.enc_layer1 = keras.layers.Dropout(rate=0.1)(self.enc_layer1)
-        self.enc_layer2_r = keras.layers.Conv1D(filters=autoencoder_layer2_filters, kernel_size=autoencoder_layer2_ks, padding="same", activation=leaky_relu(0.01))(self.enc_layer1)
+        self.enc_layer2_r = keras.layers.Conv1D(filters=autoencoder_layer2_filters, kernel_size=autoencoder_layer2_ks,
+                                                padding="same", activation=LeakyReLU(0.01))(self.enc_layer1)
         self.enc_layer2 = keras.layers.normalization.batch_normalization.BatchNormalization()(self.enc_layer2_r)
         self.enc_layer2 = keras.layers.MaxPooling1D(pool_size=20, strides=autoencoder_layer2_strides, padding="same")(self.enc_layer2)
         self.enc_layer2 = keras.layers.Dropout(rate=0.1)(self.enc_layer2)
-        self.enc_layer3_r = keras.layers.Conv1D(filters=autoencoder_layer3_filters, kernel_size=autoencoder_layer3_ks, padding="same", activation=leaky_relu(0.01))(self.enc_layer2)
+        self.enc_layer3_r = keras.layers.Conv1D(filters=autoencoder_layer3_filters, kernel_size=autoencoder_layer3_ks,
+                                                padding="same", activation=LeakyReLU(0.01))(self.enc_layer2)
         self.enc_layer3 = keras.layers.normalization.batch_normalization.BatchNormalization()(self.enc_layer3_r)
         self.enc_layer3 = keras.layers.MaxPooling1D(pool_size=15, strides=autoencoder_layer3_strides, padding="same")(self.enc_layer3)
         self.enc_layer3 = keras.layers.Dropout(rate=0.1)(self.enc_layer3)
-        self.enc_layer4_r = keras.layers.Conv1D(filters=autoencoder_layer4_filters, kernel_size=autoencoder_layer4_ks, padding="same", activation=leaky_relu(0.01))(self.enc_layer3)
+        self.enc_layer4_r = keras.layers.Conv1D(filters=autoencoder_layer4_filters, kernel_size=autoencoder_layer4_ks,
+                                                padding="same", activation=LeakyReLU(0.01))(self.enc_layer3)
         self.enc_layer4 = keras.layers.normalization.batch_normalization.BatchNormalization()(self.enc_layer4_r)
         self.enc_layer4 = keras.layers.MaxPooling1D(pool_size=10, strides=autoencoder_layer4_strides, padding="same")(self.enc_layer4)
         self.enc_layer4 = keras.layers.Dropout(rate=0.1)(self.enc_layer4)
-        self.enc_layer5_r = keras.layers.Conv1D(filters=autoencoder_layer5_filters, kernel_size=autoencoder_layer5_ks, padding="same", activation=leaky_relu(0.01))(self.enc_layer4)
+        self.enc_layer5_r = keras.layers.Conv1D(filters=autoencoder_layer5_filters, kernel_size=autoencoder_layer5_ks,
+                                                padding="same", activation=LeakyReLU(0.01))(self.enc_layer4)
         self.enc_layer5 = keras.layers.normalization.batch_normalization.BatchNormalization()(self.enc_layer5_r)
         self.enc_layer5 = keras.layers.MaxPooling1D(pool_size=4, strides=autoencoder_layer5_strides, padding="same")(self.enc_layer5)
         self.enc_layer5 = keras.layers.Dropout(rate=0.1)(self.enc_layer5)
-        self.enc_layer6_r = keras.layers.Conv1D(filters=autoencoder_layer6_filters, kernel_size=autoencoder_layer6_ks, padding="same", activation=leaky_relu(0.01))(self.enc_layer5)
+        self.enc_layer6_r = keras.layers.Conv1D(filters=autoencoder_layer6_filters, kernel_size=autoencoder_layer6_ks,
+                                                padding="same", activation=LeakyReLU(0.01))(self.enc_layer5)
         self.enc_layer6 = keras.layers.normalization.batch_normalization.BatchNormalization()(self.enc_layer6_r)
         self.enc_layer6 = keras.layers.MaxPooling1D(pool_size=3, strides=autoencoder_layer6_strides, padding="same")(self.enc_layer6)
         self.enc_layer6 = keras.layers.Dropout(rate=0.1)(self.enc_layer6)
         self.dec_layer6 = keras.layers.UpSampling1D(autoencoder_layer6_strides)(self.enc_layer6)
-        self.dec_layer6 = keras.layers.Conv1DTranspose(filters=autoencoder_layer6_filters, kernel_size=autoencoder_layer6_ks, padding="same", activation=leaky_relu(0.01))(self.dec_layer6)
+        self.dec_layer6 = keras.layers.Conv1DTranspose(filters=autoencoder_layer6_filters, kernel_size=autoencoder_layer6_ks,
+                                                       padding="same", activation=LeakyReLU(0.01))(self.dec_layer6)
         self.dec_layer6 = keras.layers.normalization.batch_normalization.BatchNormalization()(self.dec_layer6)
         self.dec_layer6 = keras.layers.Add()([self.enc_layer6_r, self.dec_layer6])
         self.dec_layer5 = keras.layers.UpSampling1D(autoencoder_layer5_strides)(self.dec_layer6)
-        self.dec_layer5 = keras.layers.Conv1DTranspose(filters=autoencoder_layer5_filters, kernel_size=autoencoder_layer5_ks, padding="same", activation=leaky_relu(0.01))(self.dec_layer5)
+        self.dec_layer5 = keras.layers.Conv1DTranspose(filters=autoencoder_layer5_filters,
+                                                       kernel_size=autoencoder_layer5_ks, padding="same",
+                                                       activation=LeakyReLU(0.01))(self.dec_layer5)
         self.dec_layer5 = keras.layers.normalization.batch_normalization.BatchNormalization()(self.dec_layer5)
         self.dec_layer5 = keras.layers.Add()([self.enc_layer5_r, self.dec_layer5])
         self.dec_layer4 = keras.layers.UpSampling1D(autoencoder_layer4_strides)(self.dec_layer5)
         self.dec_layer4 = keras.layers.Cropping1D(cropping=(0, 1))(self.dec_layer4)
-        self.dec_layer4 = keras.layers.Conv1DTranspose(filters=autoencoder_layer4_filters, kernel_size=autoencoder_layer4_ks, padding="same", activation=leaky_relu(0.01))(self.dec_layer4)
+        self.dec_layer4 = keras.layers.Conv1DTranspose(filters=autoencoder_layer4_filters,
+                                                       kernel_size=autoencoder_layer4_ks, padding="same",
+                                                       activation=LeakyReLU(0.01))(self.dec_layer4)
         self.dec_layer4 = keras.layers.normalization.batch_normalization.BatchNormalization()(self.dec_layer4)
         self.dec_layer4 = keras.layers.Add()([self.enc_layer4_r, self.dec_layer4])
         self.dec_layer3 = keras.layers.UpSampling1D(autoencoder_layer3_strides)(self.dec_layer4)
         self.dec_layer3 = keras.layers.Cropping1D(cropping=1)(self.dec_layer3)
-        self.dec_layer3 = keras.layers.Conv1DTranspose(filters=autoencoder_layer3_filters, kernel_size=autoencoder_layer3_ks, padding="same", activation=leaky_relu(0.01))(self.dec_layer3)
+        self.dec_layer3 = keras.layers.Conv1DTranspose(filters=autoencoder_layer3_filters,
+                                                       kernel_size=autoencoder_layer3_ks, padding="same",
+                                                       activation=LeakyReLU(0.01))(self.dec_layer3)
         self.dec_layer3 = keras.layers.normalization.batch_normalization.BatchNormalization()(self.dec_layer3)
         self.dec_layer3 = keras.layers.Add()([self.enc_layer3_r, self.dec_layer3])
         self.dec_layer2 = keras.layers.UpSampling1D(autoencoder_layer2_strides)(self.dec_layer3)
         self.dec_layer2 = keras.layers.Cropping1D(cropping=2)(self.dec_layer2)
-        self.dec_layer2 = keras.layers.Conv1DTranspose(filters=autoencoder_layer2_filters, kernel_size=autoencoder_layer2_ks, padding="same", activation=leaky_relu(0.01))(self.dec_layer2)
+        self.dec_layer2 = keras.layers.Conv1DTranspose(filters=autoencoder_layer2_filters,
+                                                       kernel_size=autoencoder_layer2_ks, padding="same",
+                                                       activation=LeakyReLU(0.01))(self.dec_layer2)
         self.dec_layer2 = keras.layers.normalization.batch_normalization.BatchNormalization()(self.dec_layer2)
         self.dec_layer2 = keras.layers.Add()([self.enc_layer2_r, self.dec_layer2])
         self.dec_layer1 = keras.layers.UpSampling1D(autoencoder_layer1_strides)(self.dec_layer2)
-        self.dec_layer1 = keras.layers.Conv1DTranspose(filters=autoencoder_layer1_filters, kernel_size=autoencoder_layer1_ks, padding="same", activation=leaky_relu(0.01))(self.dec_layer1)
+        self.dec_layer1 = keras.layers.Conv1DTranspose(filters=autoencoder_layer1_filters,
+                                                       kernel_size=autoencoder_layer1_ks, padding="same",
+                                                       activation=LeakyReLU(0.01))(self.dec_layer1)
         self.dec_layer1 = keras.layers.normalization.batch_normalization.BatchNormalization()(self.dec_layer1)
         self.dec_layer1 = keras.layers.Add()([self.enc_layer1_r, self.dec_layer1])
         self.linear_proj = keras.layers.GlobalAveragePooling1D()(self.dec_layer1)
-        self.linear_proj = keras.layers.Dense(self.input_size[0], activation=leaky_relu(0.01))(self.linear_proj)
+        self.linear_proj = keras.layers.Dense(self.input_size[0], activation=LeakyReLU(0.01))(self.linear_proj)
         self.linear_proj = keras.layers.Dropout(rate=0.1)(self.linear_proj)
         self.linear_proj = keras.layers.Dense(self.input_size[0], activation="linear")(self.linear_proj)
         self.model = Model(inputs=input, outputs=self.linear_proj)
