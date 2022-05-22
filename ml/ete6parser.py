@@ -22,7 +22,7 @@ def create_injection_dataframe(injections_dir, lcs_dir):
         lc = TessLightCurve.read(lc_file)
         object_id = lc.meta['OBJECT']
         object_id = int(object_id.split(' ')[1])
-        df.append({'TIC ID': object_id, 'type': 'none', 'period': 0,
+        df = df.append({'TIC ID': object_id, 'type': 'none', 'period': 0,
                    'epoch': 0,
                    'Rsec/Rpri': 0,
                    'b': 0,
@@ -35,7 +35,7 @@ def create_injection_dataframe(injections_dir, lcs_dir):
                    'Mstar': 0}, ignore_index=True)
         target_rows = backeb_df[backeb_df['TIC ID'] == object_id]
         for index, target_row in target_rows.iterrows():
-            df.append({'TIC ID': target_row['TIC ID'], 'type': 'bckEB', 'period': target_row['Orbital Period'],
+            df = df.append({'TIC ID': target_row['TIC ID'], 'type': 'bckEB', 'period': target_row['Orbital Period'],
                        'epoch': target_row['Epoch [BTJD]'],
                        'Rsec/Rpri': target_row['Secondary Rstar'] / target_row['Primary Rstar'],
                        'b': target_row['Impact Parameter'],
@@ -48,7 +48,7 @@ def create_injection_dataframe(injections_dir, lcs_dir):
                        'Mstar': 0}, ignore_index=True)
         target_rows = eb_df[eb_df['TIC ID'] == object_id]
         for index, target_row in target_rows.iterrows():
-            df.append({'TIC ID': target_row['TIC ID'], 'type': 'EB', 'period': target_row['Orbital Period'],
+            df = df.append({'TIC ID': target_row['TIC ID'], 'type': 'EB', 'period': target_row['Orbital Period'],
                        'epoch': target_row['Epoch [BTJD]'],
                        'Rsec/Rpri': target_row['Secondary Rstar'] / target_row['Primary Rstar'],
                        'b': target_row['Impact Parameter'],
@@ -61,7 +61,7 @@ def create_injection_dataframe(injections_dir, lcs_dir):
                        'Mstar': 0}, ignore_index=True)
         target_rows = planet_df[planet_df['TIC ID'] == object_id]
         for index, target_row in target_rows.iterrows():
-            df.append({'TIC ID': target_row['TIC ID'], 'type': 'planet', 'period': target_row['Orbital Period'],
+            df = df.append({'TIC ID': target_row['TIC ID'], 'type': 'planet', 'period': target_row['Orbital Period'],
                        'epoch': target_row['Epoch [BTJD]'],
                        'Rsec/Rpri': target_row['Rp/Rstar'],
                        'b': target_row['Impact Parameter'],
