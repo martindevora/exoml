@@ -18,11 +18,21 @@ def create_injection_dataframe(injections_dir, lcs_dir):
                                'insolation', 'Rstar_primary', 'Rstar_secondary', 'contact_amplitude', 'Mstar'])
     i = 0
     log_count = 100
-    for file in os.listdir(lcs_dir):
-        lc_file = lcs_dir + '/' + file
+    for lc_file in list(pathlib.Path(lcs_dir).glob('*.fits')):
         lc = TessLightCurve.read(lc_file)
         object_id = lc.meta['OBJECT']
         object_id = int(object_id.split(' ')[1])
+        df.append({'TIC ID': object_id, 'type': 'none', 'period': 0,
+                   'epoch': 0,
+                   'Rsec/Rpri': 0,
+                   'b': 0,
+                   'a/Rstar': 0, 'duration(h)': 0,
+                   'depth_primary': 0,
+                   'depth_secondary': 0,
+                   'insolation': 0, 'Rstar_primary': 0,
+                   'Rstar_secondary': 0,
+                   'contact_amplitude': 0,
+                   'Mstar': 0}, ignore_index=True)
         target_rows = backeb_df[backeb_df['TIC ID'] == object_id]
         for index, target_row in target_rows.iterrows():
             df.append({'TIC ID': target_row['TIC ID'], 'type': 'bckEB', 'period': target_row['Orbital Period'],
@@ -35,7 +45,7 @@ def create_injection_dataframe(injections_dir, lcs_dir):
                        'insolation': 0, 'Rstar_primary': target_row['Primary Rstar'],
                        'Rstar_secondary': target_row['Secondary Rstar'],
                        'contact_amplitude': target_row['Contact Binary Amplitude'],
-                       'Mstar': 0})
+                       'Mstar': 0}, ignore_index=True)
         target_rows = eb_df[eb_df['TIC ID'] == object_id]
         for index, target_row in target_rows.iterrows():
             df.append({'TIC ID': target_row['TIC ID'], 'type': 'EB', 'period': target_row['Orbital Period'],
@@ -48,7 +58,7 @@ def create_injection_dataframe(injections_dir, lcs_dir):
                        'insolation': 0, 'Rstar_primary': target_row['Primary Rstar'],
                        'Rstar_secondary': target_row['Secondary Rstar'],
                        'contact_amplitude': target_row['Contact Binary Amplitude'],
-                       'Mstar': 0})
+                       'Mstar': 0}, ignore_index=True)
         target_rows = planet_df[planet_df['TIC ID'] == object_id]
         for index, target_row in target_rows.iterrows():
             df.append({'TIC ID': target_row['TIC ID'], 'type': 'planet', 'period': target_row['Orbital Period'],
@@ -62,11 +72,12 @@ def create_injection_dataframe(injections_dir, lcs_dir):
                        'Rstar_primary': target_row['Rstar'],
                        'Rstar_secondary': target_row['Rstar'] * target_row['Rp/Rstar'],
                        'contact_amplitude': 0,
-                       'Mstar': target_row['Mstar']})
+                       'Mstar': target_row['Mstar']}, ignore_index=True)
         df = df.sort_values(["TIC ID", "type"], ascending=True)
         df.to_csv(injections_dir + '/injected_objects.csv')
         if i % log_count == 0:
-            print("Processed " + str(i) + " TICs. Found ")
+            print("Processed " + str(i) + " TICs.")
+        i = i + 1
 
 
 def create_target_csvs(lcs_dir, models_dir, max_lc_length=20610):
@@ -186,5 +197,5 @@ lcs_dir = root_dir + 'lcs/'
 #uncompress_data('/mnt/DATA-2/ete6/backebs/BackEBs/')
 #uncompress_data('/mnt/DATA-2/ete6/ebs/EBs/')
 #uncompress_data('/mnt/DATA-2/ete6/planets/Planets/')
-#create_injection_dataframe(root_dir, lcs_dir)
-create_target_csvs(lcs_dir, root_dir)
+create_injection_dataframe(root_dir, lcs_dir)
+#create_target_csvs(lcs_dir, root_dir)
