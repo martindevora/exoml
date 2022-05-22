@@ -261,7 +261,7 @@ class AutoencoderGenerator(tf.keras.utils.Sequence):
 
     def __prepare_input_data(self, input_df):
         time = input_df["#time"].to_numpy()
-        input_df["#time"] = value_encode_times(time)
+        input_df["#time"] = value_encode_times(time - time[0])
         dif = time[1:] - time[:-1]
         jumps = np.where(np.abs(dif) > 0.25)[0]
         jumps = np.append(jumps, len(input_df))
