@@ -5,8 +5,8 @@ import numpy as np
 from keras import layers
 import tensorflow as tf
 from sklearn.utils import shuffle
+from tensorflow.python.ops.gen_nn_ops import LeakyRelu
 
-leaky_relu = lambda alpha: tf.keras.layers.LeakyReLU(alpha=alpha)
 
 class SANTO:
     """
@@ -29,8 +29,8 @@ class SANTO:
         tf.keras.backend.clear_session()
         output_dim = input_dim
         checkpoint_path = "/mnt/DATA-2/training_data/SANTEX/checkpoint"
-        transformer = Transformer(num_heads=4, key_dim=input_dim, output_dim=output_dim, stack_depth=2,
-                                  dropout_rate=0.1)
+        transformer = Transformer(num_heads=4, key_dim=input_dim, ffn_units=input_dim, output_dim=output_dim,
+                                  stack_depth=2, dropout_rate=0.1)
         # TODO this loss function is probably not well suited for our purpose as we don't want an exclusive output, but
         #  a linear one
         # Define a categorical cross entropy loss
@@ -100,7 +100,7 @@ class TransformerEncoder(layers.Layer):
         self.input_dim = input_shape[-1]
         self.att = layers.MultiHeadAttention(num_heads=self.num_heads, key_dim=self.key_dim)
         self.ffn = keras.Sequential(
-            [layers.Dense(self.input_dim, activation=leaky_relu(0.01)), layers.Dense(self.key_dim), ]
+            [layers.Dense(self.input_dim, activation=LeakyRelu(0.01)), layers.Dense(self.key_dim), ]
         )
         self.att_norm = layers.LayerNormalization(epsilon=1e-6)
         self.ffn_norm = layers.LayerNormalization(epsilon=1e-6)
@@ -131,7 +131,7 @@ class TransformerDecoder(layers.Layer):
         self.att2_dropout = layers.Dropout(self.dropout_rate)
         self.att2_norm = layers.LayerNormalization(epsilon=1e-6)
         self.ffn = keras.Sequential(
-            [layers.Dense(self.input_shape, activation=leaky_relu(0.01)), layers.Dense(self.key_dim), ]
+            [layers.Dense(self.input_shape, activation=LeakyRelu(0.01)), layers.Dense(self.key_dim), ]
         )
         self.ffn_dropout = layers.Dropout(self.dropout_rate)
         self.ffn_norm = layers.LayerNormalization(epsilon=1e-6)
@@ -168,7 +168,7 @@ class Transformer(layers.Layer):
             self.decoders.append(TransformerEncoder(self.key_dim, self.num_heads, self.dropout_rate))
         self.average_pooling = layers.GlobalAveragePooling1D()
         self.average_pooling_dropout = layers.Dropout(self.dropout_rate)
-        self.pooling_dense = layers.Dense(self.ffn_units, activation=leaky_relu(0.01))
+        self.pooling_dense = layers.Dense(self.ffn_units, activation=LeakyRelu(0.01))
         self.pooling_dense_dropout = layers.Dropout(self.dropout_rate)
         # The output is linear, in case this is a classification problem the softmax is applied in the loss function
         # TODO I don't see where softmax is applied in the loss function
