@@ -15,6 +15,7 @@ class SANTO:
         super().__init__()
 
     def loss_function(self, loss_holder, target, pred):
+        #Custom loss function to mask the padding tokens
         mask = tf.math.logical_not(tf.math.equal(target, 0))
         loss_ = loss_holder(target, pred)
 
@@ -23,11 +24,10 @@ class SANTO:
 
         return tf.reduce_mean(loss_)
 
-    def train(self, dataset, n_epochs, input_dim=20610, print_every=50):
+    def train(self, dataset, n_epochs, input_dim=(20610, 2), print_every=50):
         tf.keras.backend.clear_session()
         output_dim = input_dim
         checkpoint_path = "/mnt/DATA-2/training_data/SANTEX/checkpoint"
-        # Create the Transformer model
         transformer = Transformer(num_heads=4, key_dim=input_dim, output_dim=output_dim, stack_depth=2,
                                   dropout_rate=0.1)
         # TODO this loss function is probably not well suited for our purpose as we don't want an exclusive output, but
@@ -52,18 +52,17 @@ class SANTO:
         ''' Train the transformer model for n_epochs using the data generator dataset'''
         losses = []
         accuracies = []
-        # In every epoch
         for epoch in range(n_epochs):
             print("Start of epoch {}".format(epoch + 1))
             start = time.time()
-            # Reset the loss and accuracy calculations
+            # In every epoch reset the loss and accuracy calculations
             train_loss.reset_states()
             train_accuracy.reset_states()
             # Get a batch of inputs and targets
             for (batch, (enc_inputs, targets)) in enumerate(dataset):
-                # Set the decoder inputs
+                # Set the decoder inputs (for all the sentences in the batch, all words but the last one)
                 dec_inputs = targets[:, :-1]
-                # Set the target outputs, right shifted
+                # Set target outputs, right shifted (for all the sentences in the batch, all words but the first one)
                 dec_outputs_real = targets[:, 1:]
                 with tf.GradientTape() as tape:
                     # Call the transformer and get the predicted output
@@ -87,21 +86,6 @@ class SANTO:
             print("Saving checkpoint for epoch {} in {}".format(epoch + 1, ckpt_save_path))
             print("Time for 1 epoch: {} secs\n".format(time.time() - start))
         return losses, accuracies
-
-
-class TokenAndPositionEmbedding(layers.Layer):
-    def __init__(self, max_points_in_sequences, embed_dim=1):
-        super(TokenAndPositionEmbedding, self).__init__()
-        # TODO this positional encoding should be improved because it is restricted to the max sequence length from
-        #  the training data
-        self.pos_emb = layers.Embedding(input_dim=max_points_in_sequences, output_dim=embed_dim)
-
-    def call(self, x):
-        maxlen = tf.shape(x)[-1]
-        positions = tf.range(start=0, limit=maxlen, delta=1)
-        positions = self.pos_emb(positions)
-        x = self.token_emb(x)
-        return x + positions
 
 
 class TransformerEncoder(layers.Layer):
@@ -184,7 +168,9 @@ class Transformer(layers.Layer):
         self.average_pooling_dropout = layers.Dropout(self.dropout_rate)
         self.pooling_dense = layers.Dense(self.output_dim, activation="relu")
         self.pooling_dense_dropout = layers.Dropout(self.dropout_rate)
-        self.output_dense = layers.Dense(self.output_dim, activation="softmax")
+        # The output is linear, in case this is a classification problem the softmax is applied in the loss function
+        # TODO I don't see where softmax is applied in the loss function
+        self.output_dense = layers.Dense(self.output_dim, activation="linear")
 
     def call(self, input, predicted_output, attention_mask, training):
         for encoder in self.encoders:
