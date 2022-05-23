@@ -1,6 +1,7 @@
 import logging
 
 import foldedleastsquares
+import scipy
 import wotan
 from numpy.random import default_rng
 
@@ -14,10 +15,10 @@ import pandas as pd
 class IatsonModelGenerator(tf.keras.utils.Sequence):
     TYPE_TO_LABEL = {'bckEB': [1, 0, 0], 'EB': [0, 1, 0], 'planet': [0, 0, 1], 'none': [0, 0, 0]}
 
-    def __init__(self, injected_objects_file, batch_size, input_size=8, zero_epsilon=1e-7, min_period=0.5, max_period=20):
+    def __init__(self, injected_objects_file, batch_size, input_sizes, zero_epsilon=1e-7, min_period=0.5, max_period=20):
         self.injected_objects_file = injected_objects_file
         self.batch_size = batch_size
-        self.input_size = 8
+        self.input_sizes = input_sizes
         self.zero_epsilon = zero_epsilon
         self.injected_objects_df = pd.read_csv(injected_objects_file)
         self.random_number_generator = default_rng()
@@ -27,17 +28,19 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
     def __len__(self):
         return (np.ceil(len(self.injected_objects_df) / float(self.batch_size))).astype(int)
 
-    def rebin(self, arr, new_shape):
-        shape = (new_shape[0], arr.shape[0] // new_shape[0],
-                 new_shape[1], arr.shape[1] // new_shape[1])
-        return arr.reshape(shape).mean(-1).mean(1)
+    def bin_interp(self, array, new_size):
+        result = np.array(len(array))
+        for index, nested_array in enumerate(array):
+            arr_interp = scipy.interpolate.interp1d(np.arange(array.size), array)
+            result[index] = arr_interp(np.linspace(0, array.size - 1, new_size))
+        return result
 
     def __getitem__(self, idx):
         target_indexes = np.arange(idx * self.batch_size, (idx + 1) * self.batch_size, 1)
         target_indexes = shuffle(target_indexes)
         injected_objects_df = self.injected_objects_df.iloc[target_indexes]
         #TODO determine batch_data_array size (multiple inputs)
-        batch_data_array = np.empty(len(target_indexes), self.input_size)
+        batch_data_array = np.empty(len(target_indexes), len(self.input_size))
         batch_data_values = np.empty((len(target_indexes), 3))
         i = 0
         for df_index, target_row in injected_objects_df.iterrows():
@@ -71,53 +74,53 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
             lc_df_sorted_fold['#time_folded'] = lc_df_sorted_fold['#time_folded'] + 0.25
             lc_df_sorted_fold = lc_df_sorted_fold.sort_values(by=['#time_folded'])
             lc_df_sorted_fold.drop('#time', inplace=True, axis=1)
-            batch_data_array[i][1] = lc_df_sorted_fold.to_numpy()
+            batch_data_array[i][1] = self.bin_interp(lc_df_sorted_fold.to_numpy(), self.input_sizes[1])
             # Focus flux even
             lc_df['#time_folded'] = foldedleastsquares.fold(time, period, epoch)
             lc_df_focus = lc_df.sort_values(by=['#time_folded'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time_folded'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time_folded'] < 0.5 + duration_to_period * 3)]
             lc_df_focus.drop('#time', inplace=True, axis=1)
-            batch_data_array[i][2] = lc_df_focus.to_numpy()
+            batch_data_array[i][2] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[2])
             # Focus flux odd
             lc_df['#time_folded'] = foldedleastsquares.fold(time, period, epoch + period / 2)
             lc_df_focus = lc_df.sort_values(by=['#time_folded'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time_folded'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time_folded'] < 0.5 + duration_to_period * 3)]
             lc_df_focus.drop('#time', inplace=True, axis=1)
-            batch_data_array[i][3] = lc_df_focus.to_numpy()
+            batch_data_array[i][3] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[3])
             # Focus flux sub-harmonic even
             lc_df['#time_folded'] = foldedleastsquares.fold(time, period / 2, epoch)
             lc_df_focus = lc_df.sort_values(by=['#time_folded'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time_folded'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time_folded'] < 0.5 + duration_to_period * 3)]
             lc_df_focus.drop('#time', inplace=True, axis=1)
-            batch_data_array[i][4] = lc_df_focus.to_numpy()
+            batch_data_array[i][4] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[4])
             # Focus flux sub-harmonic odd
             lc_df['#time_folded'] = foldedleastsquares.fold(time, period / 2, epoch + period / 4)
             lc_df_focus = lc_df.sort_values(by=['#time_folded'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time_folded'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time_folded'] < 0.5 + duration_to_period * 3)]
             lc_df_focus.drop('#time', inplace=True, axis=1)
-            batch_data_array[i][5] = lc_df_focus.to_numpy()
+            batch_data_array[i][5] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[5])
             # Focus flux harmonic even
             lc_df['#time_folded'] = foldedleastsquares.fold(time, period * 2, epoch)
             lc_df_focus = lc_df.sort_values(by=['#time_folded'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time_folded'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time_folded'] < 0.5 + duration_to_period * 3)]
             lc_df_focus.drop('#time', inplace=True, axis=1)
-            batch_data_array[i][6] = lc_df_focus.to_numpy()
+            batch_data_array[i][6] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[6])
             # Focus flux harmonic odd
             lc_df['#time_folded'] = foldedleastsquares.fold(time, period * 2, epoch + period * 3 / 2)
             lc_df_focus = lc_df.sort_values(by=['#time_folded'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time_folded'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time_folded'] < 0.5 + duration_to_period * 3)]
             lc_df_focus.drop('#time', inplace=True, axis=1)
-            batch_data_array[i][7] = lc_df_focus.to_numpy()
+            batch_data_array[i][7] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[7])
             assert not np.isnan(batch_data_array[i]).any() and not np.isinf(batch_data_array[i]).any()
             logging.info("GENERATOR Inputs max " + str(np.max(batch_data_array[i])) + " and min " + str(np.min(batch_data_array[i])))
             i = i + 1
-        return [batch_data_array], batch_data_values
+        return batch_data_array, batch_data_values
 
     def __prepare_input_data(self, input_df):
         time = input_df["#time"].to_numpy()
@@ -142,5 +145,3 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
         input_df = input_df.replace(0.0, self.zero_epsilon)
         input_df = input_df.replace(0, self.zero_epsilon)
         return input_df
-
-IatsonModelGenerator("/mnt/DATA-2/ete6/injected_objects.csv", 20, )
