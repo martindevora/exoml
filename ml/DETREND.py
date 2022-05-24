@@ -128,7 +128,7 @@ class AutoEncoder(WithLogging):
 
     def inform(self):
         logging.info("Creating model plot and summary")
-        plot_model(self.model, "detrend_autoencoder_resnet.png", show_shapes=True)
+        plot_model(self.model, "DETREND.png", show_shapes=True)
         self.model.summary()
         return self
 
@@ -236,7 +236,7 @@ class AutoEncoder(WithLogging):
             logging.info("Saving model into " + model_path)
             self.model.save(model_path)
         else:
-            logging.info("dry_run was activated and 'training' will not be launched", 'warn')
+            logging.warning("dry_run was activated and 'training' will not be launched")
 
 
 
