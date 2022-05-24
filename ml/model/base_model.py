@@ -1,4 +1,6 @@
 import logging
+import os
+import pandas as pd
 from abc import abstractmethod
 
 from keras.utils.vis_utils import plot_model
@@ -34,6 +36,15 @@ class BaseModel(WithLogging):
         """
         pass
 
+    @abstractmethod
+    def load_training_set(self, **kwargs):
+        """
+        Loads the training set from its source
+        :param kwargs: the case-specific params
+        :return: either a list or a Pandas Dataframe
+        """
+        pass
+
     def compile(self, optimizer, loss, metrics=None):
         """
         Compiles and prepares the model for training
@@ -61,6 +72,41 @@ class BaseModel(WithLogging):
         self.model.summary()
         ModelWeightsLogger().log_model_weights(self.model)
         return self
+
+    def prepare_training_data(self, training_dir, output_dir, train_percent=0.8, test_percent=0.2,
+                              training_set_limit=None):
+        training_dataset = self.load_training_set(training_dir)
+        if training_set_limit is not None:
+            if isinstance(training_dataset, pd.DataFrame):
+                training_dataset = training_dataset[:training_set_limit]
+            else:
+                training_dataset = training_dataset[:training_set_limit]
+        dataset_length = len(training_dataset)
+        train_last_index = int(dataset_length * train_percent)
+        test_last_index = train_last_index + int(dataset_length * test_percent)
+        test_last_index = test_last_index if test_last_index < dataset_length else dataset_length
+        train_dataset_filename = output_dir + "/train_dataset.csv"
+        test_dataset_filename = output_dir + "/test_dataset.csv"
+        logging.info("Storing train and test file names in " + train_dataset_filename + " and " + test_dataset_filename)
+        if os.path.exists(train_dataset_filename):
+            os.remove(train_dataset_filename)
+        if os.path.exists(test_dataset_filename):
+            os.remove(test_dataset_filename)
+        if isinstance(training_dataset, pd.DataFrame):
+            train_filenames = training_dataset.iloc[0:train_last_index]
+            test_filenames = training_dataset.iloc[train_last_index:test_last_index]
+            train_filenames.to_csv(output_dir + '/train_dataset.csv')
+            test_filenames.to_csv(output_dir + '/test_dataset.csv')
+        else:
+            train_filenames = training_dataset[0:train_last_index]
+            test_filenames = training_dataset[train_last_index:test_last_index]
+            with open(output_dir + "/train_dataset.csv", 'w') as file:
+                file.write('file_name')
+                file.write('\n'.join(train_filenames))
+            with open(output_dir + "/test_dataset.csv", 'w') as file:
+                file.write('file_name')
+                file.write('\n'.join(test_filenames))
+        return train_filenames, test_filenames
 
     def set_model(self, model):
         """
