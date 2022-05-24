@@ -187,4 +187,7 @@ class IATSON(BaseModel):
         self.set_model(keras.Model(inputs=inputs, outputs=final_branch, name="IATSON"))
         return self
 
+    def train(self, **kwargs):
+        pass
+
 iatson = IATSON().build().inform("IATSON.png")
