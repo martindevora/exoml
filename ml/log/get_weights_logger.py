@@ -14,7 +14,7 @@ class ModelWeightsLogger:
                 w = weights_and_bias[0]
                 b = weights_and_bias[1]
                 logging.debug('Layer no %s of type %s has weights of shape %s and biases of shape %s' % (
-                    layer_i, model.layers[layer_i], np.shape(w), np.shape(b)), 'debug')
+                    layer_i, model.layers[layer_i], np.shape(w), np.shape(b)))
                 nan_weight_indexes = np.argwhere(np.isnan(w)).flatten()
                 nan_bias_indexes = np.argwhere(np.isnan(w)).flatten()
                 nan_weight_indexes_count = len(nan_weight_indexes)
