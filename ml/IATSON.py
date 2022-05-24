@@ -1,12 +1,14 @@
 import keras
 from keras.layers import LeakyReLU
 
+from ml.model.base_model import BaseModel
 
-class IATSON:
+
+class IATSON(BaseModel):
     def __init__(self) -> None:
         super().__init__()
 
-    def get_flux_conv_branch(self, name):
+    def _get_flux_conv_branch(self, name):
         # (time, flux, [detrended_flux1 ... detrended_flux5], flux_model, centroidx, centroidy, motionx, motiony, bck)
         # flux model by transit params and stellar params
         leaky_relu_alpha = 0.01
@@ -27,9 +29,9 @@ class IATSON:
         flux_branch = keras.layers.MaxPooling1D(pool_size=2, strides=2)(flux_branch)
         return flux_input, flux_branch
 
-    def get_flux_model_branch(self):
+    def _get_flux_model_branch(self):
         leaky_relu_alpha = 0.01
-        flux_input, flux_branch = self.get_flux_conv_branch("global_flux_branch")
+        flux_input, flux_branch = self._get_flux_conv_branch("global_flux_branch")
         flux_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
         flux_branch = keras.layers.Dropout(rate=0.1)(flux_branch)
         flux_branch = keras.layers.Dense(16, activation='linear')(flux_branch)
@@ -37,7 +39,7 @@ class IATSON:
         flux_branch = keras.Model(inputs=[flux_input], outputs=flux_branch)
         return flux_branch
 
-    def get_focus_flux_branch(self, name):
+    def _get_focus_flux_branch(self, name):
         leaky_relu_alpha = 0.01
         focus_flux_input = keras.Input(shape=(500, 13), name=name)
         # (time, flux, detrended_flux1... detrended_flux5, flux_model, centroidx, centroidy, motionx, motiony, bck)
@@ -57,15 +59,15 @@ class IATSON:
         focus_flux_branch = keras.layers.LayerNormalization()(focus_flux_branch)
         return focus_flux_input, focus_flux_branch
 
-    def get_focus_flux_model_branch(self):
+    def _get_focus_flux_model_branch(self):
         leaky_relu_alpha = 0.01
-        odd_flux_input, odd_flux_branch = self.get_focus_flux_branch("focus_odd_flux_branch")
-        even_flux_input, even_flux_branch = self.get_focus_flux_branch("focus_even_flux_branch")
-        harmonic_odd_flux_input, harmonic_odd_flux_branch = self.get_focus_flux_branch("focus_harmonic_odd_flux_branch")
-        harmonic_even_flux_input, harmonic_even_flux_branch = self.get_focus_flux_branch("focus_harmonic_even_flux_branch")
-        subharmonic_odd_flux_input, subharmonic_odd_flux_branch = self.get_focus_flux_branch(
+        odd_flux_input, odd_flux_branch = self._get_focus_flux_branch("focus_odd_flux_branch")
+        even_flux_input, even_flux_branch = self._get_focus_flux_branch("focus_even_flux_branch")
+        harmonic_odd_flux_input, harmonic_odd_flux_branch = self._get_focus_flux_branch("focus_harmonic_odd_flux_branch")
+        harmonic_even_flux_input, harmonic_even_flux_branch = self._get_focus_flux_branch("focus_harmonic_even_flux_branch")
+        subharmonic_odd_flux_input, subharmonic_odd_flux_branch = self._get_focus_flux_branch(
             "focus_subharmonic_odd_flux_branch")
-        subharmonic_even_flux_input, subharmonic_even_flux_branch = self.get_focus_flux_branch(
+        subharmonic_even_flux_input, subharmonic_even_flux_branch = self._get_focus_flux_branch(
             "focus_subharmonic_even_flux_branch")
         odd_flux_branch = keras.layers.Add()(
             [odd_flux_branch, harmonic_odd_flux_branch, subharmonic_odd_flux_branch])
@@ -87,7 +89,7 @@ class IATSON:
         focus_flux_branch = keras.Model(inputs=input, outputs=focus_flux_branch)
         return focus_flux_branch
 
-    def get_singletransit_tpf_model(self):
+    def _get_singletransit_tpf_model(self):
         video_image_width = 13
         video_image_height = 13
         video_image_channels = 1
@@ -109,7 +111,7 @@ class IATSON:
         tpf_model = keras.layers.Flatten()(tpf_model)
         return keras.Model(inputs=tpf_model_input, outputs=tpf_model)
 
-    def get_singletransit_motion_centroids_model(self):
+    def _get_singletransit_motion_centroids_model(self):
         mc_input = keras.Input(
             shape=(100, 4),
             name="motion_centroids_input")
@@ -125,7 +127,7 @@ class IATSON:
         mc_model = keras.layers.Flatten()(mc_model)
         return keras.Model(inputs=mc_input, outputs=mc_model)
 
-    def get_singletransit_bckflux_model(self):
+    def _get_singletransit_bckflux_model(self):
         bck_input = keras.Input(shape=(100, 1), name="bck_input")
         bck_model = keras.layers.Conv1D(filters=25, kernel_size=2, strides=2, activation="relu", use_bias=True,
                                         padding='same')(bck_input)
@@ -139,7 +141,7 @@ class IATSON:
         bck_model = keras.layers.Flatten()(bck_model)
         return keras.Model(inputs=bck_input, outputs=bck_model)
 
-    def get_singletransit_flux_model(self):
+    def _get_singletransit_flux_model(self):
         bck_input = keras.Input(shape=(100, 1), name="flux_input")
         bck_model = keras.layers.Conv1D(filters=25, kernel_size=2, strides=2, activation="relu", use_bias=True,
                                         padding='same')(bck_input)
@@ -153,11 +155,11 @@ class IATSON:
         bck_model = keras.layers.Flatten()(bck_model)
         return keras.Model(inputs=bck_input, outputs=bck_model)
 
-    def get_single_transit_model(self):
-        tpf_branch = self.get_singletransit_tpf_model()
-        mc_branch = self.get_singletransit_motion_centroids_model()
-        bck_branch = self.get_singletransit_bckflux_model()
-        flux_branch = self.get_singletransit_flux_model()
+    def _get_single_transit_model(self):
+        tpf_branch = self._get_singletransit_tpf_model()
+        mc_branch = self._get_singletransit_motion_centroids_model()
+        bck_branch = self._get_singletransit_bckflux_model()
+        flux_branch = self._get_singletransit_flux_model()
         final_branch = keras.layers.concatenate(
             [tpf_branch.output, mc_branch.output, bck_branch.output, flux_branch.output], axis=1)
         final_branch = keras.layers.Dense(64, activation="relu", name="final-dense1")(final_branch)
@@ -167,22 +169,22 @@ class IATSON:
         model = keras.Model(inputs=inputs, outputs=final_branch, name="mnist_model")
         keras.utils.vis_utils.plot_model(model, "IATSON_model.png", show_shapes=True)
 
-    def get_model(self):
+    def build(self):
         leaky_relu_alpha = 0.01
         stellar_model_input = keras.Input(shape=(11, 1), name="stellar_model")
         stellar_model_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha), name="stellar-first")(stellar_model_input)
         stellar_model_branch = keras.layers.Dropout(rate=0.1, name="stellar-first-dropout-0.1")(stellar_model_branch)
         stellar_model_branch = keras.layers.Dense(16, activation="relu", name="stellar-refinement")(
             stellar_model_branch)
-        flux_model_branch = self.get_flux_model_branch()
-        focus_flux_model_branch = self.get_focus_flux_model_branch()
+        flux_model_branch = self._get_flux_model_branch()
+        focus_flux_model_branch = self._get_focus_flux_model_branch()
         final_branch = keras.layers.Concatenate(axis=1)(
             [stellar_model_branch, flux_model_branch.output, focus_flux_model_branch.output])
         final_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha), name="final-dense1")(final_branch)
         final_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha), name="final-dense2")(final_branch)
         final_branch = keras.layers.Dense(3, activation="softmax", name="final-dense-softmax")(final_branch)
         inputs = [stellar_model_input] + flux_model_branch.inputs + focus_flux_model_branch.inputs
-        model = keras.Model(inputs=inputs, outputs=final_branch, name="mnist_model")
-        keras.utils.vis_utils.plot_model(model, "IATSON.png", show_shapes=True)
+        self.set_model(keras.Model(inputs=inputs, outputs=final_branch, name="IATSON"))
+        return self
 
-IATSON().get_model()
+iatson = IATSON().build().inform("IATSON.png")

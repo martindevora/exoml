@@ -1,8 +1,9 @@
 import logging
 import sys
+from abc import ABC
 
 
-class WithLogging:
+class WithLogging(ABC):
     def __init__(self, log_file=None) -> None:
         formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
         logger = logging.getLogger()

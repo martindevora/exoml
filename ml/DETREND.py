@@ -9,21 +9,19 @@ from keras.layers import LeakyReLU
 from keras.optimizer_v2.learning_rate_schedule import ExponentialDecay
 from keras.utils import losses_utils
 from sklearn.utils import shuffle
-from tensorflow.python.keras.utils.vis_utils import plot_model
 
 from ml import thread_config
 from ml.callback.batch_aware_csvlogger import BatchAwareCsvLogger
 from ml.callback.get_weights import GetWeights
 from ml.generator.detrend_generator import DetrendModelGenerator
 from ml.log.get_weights_logger import ModelWeightsLogger
-from ml.log.with_logging import WithLogging
 from ml.metrics.fixed_mean import FixedMean
-
+from ml.model.base_model import BaseModel
 
 thread_config.setup_threads(5)
 
 
-class AutoEncoder(WithLogging):
+class AutoEncoder(BaseModel):
     def __init__(self, input_size=(20610, 8)):
         super().__init__()
         self.input_size = input_size
@@ -123,20 +121,8 @@ class AutoEncoder(WithLogging):
         self.linear_proj = keras.layers.Dense(self.input_size[0], activation=LeakyReLU(0.01))(self.linear_proj)
         self.linear_proj = keras.layers.Dropout(rate=0.1)(self.linear_proj)
         self.linear_proj = keras.layers.Dense(self.input_size[0], activation="linear")(self.linear_proj)
-        self.model = Model(inputs=input, outputs=self.linear_proj)
+        self.set_model(Model(inputs=input, outputs=self.linear_proj))
         return self
-
-    def inform(self):
-        logging.info("Creating model plot and summary")
-        plot_model(self.model, "DETREND.png", show_shapes=True)
-        self.model.summary()
-        return self
-
-    def compile(self, optimizer, loss, metrics=[]):
-        metrics_str = [str(metric) for metric in metrics]
-        logging.info("Compiling model with optimizer " + str(optimizer) + ", loss " + str(loss) + " and metrics [" +
-            ",".join(metrics_str) + "]")
-        self.model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
 
     def prepare_training_data(self, training_dir, train_percent=0.8, test_percent=0.2, training_set_limit=None):
         lc_filenames = [str(file) for file in list(pathlib.Path(training_dir).glob('*_lc.csv'))]
@@ -152,7 +138,7 @@ class AutoEncoder(WithLogging):
 
     def train(self, training_dir, output_dir, batch_size=20, epochs=20, initial_learning_rate=0.00001,
               dataset_iterations_per_epoch=1, train_percent=0.8,
-              test_percent=0.2, training_set_limit=None, inform=False, dry_run=True, zero_epsilon=1e-7,
+              test_percent=0.2, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
               gradient_clip_norm=0.01):
         logging.info("Preparing training data with (training_dir," + str(training_dir) +
             ") (train_percent," + str(train_percent) +
@@ -197,9 +183,6 @@ class AutoEncoder(WithLogging):
                                                 "mean_squared_logarithmic_error",
                                                 "cosine_proximity"])
         model_weights_logger = ModelWeightsLogger()
-        if inform:
-            self.inform()
-            model_weights_logger.log_model_weights(self.model)
         if not dry_run:
             logging.info("Initializing training and validation generators with (batch_size," + str(batch_size) +
                 ") (self.input_size," + str(self.input_size) +
@@ -241,8 +224,8 @@ class AutoEncoder(WithLogging):
 
 
 auto_encoder = AutoEncoder().build()
-auto_encoder.train("/mnt/DATA-2/ete6/lcs/", os.getcwd(), 10, 50, inform=True, dry_run=True,
-                   training_set_limit=100)
+#auto_encoder.inform("DETREND.png")
+auto_encoder.train("/mnt/DATA-2/ete6/lcs/", os.getcwd(), 10, 50, dry_run=True, training_set_limit=100)
 # lc_filenames = [str(file) for file in list(pathlib.Path("/mnt/DATA-2/ete6/lcs/").glob('*_lc.csv'))]
 # lc_filenames.sort()
 # lc_filenames = shuffle(lc_filenames)

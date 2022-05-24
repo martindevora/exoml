@@ -1,5 +1,5 @@
-from sherlockpipe.ml.ml_model_builder import MLModelBuilder
-from sherlockpipe.ml.ml_training_set_preparer import MlTrainingSetPreparer
+from ml_model_builder import MLModelBuilder
+from ml_training_set_preparer import MlTrainingSetPreparer
 
 
 cpus = 1
