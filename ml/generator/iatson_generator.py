@@ -14,7 +14,7 @@ import pandas as pd
 
 
 class IatsonModelGenerator(tf.keras.utils.Sequence):
-    TYPE_TO_LABEL = {'bckEB': [1, 0, 0], 'EB': [0, 1, 0], 'planet': [0, 0, 1], 'none': [0, 0, 0]}
+    TYPE_TO_LABEL = {'bckEB': [1, 0, 0, 0], 'EB': [0, 1, 0, 0], 'planet': [0, 0, 1, 0], 'none': [0, 0, 0, 1]}
 
     def __init__(self, injected_objects_df, lcs_dir, batch_size, input_sizes, zero_epsilon=1e-7,
                  min_period=0.5, max_period=20):

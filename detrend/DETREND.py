@@ -124,17 +124,9 @@ class AutoEncoder(BaseModel):
         self.set_model(Model(inputs=input, outputs=self.linear_proj))
         return self
 
-    def prepare_training_data(self, training_dir, train_percent=0.8, test_percent=0.2, training_set_limit=None):
-        lc_filenames = [str(file) for file in list(pathlib.Path(training_dir).glob('*_lc.csv'))]
-        if training_set_limit is not None:
-            lc_filenames = lc_filenames[:training_set_limit]
-        lc_filenames.sort()
-        lc_filenames = shuffle(lc_filenames)
-        dataset_length = len(lc_filenames)
-        train_last_index = int(dataset_length * train_percent)
-        test_last_index = train_last_index + int(dataset_length * test_percent)
-        test_last_index = test_last_index if test_last_index < dataset_length else dataset_length
-        return lc_filenames[0:train_last_index], lc_filenames[train_last_index:test_last_index]
+    def load_training_set(self, **kwargs):
+        training_dir = kwargs.get('training_dir')
+        return [str(file) for file in list(pathlib.Path(training_dir).glob('*_lc.csv'))]
 
     def train(self, training_dir, output_dir, batch_size=20, epochs=20, initial_learning_rate=0.00001,
               dataset_iterations_per_epoch=1, train_percent=0.8,
@@ -145,24 +137,11 @@ class AutoEncoder(BaseModel):
             ") (test_percent," + str(test_percent) +
             ") (training_set_limit," + str(training_set_limit) +
             ")")
-        train_filenames, test_filenames = self.prepare_training_data(training_dir, train_percent, test_percent,
-                                                                     training_set_limit)
+        train_filenames, test_filenames = self.prepare_training_data(training_dir, output_dir, train_percent,
+                                                                     test_percent, training_set_limit)
         # The optimizer is executed once for every batch, hence optimizer steps per epoch are
         train_dataset_size = len(train_filenames)
         test_dataset_size = len(test_filenames)
-        train_dataset_filename = output_dir + "/train_dataset.csv"
-        test_dataset_filename = output_dir + "/test_dataset.csv"
-        logging.info("Storing train and test file names in " + train_dataset_filename + " and " + test_dataset_filename)
-        if os.path.exists(train_dataset_filename):
-            os.remove(train_dataset_filename)
-        if os.path.exists(test_dataset_filename):
-            os.remove(test_dataset_filename)
-        with open(output_dir + "/train_dataset.csv", 'w') as file:
-            file.write('file_name')
-            file.write('\n'.join(train_filenames))
-        with open(output_dir + "/test_dataset.csv", 'w') as file:
-            file.write('file_name')
-            file.write('\n'.join(train_filenames))
         steps_per_epoch = int(dataset_iterations_per_epoch * train_dataset_size // batch_size)
         total_steps = steps_per_epoch * epochs
         learning_rate_decay_steps = total_steps // 100

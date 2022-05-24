@@ -1,12 +1,25 @@
+import logging
+import pandas as pd
+import tensorflow as tf
 import keras
 from keras.layers import LeakyReLU
+from keras.losses import CategoricalCrossentropy
+from keras.optimizer_v2.learning_rate_schedule import ExponentialDecay
+from keras.utils import losses_utils
+from sklearn.utils import shuffle
 
+from ml.callback.batch_aware_csvlogger import BatchAwareCsvLogger
+from ml.callback.get_weights import GetWeights
+from ml.generator.iatson_generator import IatsonModelGenerator
+from ml.log.get_weights_logger import ModelWeightsLogger
+from ml.metrics.fixed_mean import FixedMean
 from ml.model.base_model import BaseModel
 
 
 class IATSON(BaseModel):
     def __init__(self) -> None:
         super().__init__()
+        self.input_size = 8
 
     def _get_flux_conv_branch(self, name):
         # (time, flux, [detrended_flux1 ... detrended_flux5], flux_model, centroidx, centroidy, motionx, motiony, bck)
@@ -182,12 +195,87 @@ class IATSON(BaseModel):
             [stellar_model_branch, flux_model_branch.output, focus_flux_model_branch.output])
         final_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha), name="final-dense1")(final_branch)
         final_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha), name="final-dense2")(final_branch)
-        final_branch = keras.layers.Dense(3, activation="softmax", name="final-dense-softmax")(final_branch)
+        final_branch = keras.layers.Dense(4, activation="softmax", name="final-dense-softmax")(final_branch)
         inputs = [stellar_model_input] + flux_model_branch.inputs + focus_flux_model_branch.inputs
         self.set_model(keras.Model(inputs=inputs, outputs=final_branch, name="IATSON"))
         return self
 
-    def train(self, **kwargs):
-        pass
+    def load_training_set(self, **kwargs):
+        training_dir = kwargs.get('training_dir')
+        injected_objects_df = pd.read_csv(training_dir + "/injected_objects.csv")
+        injected_objects_df = shuffle(injected_objects_df)
+        injected_objects_df.reset_index(inplace=True, drop=True)
+        return injected_objects_df
+
+    def train(self, training_dir, output_dir, batch_size=20, epochs=20, initial_learning_rate=0.01,
+              dataset_iterations_per_epoch=1, train_percent=0.8,
+              test_percent=0.2, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
+              gradient_clip_norm=0.01):
+        logging.info("Preparing training data with (training_dir," + str(training_dir) +
+                     ") (train_percent," + str(train_percent) +
+                     ") (test_percent," + str(test_percent) +
+                     ") (training_set_limit," + str(training_set_limit) +
+                     ")")
+        train_filenames, test_filenames = self.prepare_training_data(training_dir, output_dir, train_percent,
+                                                                     test_percent,
+                                                                     training_set_limit)
+        # The optimizer is executed once for every batch, hence optimizer steps per epoch are
+        train_dataset_size = len(train_filenames)
+        test_dataset_size = len(test_filenames)
+        steps_per_epoch = int(dataset_iterations_per_epoch * train_dataset_size // batch_size)
+        total_steps = steps_per_epoch * epochs
+        learning_rate_decay_steps = total_steps // 100
+        learning_rate_decay_steps = learning_rate_decay_steps if learning_rate_decay_steps > epochs else epochs
+        logging.info("Initializing optimizer with (initial_learning_rate," + str(initial_learning_rate) +
+                     ") (learning_rate_decay_steps," + str(learning_rate_decay_steps) +
+                     ") (gradient_clip_norm," + str(gradient_clip_norm) +
+                     ")")
+        leaning_rate_schedule = ExponentialDecay(initial_learning_rate, decay_steps=learning_rate_decay_steps,
+                                                 decay_rate=0.95)
+        optimizer = tf.keras.optimizers.Adam(leaning_rate_schedule, beta_1=0.9, beta_2=0.98, epsilon=1e-9,
+                                             clipnorm=gradient_clip_norm)
+        loss = CategoricalCrossentropy(reduction=losses_utils.ReductionV2.AUTO)
+        self.compile(optimizer, loss, metrics=["accuracy"])
+        model_weights_logger = ModelWeightsLogger()
+        if not dry_run:
+            logging.info("Initializing training and validation generators with (batch_size," + str(batch_size) +
+                         ") (self.input_size," + str(self.input_size) +
+                         ") (zero_epsilon," + str(zero_epsilon) +
+                         ")")
+            lcs_dir = training_dir + '/lcs/'
+            training_batch_generator = IatsonModelGenerator(train_filenames, lcs_dir, batch_size, self.input_size,
+                                                            zero_epsilon)
+            validation_batch_generator = IatsonModelGenerator(test_filenames, lcs_dir, batch_size, self.input_size,
+                                                              zero_epsilon)
+            csv_log = output_dir + '/training_log.csv'
+            logging.info("Initializing csv logger with (csv_log," + str(csv_log) +
+                         ") (steps_per_epoch," + str(steps_per_epoch) +
+                         ")")
+            csv_logger = BatchAwareCsvLogger(csv_log, steps_per_epoch)
+            model_path = output_dir + '/IATSON'
+            logging.info("Initializing model checkpoint with (model_path," + str(model_path) +
+                         ") (steps_per_epoch," + str(steps_per_epoch) +
+                         ")")
+            cp_callback = tf.keras.callbacks.ModelCheckpoint(
+                filepath=model_path,
+                verbose=1,
+                save_weights_only=True,
+                save_freq=steps_per_epoch)
+            get_weights_callback = GetWeights(model_weights_logger)
+            model_validation_steps = int(test_dataset_size // batch_size)
+            logging.info("Initializing training with (epochs," + str(epochs) +
+                         ") (steps_per_epoch," + str(steps_per_epoch) +
+                         ") (model_validation_steps," + str(model_validation_steps) +
+                         ")")
+            self.model.fit(x=training_batch_generator,
+                           steps_per_epoch=steps_per_epoch,
+                           epochs=epochs, verbose=1,
+                           validation_data=validation_batch_generator,
+                           validation_steps=model_validation_steps,
+                           callbacks=[csv_logger, cp_callback, get_weights_callback])
+            logging.info("Saving model into " + model_path)
+            self.model.save(model_path)
+        else:
+            logging.warning("dry_run was activated and 'training' will not be launched")
 
 iatson = IATSON().build().inform("IATSON.png")
