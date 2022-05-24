@@ -42,15 +42,22 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
         target_indexes = shuffle(target_indexes)
         injected_objects_df = self.injected_objects_df.iloc[target_indexes]
         #TODO determine batch_data_array size (multiple inputs)
-        batch_data_array = np.empty((len(target_indexes), len(self.input_sizes)))
-        batch_data_values = np.empty((len(target_indexes), 3))
+        star_array = np.empty((len(target_indexes), 11))
+        global_flux_array = np.empty((len(target_indexes), 2500))
+        folded_flux_even_array = np.empty((len(target_indexes), 500))
+        folded_flux_odd_array = np.empty((len(target_indexes), 500))
+        folded_flux_even_subhar_array = np.empty((len(target_indexes), 500))
+        folded_flux_odd_subhar_array = np.empty((len(target_indexes), 500))
+        folded_flux_even_har_array = np.empty((len(target_indexes), 500))
+        folded_flux_odd_har_array = np.empty((len(target_indexes), 500))
+        batch_data_values = np.empty((len(target_indexes), len(self.TYPE_TO_LABEL)))
         i = 0
         for df_index, target_row in injected_objects_df.iterrows():
             target_id = int(target_row['TIC ID'])
             leading_zeros_object_id = '{:09}'.format(target_id)
             lc_filename = str(leading_zeros_object_id) + '_lc.csv'
             star_filename = str(leading_zeros_object_id) + '_star.csv'
-            star_df = pd.read_csv(self.lcs_dir + '/' + star_filename)
+            star_df = pd.read_csv(self.lcs_dir + '/' + star_filename, index_col=False)
             lc_df = pd.read_csv(self.lcs_dir + '/' + lc_filename, usecols=['#time', 'flux', 'flux_err', 'centroid_x',
                                                                            'centroid_y', 'motion_x', 'motion_y', 'bck_flux'], low_memory=True)
             type = target_row['type']
@@ -62,70 +69,90 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
                 period = self.random_number_generator.uniform(self.min_period, self.max_period)
                 min_lc_time = lc_df['#time'].min()
                 epoch = self.random_number_generator.uniform(min_lc_time, min_lc_time + period)
-                duration = wotan.t14(star_df['radius'], star_df['mass'], period)
+                star_radius = star_df['radius'].iloc[0]
+                star_radius = 1 if np.isnan(star_radius) else star_radius
+                star_mass = star_df['mass'].iloc[0]
+                star_mass = 1 if np.isnan(star_mass) else star_mass
+                duration = wotan.t14(star_radius, star_mass, period)
             else:
                 period = target_row['period']
                 epoch = target_row['epoch']
                 duration = target_row['duration(h)'] / 24
             duration_to_period = duration / period
             #['ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k'])
-            batch_data_array[i][0] = star_df.to_numpy()
-            time = lc_df['#time']
+            star_df.drop('Unnamed: 0', inplace=True, axis=1)
+            star_array[i] = star_df.to_numpy()
+            time = lc_df['#time'].to_numpy()
             #TODO we need to bin the data to match input sizes yet
             # Global flux
-            lc_df['#time_folded'] = foldedleastsquares.fold(time, period, epoch)
-            lc_df_sorted_fold = lc_df.sort_values(by=['#time_folded'])
             # Shifting data 1/4 so that main transit and possible occultation don't get cut by the borders
-            lc_df_sorted_fold['#time_folded'] = lc_df_sorted_fold['#time_folded'] + 0.25
+            lc_df['#time_folded'] = foldedleastsquares.fold(time, period, epoch + period / 4)
+            lc_df_sorted_fold = lc_df.sort_values(by=['#time_folded'])
             lc_df_sorted_fold = lc_df_sorted_fold.sort_values(by=['#time_folded'])
             lc_df_sorted_fold.drop('#time', inplace=True, axis=1)
-            batch_data_array[i][1] = self.bin_interp(lc_df_sorted_fold.to_numpy(), self.input_sizes[1])
+            global_flux_array[i] = self.bin_interp(lc_df_sorted_fold.to_numpy(), self.input_sizes[1])
             # Focus flux even
             lc_df['#time_folded'] = foldedleastsquares.fold(time, period, epoch)
             lc_df_focus = lc_df.sort_values(by=['#time_folded'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time_folded'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time_folded'] < 0.5 + duration_to_period * 3)]
             lc_df_focus.drop('#time', inplace=True, axis=1)
-            batch_data_array[i][2] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[2])
+            folded_flux_even_array[i] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[2])
             # Focus flux odd
             lc_df['#time_folded'] = foldedleastsquares.fold(time, period, epoch + period / 2)
             lc_df_focus = lc_df.sort_values(by=['#time_folded'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time_folded'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time_folded'] < 0.5 + duration_to_period * 3)]
             lc_df_focus.drop('#time', inplace=True, axis=1)
-            batch_data_array[i][3] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[3])
+            folded_flux_odd_array[i] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[3])
             # Focus flux sub-harmonic even
             lc_df['#time_folded'] = foldedleastsquares.fold(time, period / 2, epoch)
             lc_df_focus = lc_df.sort_values(by=['#time_folded'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time_folded'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time_folded'] < 0.5 + duration_to_period * 3)]
             lc_df_focus.drop('#time', inplace=True, axis=1)
-            batch_data_array[i][4] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[4])
+            folded_flux_even_subhar_array[i] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[4])
             # Focus flux sub-harmonic odd
             lc_df['#time_folded'] = foldedleastsquares.fold(time, period / 2, epoch + period / 4)
             lc_df_focus = lc_df.sort_values(by=['#time_folded'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time_folded'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time_folded'] < 0.5 + duration_to_period * 3)]
             lc_df_focus.drop('#time', inplace=True, axis=1)
-            batch_data_array[i][5] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[5])
+            folded_flux_odd_subhar_array[i] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[5])
             # Focus flux harmonic even
             lc_df['#time_folded'] = foldedleastsquares.fold(time, period * 2, epoch)
             lc_df_focus = lc_df.sort_values(by=['#time_folded'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time_folded'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time_folded'] < 0.5 + duration_to_period * 3)]
             lc_df_focus.drop('#time', inplace=True, axis=1)
-            batch_data_array[i][6] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[6])
+            folded_flux_even_har_array[i] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[6])
             # Focus flux harmonic odd
             lc_df['#time_folded'] = foldedleastsquares.fold(time, period * 2, epoch + period * 3 / 2)
             lc_df_focus = lc_df.sort_values(by=['#time_folded'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time_folded'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time_folded'] < 0.5 + duration_to_period * 3)]
             lc_df_focus.drop('#time', inplace=True, axis=1)
-            batch_data_array[i][7] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[7])
-            assert not np.isnan(batch_data_array[i]).any() and not np.isinf(batch_data_array[i]).any()
-            logging.info("GENERATOR Inputs max " + str(np.max(batch_data_array[i])) + " and min " + str(np.min(batch_data_array[i])))
+            folded_flux_odd_har_array[i] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[7])
+            assert not np.isnan(star_array[i]).any() and not np.isinf(star_array[i]).any()
+            assert not np.isnan(global_flux_array[i]).any() and not np.isinf(global_flux_array[i]).any()
+            assert not np.isnan(folded_flux_even_array[i]).any() and not np.isinf(folded_flux_even_array[i]).any()
+            assert not np.isnan(folded_flux_odd_array[i]).any() and not np.isinf(folded_flux_odd_array[i]).any()
+            assert not np.isnan(folded_flux_even_subhar_array[i]).any() and not np.isinf(folded_flux_even_subhar_array[i]).any()
+            assert not np.isnan(folded_flux_odd_subhar_array[i]).any() and not np.isinf(folded_flux_odd_subhar_array[i]).any()
+            assert not np.isnan(folded_flux_even_har_array[i]).any() and not np.isinf(folded_flux_even_har_array[i]).any()
+            assert not np.isnan(folded_flux_odd_har_array[i]).any() and not np.isinf(folded_flux_odd_har_array[i]).any()
+            logging.info("GENERATOR Star Inputs max " + str(np.max(star_array[i])) + " and min " + str(np.min(star_array[i])))
+            logging.info("GENERATOR Global Flux Inputs max " + str(np.max(global_flux_array[i])) + " and min " + str(np.min(global_flux_array[i])))
+            logging.info("GENERATOR Folded Even Inputs max " + str(np.max(folded_flux_even_array[i])) + " and min " + str(np.min(folded_flux_even_array[i])))
+            logging.info("GENERATOR Folded Odd Inputs max " + str(np.max(folded_flux_odd_array[i])) + " and min " + str(np.min(folded_flux_odd_array[i])))
+            logging.info("GENERATOR Folded Even Subhar Inputs max " + str(np.max(folded_flux_even_subhar_array[i])) + " and min " + str(np.min(folded_flux_even_subhar_array[i])))
+            logging.info("GENERATOR Folded Odd Subhar Inputs max " + str(np.max(folded_flux_odd_subhar_array[i])) + " and min " + str(np.min(folded_flux_odd_subhar_array[i])))
+            logging.info("GENERATOR Folded Even Har Inputs max " + str(np.max(folded_flux_even_har_array[i])) + " and min " + str(np.min(folded_flux_even_har_array[i])))
+            logging.info("GENERATOR Folded Odd Har Inputs max " + str(np.max(folded_flux_odd_har_array[i])) + " and min " + str(np.min(folded_flux_odd_har_array[i])))
             i = i + 1
-        return batch_data_array, batch_data_values
+        return [star_array, global_flux_array, folded_flux_even_array, folded_flux_odd_array,
+                folded_flux_even_subhar_array, folded_flux_odd_subhar_array, folded_flux_even_har_array,
+                folded_flux_odd_har_array], batch_data_values
 
     def __prepare_input_data(self, input_df):
         time = input_df["#time"].to_numpy()
@@ -151,7 +178,7 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
         input_df = input_df.replace(0, self.zero_epsilon)
         return input_df
 
-df = pd.read_csv("/mnt/DATA-2/ete6/injected_objects.csv")
+df = pd.read_csv("/mnt/DATA-2/ete6/injected_objects.csv", index_col=False)
 df = shuffle(df)
 df.reset_index(inplace=True, drop=True)
 img = IatsonModelGenerator(df, "/mnt/DATA-2/ete6/lcs", 20, [11, 2500, 500, 500, 500, 500, 500, 500])

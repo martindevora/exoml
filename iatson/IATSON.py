@@ -26,13 +26,15 @@ class IATSON(BaseModel):
         # flux model by transit params and stellar params
         leaky_relu_alpha = 0.01
         flux_input = keras.Input(shape=(2500, 8), name=name)
-        flux_branch = keras.layers.SpatialDropout1D(rate=0.2)(flux_input)
+        flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_input)
+        flux_branch = keras.layers.SpatialDropout1D(rate=0.2)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=128, kernel_size=9, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
         flux_branch = keras.layers.MaxPooling1D(pool_size=10, strides=6)(flux_branch)
         flux_branch = keras.layers.Dropout(rate=0.1)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=64, kernel_size=7, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
+        flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
         flux_branch = keras.layers.MaxPooling1D(pool_size=4, strides=3)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=32, kernel_size=5, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
@@ -40,6 +42,7 @@ class IATSON(BaseModel):
         flux_branch = keras.layers.Conv1D(filters=16, kernel_size=3, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
         flux_branch = keras.layers.MaxPooling1D(pool_size=2, strides=2)(flux_branch)
+        flux_branch = keras.layers.LayerNormalization()(flux_branch)
         return flux_input, flux_branch
 
     def _get_flux_model_branch(self):
@@ -55,6 +58,7 @@ class IATSON(BaseModel):
     def _get_focus_flux_branch(self, name):
         leaky_relu_alpha = 0.01
         focus_flux_input = keras.Input(shape=(500, 13), name=name)
+        flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_input)
         # (time, flux, detrended_flux1... detrended_flux5, flux_model, centroidx, centroidy, motionx, motiony, bck)
         # flux model by transit params and stellar params
         focus_flux_branch = keras.layers.SpatialDropout1D(rate=0.2)(focus_flux_input)
@@ -66,6 +70,7 @@ class IATSON(BaseModel):
         focus_flux_branch = keras.layers.Conv1D(filters=32, kernel_size=3, padding="same",
                                                 activation=LeakyReLU(leaky_relu_alpha), use_bias=True)(
             focus_flux_branch)
+        focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_branch)
         focus_flux_branch = keras.layers.MaxPooling1D(pool_size=3, strides=3)(focus_flux_branch)
         focus_flux_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha))(focus_flux_branch)
         focus_flux_branch = keras.layers.Dropout(rate=0.1)(focus_flux_branch)
@@ -202,7 +207,7 @@ class IATSON(BaseModel):
 
     def load_training_set(self, **kwargs):
         training_dir = kwargs.get('training_dir')
-        injected_objects_df = pd.read_csv(training_dir + "/injected_objects.csv")
+        injected_objects_df = pd.read_csv(training_dir + "/injected_objects.csv", index_col=None)
         injected_objects_df = shuffle(injected_objects_df)
         injected_objects_df.reset_index(inplace=True, drop=True)
         return injected_objects_df
@@ -279,3 +284,4 @@ class IATSON(BaseModel):
             logging.warning("dry_run was activated and 'training' will not be launched")
 
 iatson = IATSON().build().inform("IATSON.png")
+iatson.train('/mnt/DATA-2/ete6/', './', 10, 50, dry_run=True)
