@@ -1,4 +1,5 @@
 import logging
+import pathlib
 
 import foldedleastsquares
 import scipy
@@ -15,12 +16,13 @@ import pandas as pd
 class IatsonModelGenerator(tf.keras.utils.Sequence):
     TYPE_TO_LABEL = {'bckEB': [1, 0, 0], 'EB': [0, 1, 0], 'planet': [0, 0, 1], 'none': [0, 0, 0]}
 
-    def __init__(self, injected_objects_file, batch_size, input_sizes, zero_epsilon=1e-7, min_period=0.5, max_period=20):
-        self.injected_objects_file = injected_objects_file
+    def __init__(self, injected_objects_df, lcs_dir, batch_size, input_sizes, zero_epsilon=1e-7,
+                 min_period=0.5, max_period=20):
+        self.injected_objects_df = injected_objects_df
+        self.lcs_dir = lcs_dir
         self.batch_size = batch_size
         self.input_sizes = input_sizes
         self.zero_epsilon = zero_epsilon
-        self.injected_objects_df = pd.read_csv(injected_objects_file)
         self.random_number_generator = default_rng()
         self.min_period = min_period
         self.max_period = max_period
@@ -40,31 +42,34 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
         target_indexes = shuffle(target_indexes)
         injected_objects_df = self.injected_objects_df.iloc[target_indexes]
         #TODO determine batch_data_array size (multiple inputs)
-        batch_data_array = np.empty(len(target_indexes), len(self.input_size))
+        batch_data_array = np.empty((len(target_indexes), len(self.input_sizes)))
         batch_data_values = np.empty((len(target_indexes), 3))
         i = 0
         for df_index, target_row in injected_objects_df.iterrows():
-            target_id = target_row['TIC ID']
-            lc_filename = str(target_id) + '_lc.csv'
-            star_filename = str(target_id) + '_star.csv'
-            star_df = pd.read_csv(star_filename)
-            lc_df = pd.read_csv(lc_filename, usecols=['#time', 'flux', 'flux_err', 'centroid_x', 'centroid_y',
-                                                      'motion_x', 'motion_y', 'bck_flux'], low_memory=True)
+            target_id = int(target_row['TIC ID'])
+            leading_zeros_object_id = '{:09}'.format(target_id)
+            lc_filename = str(leading_zeros_object_id) + '_lc.csv'
+            star_filename = str(leading_zeros_object_id) + '_star.csv'
+            star_df = pd.read_csv(self.lcs_dir + '/' + star_filename)
+            lc_df = pd.read_csv(self.lcs_dir + '/' + lc_filename, usecols=['#time', 'flux', 'flux_err', 'centroid_x',
+                                                                           'centroid_y', 'motion_x', 'motion_y', 'bck_flux'], low_memory=True)
             type = target_row['type']
             batch_data_values[i] = self.TYPE_TO_LABEL[type]
+            not_null_times_args = np.argwhere(lc_df['#time'].to_numpy() > 0).flatten()
+            lc_df = lc_df.iloc[not_null_times_args]
             if type == 'none':
                 #TODO determine a period far to collision with existing periods
                 period = self.random_number_generator.uniform(self.min_period, self.max_period)
                 min_lc_time = lc_df['#time'].min()
                 epoch = self.random_number_generator.uniform(min_lc_time, min_lc_time + period)
-                duration = wotan.t14(star_df.iloc[0]['radius'], star_df.iloc[0]['mass'], period)
+                duration = wotan.t14(star_df['radius'], star_df['mass'], period)
             else:
-                period = target_row['period(h)']
+                period = target_row['period']
                 epoch = target_row['epoch']
                 duration = target_row['duration(h)'] / 24
             duration_to_period = duration / period
             #['ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k'])
-            batch_data_array[i][0] = star_df.iloc[0].to_numpy()
+            batch_data_array[i][0] = star_df.to_numpy()
             time = lc_df['#time']
             #TODO we need to bin the data to match input sizes yet
             # Global flux
@@ -145,3 +150,9 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
         input_df = input_df.replace(0.0, self.zero_epsilon)
         input_df = input_df.replace(0, self.zero_epsilon)
         return input_df
+
+df = pd.read_csv("/mnt/DATA-2/ete6/injected_objects.csv")
+df = shuffle(df)
+df.reset_index(inplace=True, drop=True)
+img = IatsonModelGenerator(df, "/mnt/DATA-2/ete6/lcs", 20, [11, 2500, 500, 500, 500, 500, 500, 500])
+img.__getitem__(20)
