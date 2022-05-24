@@ -73,11 +73,13 @@ def create_injection_dataframe(injections_dir, lcs_dir):
                        'Rstar_secondary': target_row['Rstar'] * target_row['Rp/Rstar'],
                        'contact_amplitude': 0,
                        'Mstar': target_row['Mstar']}, ignore_index=True)
-        df = df.sort_values(["TIC ID", "type"], ascending=True)
-        df.to_csv(injections_dir + '/injected_objects.csv')
-        if i % log_count == 0:
+        if (i + 1) % log_count == 0:
             print("Processed " + str(i) + " TICs.")
+            df = df.sort_values(["TIC ID", "type"], ascending=True)
+            df.to_csv(injections_dir + '/injected_objects.csv')
         i = i + 1
+    df = df.sort_values(["TIC ID", "type"], ascending=True)
+    df.to_csv(injections_dir + '/injected_objects.csv')
 
 
 def create_target_csvs(lcs_dir, models_dir, max_lc_length=20610):
@@ -151,12 +153,13 @@ def create_target_csvs(lcs_dir, models_dir, max_lc_length=20610):
         lc_df.to_csv(lcs_dir + '/' + leading_zeros_object_id + '_lc.csv')
         star_info = TicStarCatalog().catalog_info(object_id)
         star_df = pd.DataFrame(columns=['ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k'])
-        star_df.append({'ld_a': star_info[0][0], 'ld_b': star_info[0][1], 'Teff': star_info[1], 'lum': star_info[2],
-                        'logg': star_info[3], 'radius': star_info[5], 'mass': star_info[8], 'v': star_info[13],
-                        'j': star_info[15], 'h': star_info[17], 'k': star_info[19]}, ignore_index=True)
+        star_df = star_df.append({'ld_a': star_info[0][0], 'ld_b': star_info[0][1], 'Teff': star_info[1],
+                                  'lum': star_info[2], 'logg': star_info[3], 'radius': star_info[5],
+                                  'mass': star_info[8], 'v': star_info[13], 'j': star_info[15], 'h': star_info[17],
+                                  'k': star_info[19]}, ignore_index=True)
         star_df.to_csv(lcs_dir + '/' + leading_zeros_object_id + '_star.csv')
         i = i + 1
-        if i % 20 == 0:
+        if i % 100 == 0:
             print("Created " + str(i) + " csvs")
 
 def resample_model(model, lc_time):
@@ -197,5 +200,5 @@ lcs_dir = root_dir + 'lcs/'
 #uncompress_data('/mnt/DATA-2/ete6/backebs/BackEBs/')
 #uncompress_data('/mnt/DATA-2/ete6/ebs/EBs/')
 #uncompress_data('/mnt/DATA-2/ete6/planets/Planets/')
-create_injection_dataframe(root_dir, lcs_dir)
-#create_target_csvs(lcs_dir, root_dir)
+#create_injection_dataframe(root_dir, lcs_dir)
+create_target_csvs(lcs_dir, root_dir)
