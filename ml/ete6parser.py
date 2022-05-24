@@ -151,13 +151,22 @@ def create_target_csvs(lcs_dir, models_dir, max_lc_length=20610):
         lc_df['planet_model'] = np.concatenate((padding_ones_left, np.array(planet_model_flux), padding_ones_right))
         lc_df = lc_df.fillna(0)
         lc_df.to_csv(lcs_dir + '/' + leading_zeros_object_id + '_lc.csv')
-        star_info = TicStarCatalog().catalog_info(object_id)
-        star_df = pd.DataFrame(columns=['ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k'])
-        star_df = star_df.append({'ld_a': star_info[0][0], 'ld_b': star_info[0][1], 'Teff': star_info[1],
-                                  'lum': star_info[2], 'logg': star_info[3], 'radius': star_info[5],
-                                  'mass': star_info[8], 'v': star_info[13], 'j': star_info[15], 'h': star_info[17],
-                                  'k': star_info[19]}, ignore_index=True)
-        star_df.to_csv(lcs_dir + '/' + leading_zeros_object_id + '_star.csv')
+        tries = 0
+        while tries < 3:
+            try:
+                star_info = TicStarCatalog().catalog_info(object_id)
+                star_df = pd.DataFrame(
+                    columns=['ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k'])
+                star_df = star_df.append({'ld_a': star_info[0][0], 'ld_b': star_info[0][1], 'Teff': star_info[1],
+                                          'lum': star_info[2], 'logg': star_info[3], 'radius': star_info[5],
+                                          'mass': star_info[8], 'v': star_info[13], 'j': star_info[15],
+                                          'h': star_info[17],
+                                          'k': star_info[19]}, ignore_index=True)
+                star_df.to_csv(lcs_dir + '/' + leading_zeros_object_id + '_star.csv')
+                tries = 3
+            except Exception as e:
+                print(e)
+                tries = tries + 1
         i = i + 1
         if i % 100 == 0:
             print("Created " + str(i) + " csvs")
