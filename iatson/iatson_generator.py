@@ -89,7 +89,9 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
         return star_df
 
     def __getitem__(self, idx):
-        target_indexes = np.arange(idx * self.batch_size, (idx + 1) * self.batch_size, 1)
+        max_index = (idx + 1) * self.batch_size
+        max_index = len(self.injected_objects_df) - 1 if max_index >= len(self.injected_objects_df) else max_index
+        target_indexes = np.arange(idx * self.batch_size, max_index, 1)
         target_indexes = shuffle(target_indexes)
         injected_objects_df = self.injected_objects_df.iloc[target_indexes]
         measurements_per_point = 8
