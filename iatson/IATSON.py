@@ -3,7 +3,8 @@ import pandas as pd
 import tensorflow as tf
 import keras
 from keras.layers import LeakyReLU
-from keras.losses import CategoricalCrossentropy
+from keras.losses import CategoricalCrossentropy, SparseCategoricalCrossentropy
+from keras.metrics import SparseCategoricalAccuracy, CategoricalAccuracy
 from keras.optimizer_v2.learning_rate_schedule import ExponentialDecay
 from keras.utils import losses_utils
 from sklearn.utils import shuffle
@@ -238,8 +239,10 @@ class IATSON(BaseModel):
                                                  decay_rate=0.95)
         optimizer = tf.keras.optimizers.Adam(leaning_rate_schedule, beta_1=0.9, beta_2=0.98, epsilon=1e-9,
                                              clipnorm=gradient_clip_norm)
+        # We don't use SparseCategoricalCrossentropy because our targets are one-hot encoded
         loss = CategoricalCrossentropy(reduction=losses_utils.ReductionV2.AUTO)
-        self.compile(optimizer, loss, metrics=["accuracy"])
+        accuracy = CategoricalAccuracy()
+        self.compile(optimizer, loss, metrics=[accuracy])
         model_weights_logger = ModelWeightsLogger()
         if not dry_run:
             logging.info("Initializing training and validation generators with (batch_size," + str(batch_size) +
