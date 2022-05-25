@@ -20,7 +20,7 @@ from ml.model.base_model import BaseModel
 thread_config.setup_threads(5)
 
 
-class AutoEncoder(BaseModel):
+class DETREND(BaseModel):
     def __init__(self, input_size=(20610, 8)):
         super().__init__()
         self.input_size = input_size
@@ -201,7 +201,7 @@ class AutoEncoder(BaseModel):
 
 
 
-auto_encoder = AutoEncoder().build()
+auto_encoder = DETREND().build()
 #auto_encoder.inform("DETREND.png")
 auto_encoder.train("/mnt/DATA-2/ete6/lcs/", os.getcwd(), 10, 50, dry_run=True, training_set_limit=100)
 # lc_filenames = [str(file) for file in list(pathlib.Path("/mnt/DATA-2/ete6/lcs/").glob('*_lc.csv'))]
