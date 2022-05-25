@@ -136,10 +136,10 @@ class TransformerDecoder(layers.Layer):
         self.ffn_dropout = layers.Dropout(self.dropout_rate)
         self.ffn_norm = layers.LayerNormalization(epsilon=1e-6)
 
-    def call(self, encoder_inputs, output_inputs, attention_mask, training):
-        attn_output = self.att1(output_inputs, output_inputs, attention_mask=attention_mask)
+    def call(self, inputs, encoder_inputs, attention_mask, training):
+        attn_output = self.att1(inputs, inputs, attention_mask=attention_mask)
         attn_output = self.att1_dropout(attn_output, training=training)
-        norm1_output = self.att1_norm(output_inputs + attn_output)
+        norm1_output = self.att1_norm(inputs + attn_output)
         attn_output = self.att2(norm1_output, encoder_inputs)
         attn_output = self.att2_dropout(attn_output, training=training)
         norm2_output = self.att2_norm(norm1_output + attn_output)
@@ -178,7 +178,7 @@ class Transformer(layers.Layer):
         for encoder in self.encoders:
             encoder_output = encoder(input, training)
         for decoder in self.decoders:
-            decoder_output = decoder(encoder_output, predicted_output, attention_mask, training)
+            decoder_output = decoder(predicted_output, encoder_output, attention_mask, training)
         linear_proj_output = self.average_pooling(decoder_output)
         linear_proj_output = self.pooling_dense(linear_proj_output)
         linear_proj_output = self.pooling_dense_dropout(linear_proj_output, training=training)
