@@ -3,13 +3,13 @@ import pandas as pd
 import tensorflow as tf
 import keras
 from keras.layers import LeakyReLU
-from keras.losses import CategoricalCrossentropy, SparseCategoricalCrossentropy
-from keras.metrics import SparseCategoricalAccuracy, CategoricalAccuracy
+from keras.losses import CategoricalCrossentropy
+from keras.metrics import CategoricalAccuracy
 from keras.optimizer_v2.learning_rate_schedule import ExponentialDecay
 from keras.utils import losses_utils
 from sklearn.utils import shuffle
 
-from ml.callback.batch_aware_csvlogger import BatchAwareCsvLogger
+from ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
 from ml.callback.get_weights import GetWeights
 from iatson.iatson_generator import IatsonModelGenerator
 from ml.log.get_weights_logger import ModelWeightsLogger

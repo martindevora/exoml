@@ -10,7 +10,7 @@ from keras.optimizer_v2.learning_rate_schedule import ExponentialDecay
 from keras.utils import losses_utils
 
 from ml import thread_config
-from ml.callback.batch_aware_csvlogger import BatchAwareCsvLogger
+from ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
 from ml.callback.get_weights import GetWeights
 from detrend.detrend_generator import DetrendModelGenerator
 from ml.log.get_weights_logger import ModelWeightsLogger
