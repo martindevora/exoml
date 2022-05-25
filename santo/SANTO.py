@@ -1,11 +1,10 @@
 import time
 import pandas as pd
-import keras
 import numpy as np
-from keras import layers
 import tensorflow as tf
 from sklearn.utils import shuffle
-from tensorflow.python.ops.gen_nn_ops import LeakyRelu
+
+from ml.layers.transformer import Transformer
 
 
 class SANTO:
@@ -87,103 +86,6 @@ class SANTO:
             print("Saving checkpoint for epoch {} in {}".format(epoch + 1, ckpt_save_path))
             print("Time for 1 epoch: {} secs\n".format(time.time() - start))
         return losses, accuracies
-
-
-class TransformerEncoder(layers.Layer):
-    def __init__(self, key_dim, num_heads, dropout_rate=0.1):
-        super(TransformerEncoder, self).__init__()
-        self.key_dim = key_dim
-        self.num_heads = num_heads
-        self.dropout_rate = dropout_rate
-
-    def build(self, input_shape):
-        self.input_dim = input_shape[-1]
-        self.att = layers.MultiHeadAttention(num_heads=self.num_heads, key_dim=self.key_dim)
-        self.ffn = keras.Sequential(
-            [layers.Dense(self.input_dim, activation=LeakyRelu(0.01)), layers.Dense(self.key_dim), ]
-        )
-        self.att_norm = layers.LayerNormalization(epsilon=1e-6)
-        self.ffn_norm = layers.LayerNormalization(epsilon=1e-6)
-        self.att_dropout = layers.Dropout(self.dropout_rate)
-        self.ffn_dropout = layers.Dropout(self.dropout_rate)
-
-    def call(self, inputs, training):
-        attn_output = self.att(inputs, inputs)
-        attn_output = self.att_dropout(attn_output, training=training)
-        out1 = self.att_norm(inputs + attn_output)
-        ffn_output = self.ffn(out1)
-        ffn_output = self.ffn_dropout(ffn_output, training=training)
-        return self.ffn_norm(out1 + ffn_output)
-
-
-class TransformerDecoder(layers.Layer):
-    def __init__(self, key_dim, num_heads, dropout_rate=0.1):
-        super(TransformerDecoder, self).__init__()
-        self.key_dim = key_dim
-        self.num_heads = num_heads
-        self.dropout_rate = dropout_rate
-
-    def build(self, input_shape):
-        self.att1 = layers.MultiHeadAttention(num_heads=self.num_heads, key_dim=self.key_dim)
-        self.att1_dropout = layers.Dropout(self.dropout_rate)
-        self.att1_norm = layers.LayerNormalization(epsilon=1e-6)
-        self.att2 = layers.MultiHeadAttention(num_heads=self.num_heads, key_dim=self.key_dim)
-        self.att2_dropout = layers.Dropout(self.dropout_rate)
-        self.att2_norm = layers.LayerNormalization(epsilon=1e-6)
-        self.ffn = keras.Sequential(
-            [layers.Dense(self.input_shape, activation=LeakyRelu(0.01)), layers.Dense(self.key_dim), ]
-        )
-        self.ffn_dropout = layers.Dropout(self.dropout_rate)
-        self.ffn_norm = layers.LayerNormalization(epsilon=1e-6)
-
-    def call(self, inputs, encoder_inputs, attention_mask, training):
-        attn_output = self.att1(inputs, inputs, attention_mask=attention_mask)
-        attn_output = self.att1_dropout(attn_output, training=training)
-        norm1_output = self.att1_norm(inputs + attn_output)
-        attn_output = self.att2(norm1_output, encoder_inputs)
-        attn_output = self.att2_dropout(attn_output, training=training)
-        norm2_output = self.att2_norm(norm1_output + attn_output)
-        ffn_output = self.ffn(norm2_output)
-        ffn_output = self.ffn_dropout(ffn_output, training=training)
-        return self.ffn_norm(norm2_output + ffn_output)
-
-
-class Transformer(layers.Layer):
-    def __init__(self, key_dim, num_heads, ffn_units, output_dim, stack_depth=2, dropout_rate=0.1):
-        super(Transformer, self).__init__()
-        self.key_dim = key_dim
-        self.ffn_units = ffn_units
-        self.output_dim = output_dim
-        self.num_heads = num_heads
-        self.dropout_rate = dropout_rate
-        self.stack_depth = stack_depth
-
-    def build(self, input_shape):
-        self.input_dim = input_shape
-        self.encoders = np.array([])
-        for i in np.arange(0, self.stack_depth):
-            self.encoders.append(TransformerEncoder(self.key_dim, self.num_heads, self.dropout_rate))
-        self.decoders = np.array([])
-        for i in np.arange(0, self.stack_depth):
-            self.decoders.append(TransformerEncoder(self.key_dim, self.num_heads, self.dropout_rate))
-        self.average_pooling = layers.GlobalAveragePooling1D()
-        self.average_pooling_dropout = layers.Dropout(self.dropout_rate)
-        self.pooling_dense = layers.Dense(self.ffn_units, activation=LeakyRelu(0.01))
-        self.pooling_dense_dropout = layers.Dropout(self.dropout_rate)
-        # The output is linear, in case this is a classification problem the softmax is applied in the loss function
-        # TODO I don't see where softmax is applied in the loss function
-        self.output_dense = layers.Dense(self.output_dim, activation="linear")
-
-    def call(self, input, predicted_output, attention_mask, training):
-        for encoder in self.encoders:
-            encoder_output = encoder(input, training)
-        for decoder in self.decoders:
-            decoder_output = decoder(predicted_output, encoder_output, attention_mask, training)
-        linear_proj_output = self.average_pooling(decoder_output)
-        linear_proj_output = self.pooling_dense(linear_proj_output)
-        linear_proj_output = self.pooling_dense_dropout(linear_proj_output, training=training)
-        linear_proj_output = self.output_dense(linear_proj_output, training=training)
-        return linear_proj_output
 
 
 class AutoencoderGenerator(tf.keras.utils.Sequence):
