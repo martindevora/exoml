@@ -75,7 +75,7 @@ class BaseModel(WithLogging):
 
     def prepare_training_data(self, training_dir, output_dir, train_percent=0.8, test_percent=0.2,
                               training_set_limit=None):
-        training_dataset = self.load_training_set(training_dir)
+        training_dataset = self.load_training_set(training_dir=training_dir)
         if training_set_limit is not None:
             if isinstance(training_dataset, pd.DataFrame):
                 training_dataset = training_dataset[:training_set_limit]
