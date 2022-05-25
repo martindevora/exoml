@@ -10,9 +10,8 @@ from sklearn.utils import shuffle
 
 from ml.callback.batch_aware_csvlogger import BatchAwareCsvLogger
 from ml.callback.get_weights import GetWeights
-from ml.generator.iatson_generator import IatsonModelGenerator
+from iatson.iatson_generator import IatsonModelGenerator
 from ml.log.get_weights_logger import ModelWeightsLogger
-from ml.metrics.fixed_mean import FixedMean
 from ml.model.base_model import BaseModel
 
 

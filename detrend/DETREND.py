@@ -8,12 +8,11 @@ from keras import Model
 from keras.layers import LeakyReLU
 from keras.optimizer_v2.learning_rate_schedule import ExponentialDecay
 from keras.utils import losses_utils
-from sklearn.utils import shuffle
 
 from ml import thread_config
 from ml.callback.batch_aware_csvlogger import BatchAwareCsvLogger
 from ml.callback.get_weights import GetWeights
-from ml.generator.detrend_generator import DetrendModelGenerator
+from detrend.detrend_generator import DetrendModelGenerator
 from ml.log.get_weights_logger import ModelWeightsLogger
 from ml.metrics.fixed_mean import FixedMean
 from ml.model.base_model import BaseModel
