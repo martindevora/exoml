@@ -8,6 +8,9 @@ import pandas as pd
 
 
 class DetrendModelGenerator(tf.keras.utils.Sequence):
+    """
+    Sequence generator for DETREND model batches
+    """
     def __init__(self, lc_filenames, batch_size, input_size, zero_epsilon):
         self.lc_filenames = lc_filenames
         self.batch_size = batch_size
@@ -25,20 +28,23 @@ class DetrendModelGenerator(tf.keras.utils.Sequence):
         i = 0
         for file in filenames_shuffled:
             input_df = pd.read_csv(file, usecols=['#time', 'flux', 'flux_err', 'centroid_x', 'centroid_y',
-                                                                'motion_x', 'motion_y', 'bck_flux'], low_memory=True)
+                                                  'motion_x', 'motion_y', 'bck_flux'], low_memory=True)
             values_df = pd.read_csv(file, usecols=['eb_model', 'bckeb_model', 'planet_model'],
                                     low_memory=True)
             input_df = self.__prepare_input_data(input_df)
             batch_data_array[i] = input_df.to_numpy()
             assert not np.isnan(batch_data_array[i]).any() and not np.isinf(batch_data_array[i]).any()
-            values_df['model'] = 1 - ((1 - values_df['eb_model']) + (1 - values_df['bckeb_model']) + (1 - values_df['planet_model']))
+            values_df['model'] = 1 - ((1 - values_df['eb_model']) + (1 - values_df['bckeb_model']) +
+                                      (1 - values_df['planet_model']))
             batch_data_values[i] = values_df['model'].to_numpy()
             batch_data_values[i] = np.nan_to_num(batch_data_values[i], nan=self.zero_epsilon)
             negative_values_args = np.argwhere(batch_data_values[i] <= 0).flatten()
             batch_data_values[i][negative_values_args] = self.zero_epsilon
             assert not np.isnan(batch_data_values[i]).any() and not np.isinf(batch_data_values[i]).any()
-            logging.info("GENERATOR Inputs max " + str(np.max(batch_data_array[i])) + " and min " + str(np.min(batch_data_array[i])))
-            logging.info("GENERATOR Values max " + str(np.max(batch_data_values[i])) + " and min " + str(np.min(batch_data_values[i])))
+            logging.info("GENERATOR Inputs max " + str(np.max(batch_data_array[i])) + " and min " +
+                         str(np.min(batch_data_array[i])))
+            logging.info("GENERATOR Values max " + str(np.max(batch_data_values[i])) + " and min " +
+                         str(np.min(batch_data_values[i])))
             i = i + 1
         return batch_data_array, batch_data_values
 
