@@ -19,7 +19,7 @@ from ml.model.base_model import BaseModel
 class IATSON(BaseModel):
     def __init__(self) -> None:
         super().__init__()
-        self.input_size = 8
+        self.input_size = [11, 2500, 500, 500, 500, 500, 500, 500]
 
     def _get_flux_conv_branch(self, name):
         # (time, flux, [detrended_flux1 ... detrended_flux5], flux_model, centroidx, centroidy, motionx, motiony, bck)
@@ -57,7 +57,7 @@ class IATSON(BaseModel):
 
     def _get_focus_flux_branch(self, name):
         leaky_relu_alpha = 0.01
-        focus_flux_input = keras.Input(shape=(500, 13), name=name)
+        focus_flux_input = keras.Input(shape=(500, 8), name=name)
         flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_input)
         # (time, flux, detrended_flux1... detrended_flux5, flux_model, centroidx, centroidy, motionx, motiony, bck)
         # flux model by transit params and stellar params
@@ -198,6 +198,7 @@ class IATSON(BaseModel):
         focus_flux_model_branch = self._get_focus_flux_model_branch()
         final_branch = keras.layers.Concatenate(axis=1)(
             [stellar_model_branch, flux_model_branch.output, focus_flux_model_branch.output])
+        final_branch = keras.layers.GlobalAveragePooling1D()(final_branch)
         final_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha), name="final-dense1")(final_branch)
         final_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha), name="final-dense2")(final_branch)
         final_branch = keras.layers.Dense(4, activation="softmax", name="final-dense-softmax")(final_branch)
@@ -286,4 +287,4 @@ class IATSON(BaseModel):
             logging.warning("dry_run was activated and 'training' will not be launched")
 
 iatson = IATSON().build().inform("IATSON.png")
-iatson.train('/mnt/DATA-2/ete6/', './', 10, 50, dry_run=True)
+iatson.train('/mnt/DATA-2/ete6/', './', 20, 50, dry_run=False)
