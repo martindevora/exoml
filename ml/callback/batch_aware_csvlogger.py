@@ -1,6 +1,7 @@
 import collections
 import csv
-
+import tensorflow as tf
+import keras.backend as K
 from keras.callbacks import CSVLogger
 import numpy as np
 
@@ -29,29 +30,24 @@ class BatchAwareCsvLogger(CSVLogger):
                 return '"[%s]"' % (', '.join(map(str, k)))
             else:
                 return k
-
         if self.keys is None:
             self.keys = sorted(logs.keys())
-
         if self.model.stop_training:
             # We set NA so that csv parsers do not fail for this last epoch.
             logs = dict((k, logs[k]) if k in logs else (k, 'NA') for k in self.keys)
-
         if not self.writer:
-
             class CustomDialect(csv.excel):
                 delimiter = self.sep
-
-            fieldnames = ['epoch', 'batch'] + self.keys
-
+            fieldnames = ['epoch', 'batch', 'learning_rate'] + self.keys
             self.writer = csv.DictWriter(
                 self.csv_file,
                 fieldnames=fieldnames,
                 dialect=CustomDialect)
             if self.append_header:
                 self.writer.writeheader()
-
-        row_dict = collections.OrderedDict({'epoch': self.current_epoch, 'batch': batch})
+        learning_rate = K.eval(self.model.optimizer._decayed_lr(tf.float64))
+        row_dict = collections.OrderedDict({'epoch': self.current_epoch, 'batch': batch,
+                                            'learning_rate': learning_rate})
         row_dict.update((key, handle_value(logs[key])) for key in self.keys)
         self.writer.writerow(row_dict)
         self.csv_file.flush()
