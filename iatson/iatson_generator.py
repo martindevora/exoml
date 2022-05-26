@@ -1,10 +1,11 @@
 import logging
-import pathlib
 
+import matplotlib.pyplot as plt
 import foldedleastsquares
 import scipy
 import wotan
 from numpy.random import default_rng
+from scipy import stats
 
 from ml.encoding.time_position import value_encode_times
 from sklearn.utils import shuffle
@@ -12,12 +13,14 @@ import tensorflow as tf
 import numpy as np
 import pandas as pd
 
+from ml.physics.transit_functions import t14
+
 
 class IatsonModelGenerator(tf.keras.utils.Sequence):
     TYPE_TO_LABEL = {'bckEB': [1, 0, 0, 0], 'EB': [0, 1, 0, 0], 'planet': [0, 0, 1, 0], 'none': [0, 0, 0, 1]}
 
     def __init__(self, injected_objects_df, lcs_dir, batch_size, input_sizes, zero_epsilon=1e-7,
-                 min_period=0.5, max_period=20):
+                 min_period=0.5, max_period=10):
         self.injected_objects_df = injected_objects_df
         self.lcs_dir = lcs_dir
         self.batch_size = batch_size
@@ -37,7 +40,27 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
                 arr_interp = scipy.interpolate.interp1d(np.arange(nested_array.size), nested_array)
                 result[index] = arr_interp(np.linspace(0, nested_array.size - 1, new_size))
             except Exception as e:
-                logging.exception("Error when interpolating, will create empty input array")
+                a = 1
+                # logging.exception("Error when interpolating, will create empty input array")
+        return np.transpose(result)
+
+    def bin_by_time(self, array, new_size):
+        result = np.zeros((array.shape[1], new_size))
+        transposed_array = np.transpose(array)
+        for index, nested_array in enumerate(transposed_array):
+            if index > 0:
+                try:
+                    bin_means, bin_edges, binnumber = stats.binned_statistic(transposed_array[0], nested_array,
+                                                                             statistic='mean', bins=new_size)
+                    bin_stds, _, _ = stats.binned_statistic(transposed_array[0], nested_array, statistic='std', bins=new_size)
+                    bin_width = (bin_edges[1] - bin_edges[0])
+                    bin_centers = bin_edges[1:] - bin_width / 2
+                    if np.max(result[0]) == 0:
+                        result[0] = np.nan_to_num(bin_centers)
+                    result[index] = np.nan_to_num(bin_means)
+                except Exception as e:
+                    a = 1
+                    # logging.exception("Error when interpolating, will create empty input array")
         return np.transpose(result)
 
     def __prepare_input_lc(self, input_df):
@@ -88,6 +111,32 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
         star_df['h'] = (7 - star_df['h']) / 27
         return star_df
 
+    def __plot_df(self, df, type, scenario):
+        fig, axs = plt.subplots(2, 3, figsize=(12, 6), constrained_layout=True)
+        axs[0][0].scatter(df['#time'], df['flux'])
+        axs[0][1].scatter(df['#time'], df['centroid_x'])
+        axs[0][2].scatter(df['#time'], df['centroid_y'])
+        axs[1][0].scatter(df['#time'], df['bck_flux'])
+        axs[1][1].scatter(df['#time'], df['motion_x'])
+        axs[1][2].scatter(df['#time'], df['motion_y'])
+        plt.title(type + " " + scenario)
+        plt.show()
+        plt.clf()
+        plt.close()
+
+    def __plot_input(self, input_array, type, scenario):
+        fig, axs = plt.subplots(2, 3, figsize=(12, 6), constrained_layout=True)
+        axs[0][0].scatter(np.transpose(input_array)[0], np.transpose(input_array)[1])
+        axs[0][1].scatter(np.transpose(input_array)[0], np.transpose(input_array)[3])
+        axs[0][2].scatter(np.transpose(input_array)[0], np.transpose(input_array)[4])
+        axs[1][0].scatter(np.transpose(input_array)[0], np.transpose(input_array)[5])
+        axs[1][1].scatter(np.transpose(input_array)[0], np.transpose(input_array)[6])
+        axs[1][2].scatter(np.transpose(input_array)[0], np.transpose(input_array)[7])
+        plt.title(type + " " + scenario)
+        plt.show()
+        plt.clf()
+        plt.close()
+
     def __getitem__(self, idx):
         max_index = (idx + 1) * self.batch_size
         max_index = len(self.injected_objects_df) - 1 if max_index >= len(self.injected_objects_df) else max_index
@@ -107,6 +156,8 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
         i = 0
         for df_index, target_row in injected_objects_df.iterrows():
             target_id = int(target_row['TIC ID'])
+            # target_id = 356110099
+            # target_row = self.injected_objects_df[self.injected_objects_df['TIC ID'] == 356110099].iloc[0]
             leading_zeros_object_id = '{:09}'.format(target_id)
             lc_filename = str(leading_zeros_object_id) + '_lc.csv'
             star_filename = str(leading_zeros_object_id) + '_star.csv'
@@ -119,20 +170,30 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
             batch_data_values[i] = self.TYPE_TO_LABEL[type]
             not_null_times_args = np.argwhere(lc_df['#time'].to_numpy() > 0).flatten()
             lc_df = lc_df.iloc[not_null_times_args]
+            star_radius = star_df['radius'].iloc[0]
+            star_radius = 1 if np.isnan(star_radius) else star_radius
+            star_mass = star_df['mass'].iloc[0]
+            star_mass = 1 if np.isnan(star_mass) else star_mass
             if type == 'none':
                 #TODO determine a period far to collision with existing periods
                 period = self.random_number_generator.uniform(self.min_period, self.max_period)
                 min_lc_time = lc_df['#time'].min()
                 epoch = self.random_number_generator.uniform(min_lc_time, min_lc_time + period)
-                star_radius = star_df['radius'].iloc[0]
-                star_radius = 1 if np.isnan(star_radius) else star_radius
-                star_mass = star_df['mass'].iloc[0]
-                star_mass = 1 if np.isnan(star_mass) else star_mass
                 duration = wotan.t14(star_radius, star_mass, period)
             else:
                 period = target_row['period']
                 epoch = target_row['epoch']
                 duration = target_row['duration(h)'] / 24
+                if np.isnan(duration) or duration == 0:
+                    if not np.isnan(target_row['Rsec/Rpri']) and target_row['Rsec/Rpri'] > 0 and \
+                            target_row['Rsec/Rpri'] < 1:
+                        radius_secondary = star_radius * target_row['Rsec/Rpri']
+                        duration = t14(star_radius, star_mass, period, R_p=radius_secondary)
+                    elif not np.isnan(target_row['depth_secondary']) and target_row['depth_secondary'] > 0:
+                        radius_secondary = np.sqrt((target_row['depth_secondary'] / 1e6) * (star_radius ** 2))
+                        duration = t14(star_radius, star_mass, period, R_p=radius_secondary)
+                    else:
+                        duration = t14(star_radius, star_mass, period)
             duration_to_period = duration / period
             #['ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k'])
             star_df.drop('Unnamed: 0', inplace=True, axis=1)
@@ -144,49 +205,53 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
             lc_df_sorted_fold['#time'] = foldedleastsquares.fold(time, period, epoch + period / 4)
             lc_df_sorted_fold = lc_df_sorted_fold.sort_values(by=['#time'])
             lc_df_sorted_fold = lc_df_sorted_fold.sort_values(by=['#time'])
-            global_flux_array[i] = self.bin_interp(lc_df_sorted_fold.to_numpy(), self.input_sizes[1])
+            global_flux_array[i] = self.bin_by_time(lc_df_sorted_fold.to_numpy(), self.input_sizes[1])
             # Focus flux even
             lc_df_focus = lc_df.copy()
             lc_df_focus['#time'] = foldedleastsquares.fold(time, period, epoch)
             lc_df_focus = lc_df_focus.sort_values(by=['#time'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-            folded_flux_even_array[i] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[2])
+            folded_flux_even_array[i] = self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[2])
             # Focus flux odd
             lc_df_focus = lc_df.copy()
             lc_df_focus['#time'] = foldedleastsquares.fold(time, period, epoch + period / 2)
             lc_df_focus = lc_df_focus.sort_values(by=['#time'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-            folded_flux_odd_array[i] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[3])
+            folded_flux_odd_array[i] = self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[3])
+            # if type != "none":
+            #     self.__plot_df(lc_df_focus, type, "odd")
+            #     self.__plot_input(folded_flux_odd_array[i], type, "odd")
             # Focus flux sub-harmonic even
             lc_df_focus = lc_df.copy()
             lc_df_focus['#time'] = foldedleastsquares.fold(time, period / 2, epoch)
             lc_df_focus = lc_df_focus.sort_values(by=['#time'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-            folded_flux_even_subhar_array[i] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[4])
+            folded_flux_even_subhar_array[i] = self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[4])
             # Focus flux sub-harmonic odd
             lc_df_focus = lc_df.copy()
             lc_df_focus['#time'] = foldedleastsquares.fold(time, period / 2, epoch + period / 4)
             lc_df_focus = lc_df_focus.sort_values(by=['#time'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-            folded_flux_odd_subhar_array[i] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[5])
+            folded_flux_odd_subhar_array[i] = self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[5])
             # Focus flux harmonic even
             lc_df_focus = lc_df.copy()
             lc_df_focus['#time'] = foldedleastsquares.fold(time, period * 2, epoch)
             lc_df_focus = lc_df_focus.sort_values(by=['#time'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-            folded_flux_even_har_array[i] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[6])
+            folded_flux_even_har_array[i] = self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[6])
             # Focus flux harmonic odd
             lc_df_focus = lc_df.copy()
             lc_df_focus['#time'] = foldedleastsquares.fold(time, period * 2, epoch + period * 3 / 2)
             lc_df_focus = lc_df_focus.sort_values(by=['#time'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-            folded_flux_odd_har_array[i] = self.bin_interp(lc_df_focus.to_numpy(), self.input_sizes[7])
+            folded_flux_odd_har_array[i] = self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[7])
+            print("TARGET IS " + str(target_id))
             assert not np.isnan(star_array[i]).any() and not np.isinf(star_array[i]).any()
             assert not np.isnan(global_flux_array[i]).any() and not np.isinf(global_flux_array[i]).any()
             assert not np.isnan(folded_flux_even_array[i]).any() and not np.isinf(folded_flux_even_array[i]).any()
@@ -195,22 +260,22 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
             assert not np.isnan(folded_flux_odd_subhar_array[i]).any() and not np.isinf(folded_flux_odd_subhar_array[i]).any()
             assert not np.isnan(folded_flux_even_har_array[i]).any() and not np.isinf(folded_flux_even_har_array[i]).any()
             assert not np.isnan(folded_flux_odd_har_array[i]).any() and not np.isinf(folded_flux_odd_har_array[i]).any()
-            logging.info("GENERATOR Star Inputs max " + str(np.max(star_array[i])) + " and min " +
-                         str(np.min(star_array[i])))
-            logging.info("GENERATOR Global Flux Inputs max " + str(np.max(global_flux_array[i])) + " and min " +
-                         str(np.min(global_flux_array[i])))
-            logging.info("GENERATOR Folded Even Inputs max " + str(np.max(folded_flux_even_array[i])) + " and min " +
-                         str(np.min(folded_flux_even_array[i])))
-            logging.info("GENERATOR Folded Odd Inputs max " + str(np.max(folded_flux_odd_array[i])) + " and min " +
-                         str(np.min(folded_flux_odd_array[i])))
-            logging.info("GENERATOR Folded Even Subhar Inputs max " + str(np.max(folded_flux_even_subhar_array[i])) +
-                         " and min " + str(np.min(folded_flux_even_subhar_array[i])))
-            logging.info("GENERATOR Folded Odd Subhar Inputs max " + str(np.max(folded_flux_odd_subhar_array[i])) +
-                         " and min " + str(np.min(folded_flux_odd_subhar_array[i])))
-            logging.info("GENERATOR Folded Even Har Inputs max " + str(np.max(folded_flux_even_har_array[i])) +
-                         " and min " + str(np.min(folded_flux_even_har_array[i])))
-            logging.info("GENERATOR Folded Odd Har Inputs max " + str(np.max(folded_flux_odd_har_array[i])) +
-                         " and min " + str(np.min(folded_flux_odd_har_array[i])))
+            # logging.info("GENERATOR Star Inputs max " + str(np.max(star_array[i])) + " and min " +
+            #              str(np.min(star_array[i])))
+            # logging.info("GENERATOR Global Flux Inputs max " + str(np.max(global_flux_array[i])) + " and min " +
+            #              str(np.min(global_flux_array[i])))
+            # logging.info("GENERATOR Folded Even Inputs max " + str(np.max(folded_flux_even_array[i])) + " and min " +
+            #              str(np.min(folded_flux_even_array[i])))
+            # logging.info("GENERATOR Folded Odd Inputs max " + str(np.max(folded_flux_odd_array[i])) + " and min " +
+            #              str(np.min(folded_flux_odd_array[i])))
+            # logging.info("GENERATOR Folded Even Subhar Inputs max " + str(np.max(folded_flux_even_subhar_array[i])) +
+            #              " and min " + str(np.min(folded_flux_even_subhar_array[i])))
+            # logging.info("GENERATOR Folded Odd Subhar Inputs max " + str(np.max(folded_flux_odd_subhar_array[i])) +
+            #              " and min " + str(np.min(folded_flux_odd_subhar_array[i])))
+            # logging.info("GENERATOR Folded Even Har Inputs max " + str(np.max(folded_flux_even_har_array[i])) +
+            #              " and min " + str(np.min(folded_flux_even_har_array[i])))
+            # logging.info("GENERATOR Folded Odd Har Inputs max " + str(np.max(folded_flux_odd_har_array[i])) +
+            #              " and min " + str(np.min(folded_flux_odd_har_array[i])))
             i = i + 1
         return [star_array, global_flux_array, folded_flux_even_array, folded_flux_odd_array,
                 folded_flux_even_subhar_array, folded_flux_odd_subhar_array, folded_flux_even_har_array,
@@ -240,8 +305,8 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
         input_df = input_df.replace(0, self.zero_epsilon)
         return input_df
 
-# df = pd.read_csv("/mnt/DATA-2/ete6/injected_objects.csv", index_col=False)
-# df = shuffle(df)
-# df.reset_index(inplace=True, drop=True)
-# img = IatsonModelGenerator(df, "/mnt/DATA-2/ete6/lcs", 20, [11, 2500, 500, 500, 500, 500, 500, 500])
-# img.__getitem__(20)
+df = pd.read_csv("/mnt/DATA-2/ete6/injected_objects.csv", index_col=False)
+df = shuffle(df)
+df.reset_index(inplace=True, drop=True)
+img = IatsonModelGenerator(df, "/mnt/DATA-2/ete6/lcs", 20, [11, 2500, 500, 500, 500, 500, 500, 500])
+img.__getitem__(20)
