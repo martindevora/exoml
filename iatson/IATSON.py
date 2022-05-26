@@ -2,6 +2,7 @@ import logging
 import pandas as pd
 import tensorflow as tf
 import keras
+from keras.callbacks import EarlyStopping
 from keras.layers import LeakyReLU
 from keras.losses import CategoricalCrossentropy
 from keras.metrics import CategoricalAccuracy
@@ -27,7 +28,7 @@ class IATSON(BaseModel):
         leaky_relu_alpha = 0.01
         flux_input = keras.Input(shape=(2500, 8), name=name)
         flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_input)
-        flux_branch = keras.layers.SpatialDropout1D(rate=0.2)(flux_branch)
+        flux_branch = keras.layers.SpatialDropout1D(rate=0.1)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=128, kernel_size=9, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
         flux_branch = keras.layers.MaxPooling1D(pool_size=10, strides=6)(flux_branch)
@@ -36,9 +37,11 @@ class IATSON(BaseModel):
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
         flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
         flux_branch = keras.layers.MaxPooling1D(pool_size=4, strides=3)(flux_branch)
+        flux_branch = keras.layers.Dropout(rate=0.1)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=32, kernel_size=5, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
         flux_branch = keras.layers.MaxPooling1D(pool_size=3, strides=3)(flux_branch)
+        flux_branch = keras.layers.Dropout(rate=0.1)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=16, kernel_size=3, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
         flux_branch = keras.layers.MaxPooling1D(pool_size=2, strides=2)(flux_branch)
@@ -58,10 +61,10 @@ class IATSON(BaseModel):
     def _get_focus_flux_branch(self, name):
         leaky_relu_alpha = 0.01
         focus_flux_input = keras.Input(shape=(500, 8), name=name)
-        flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_input)
+        focus_flux_input = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_input)
         # (time, flux, detrended_flux1... detrended_flux5, flux_model, centroidx, centroidy, motionx, motiony, bck)
         # flux model by transit params and stellar params
-        focus_flux_branch = keras.layers.SpatialDropout1D(rate=0.2)(focus_flux_input)
+        focus_flux_branch = keras.layers.SpatialDropout1D(rate=0.1)(focus_flux_input)
         focus_flux_branch = keras.layers.Conv1D(filters=64, kernel_size=5, padding="same",
                                                 activation=LeakyReLU(leaky_relu_alpha), use_bias=True)(
             focus_flux_branch)
@@ -101,6 +104,7 @@ class IATSON(BaseModel):
         even_flux_branch = keras.layers.LayerNormalization()(even_flux_branch)
         focus_flux_branch = keras.layers.Add()([odd_flux_branch, even_flux_branch])
         focus_flux_branch = keras.layers.Dense(24, activation=LeakyReLU(leaky_relu_alpha))(focus_flux_branch)
+        focus_flux_branch = keras.layers.Dropout(rate=0.1)(focus_flux_branch)
         focus_flux_branch = keras.layers.Dense(16, activation='linear')(focus_flux_branch)
         input = [even_flux_input, odd_flux_input, subharmonic_even_flux_input, subharmonic_odd_flux_input,
                  harmonic_even_flux_input, harmonic_odd_flux_input]
@@ -200,7 +204,9 @@ class IATSON(BaseModel):
             [stellar_model_branch, flux_model_branch.output, focus_flux_model_branch.output])
         final_branch = keras.layers.GlobalAveragePooling1D()(final_branch)
         final_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha), name="final-dense1")(final_branch)
-        final_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha), name="final-dense2")(final_branch)
+        final_branch = keras.layers.Dropout(rate=0.1)(final_branch)
+        final_branch = keras.layers.Dense(32, activation=LeakyReLU(leaky_relu_alpha), name="final-dense2")(final_branch)
+        final_branch = keras.layers.Dropout(rate=0.1)(final_branch)
         final_branch = keras.layers.Dense(4, activation="softmax", name="final-dense-softmax")(final_branch)
         inputs = [stellar_model_input] + flux_model_branch.inputs + focus_flux_model_branch.inputs
         self.set_model(keras.Model(inputs=inputs, outputs=final_branch, name="IATSON"))
@@ -269,6 +275,15 @@ class IATSON(BaseModel):
                 verbose=1,
                 save_weights_only=True,
                 save_freq=steps_per_epoch)
+            early_stopping_callback = EarlyStopping(
+                monitor="val_loss",
+                min_delta=0.01,
+                patience=5,
+                verbose=0,
+                mode="auto",
+                baseline=None,
+                restore_best_weights=False,
+            )
             get_weights_callback = GetWeights(model_weights_logger)
             model_validation_steps = int(test_dataset_size // batch_size)
             logging.info("Initializing training with (epochs," + str(epochs) +
@@ -280,11 +295,12 @@ class IATSON(BaseModel):
                            epochs=epochs, verbose=1,
                            validation_data=validation_batch_generator,
                            validation_steps=model_validation_steps,
-                           callbacks=[csv_logger, cp_callback, get_weights_callback])
+                           callbacks=[csv_logger, cp_callback, get_weights_callback, early_stopping_callback])
             logging.info("Saving model into " + model_path)
             self.model.save(model_path)
         else:
             logging.warning("dry_run was activated and 'training' will not be launched")
 
+
 iatson = IATSON().build().inform("IATSON.png")
-iatson.train('/mnt/DATA-2/ete6/', './', 20, 50, dry_run=False)
+iatson.train('/mnt/DATA-2/ete6/', './', 10, 20, initial_learning_rate=0.02, dry_run=False)
