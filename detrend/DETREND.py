@@ -136,11 +136,11 @@ class DETREND(BaseModel):
             ") (test_percent," + str(test_percent) +
             ") (training_set_limit," + str(training_set_limit) +
             ")")
-        train_filenames, test_filenames = self.prepare_training_data(training_dir, output_dir, train_percent,
-                                                                     test_percent, training_set_limit)
+        train_filenames, validation_filenames, test_filenames = \
+            self.prepare_training_data(training_dir, output_dir, train_percent,test_percent, training_set_limit)
         # The optimizer is executed once for every batch, hence optimizer steps per epoch are
         train_dataset_size = len(train_filenames)
-        test_dataset_size = len(test_filenames)
+        test_dataset_size = len(validation_filenames)
         steps_per_epoch = int(dataset_iterations_per_epoch * train_dataset_size // batch_size)
         total_steps = steps_per_epoch * epochs
         learning_rate_decay_steps = total_steps // 100
@@ -167,7 +167,7 @@ class DETREND(BaseModel):
                 ") (zero_epsilon," + str(zero_epsilon) +
                 ")")
             training_batch_generator = DetrendModelGenerator(train_filenames, batch_size, self.input_size, zero_epsilon)
-            validation_batch_generator = DetrendModelGenerator(test_filenames, batch_size, self.input_size, zero_epsilon)
+            validation_batch_generator = DetrendModelGenerator(validation_filenames, batch_size, self.input_size, zero_epsilon)
             csv_log = output_dir + '/training_log.csv'
             logging.info("Initializing csv logger with (csv_log," + str(csv_log) +
                 ") (steps_per_epoch," + str(steps_per_epoch) +

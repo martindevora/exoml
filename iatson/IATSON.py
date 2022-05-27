@@ -26,7 +26,7 @@ class IATSON(BaseModel):
         # (time, flux, [detrended_flux1 ... detrended_flux5], flux_model, centroidx, centroidy, motionx, motiony, bck)
         # flux model by transit params and stellar params
         leaky_relu_alpha = 0.01
-        flux_input = keras.Input(shape=(2500, 8), name=name)
+        flux_input = keras.Input(shape=(2500, 13), name=name)
         flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_input)
         flux_branch = keras.layers.SpatialDropout1D(rate=0.1)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=128, kernel_size=9, padding="same",
@@ -60,7 +60,7 @@ class IATSON(BaseModel):
 
     def _get_focus_flux_branch(self, name):
         leaky_relu_alpha = 0.01
-        focus_flux_input = keras.Input(shape=(500, 8), name=name)
+        focus_flux_input = keras.Input(shape=(500, 13), name=name)
         focus_flux_input = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_input)
         # (time, flux, detrended_flux1... detrended_flux5, flux_model, centroidx, centroidy, motionx, motiony, bck)
         # flux model by transit params and stellar params
@@ -221,19 +221,18 @@ class IATSON(BaseModel):
 
     def train(self, training_dir, output_dir, batch_size=20, epochs=20, initial_learning_rate=0.01,
               dataset_iterations_per_epoch=1, train_percent=0.8,
-              test_percent=0.2, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
+              validation_percent=0.1, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
               gradient_clip_norm=0.01):
         logging.info("Preparing training data with (training_dir," + str(training_dir) +
                      ") (train_percent," + str(train_percent) +
-                     ") (test_percent," + str(test_percent) +
+                     ") (test_percent," + str(validation_percent) +
                      ") (training_set_limit," + str(training_set_limit) +
                      ")")
-        train_filenames, test_filenames = self.prepare_training_data(training_dir, output_dir, train_percent,
-                                                                     test_percent,
-                                                                     training_set_limit)
+        train_filenames, validation_filenames, test_filenames = \
+            self.prepare_training_data(training_dir, output_dir, train_percent, validation_percent, training_set_limit)
         # The optimizer is executed once for every batch, hence optimizer steps per epoch are
         train_dataset_size = len(train_filenames)
-        test_dataset_size = len(test_filenames)
+        test_dataset_size = len(validation_filenames)
         steps_per_epoch = int(dataset_iterations_per_epoch * train_dataset_size // batch_size)
         total_steps = steps_per_epoch * epochs
         learning_rate_decay_steps = total_steps // 100
@@ -259,7 +258,7 @@ class IATSON(BaseModel):
             lcs_dir = training_dir + '/lcs/'
             training_batch_generator = IatsonModelGenerator(train_filenames, lcs_dir, batch_size, self.input_size,
                                                             zero_epsilon)
-            validation_batch_generator = IatsonModelGenerator(test_filenames, lcs_dir, batch_size, self.input_size,
+            validation_batch_generator = IatsonModelGenerator(validation_filenames, lcs_dir, batch_size, self.input_size,
                                                               zero_epsilon)
             csv_log = output_dir + '/training_log.csv'
             logging.info("Initializing csv logger with (csv_log," + str(csv_log) +
@@ -303,4 +302,4 @@ class IATSON(BaseModel):
 
 
 iatson = IATSON().build().inform("IATSON.png")
-iatson.train('/mnt/DATA-2/ete6/', './', 10, 20, initial_learning_rate=0.02, dry_run=False)
+iatson.train('/mnt/DATA-2/ete6/', './', 10, 20, initial_learning_rate=0.0001, gradient_clip_norm=0.1, dry_run=False)
