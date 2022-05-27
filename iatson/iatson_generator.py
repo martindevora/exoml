@@ -20,7 +20,7 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
     TYPE_TO_LABEL = {'bckEB': [1, 0, 0, 0], 'EB': [0, 1, 0, 0], 'planet': [0, 0, 1, 0], 'none': [0, 0, 0, 1]}
 
     def __init__(self, injected_objects_df, lcs_dir, batch_size, input_sizes, zero_epsilon=1e-7,
-                 min_period=0.5, max_period=10):
+                 min_period=0.5, max_period=10, measurements_per_point=13):
         self.injected_objects_df = injected_objects_df
         self.lcs_dir = lcs_dir
         self.batch_size = batch_size
@@ -29,6 +29,7 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
         self.random_number_generator = default_rng()
         self.min_period = min_period
         self.max_period = max_period
+        self.measurements_per_point = measurements_per_point
 
     def __len__(self):
         return (np.ceil(len(self.injected_objects_df) / float(self.batch_size))).astype(int)
@@ -56,14 +57,14 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
                     bin_width = (bin_edges[1] - bin_edges[0])
                     bin_centers = bin_edges[1:] - bin_width / 2
                     if np.max(result[0]) == 0:
-                        result[0] = np.nan_to_num(bin_centers)
-                    result[index] = np.nan_to_num(bin_means)
+                        result[0] = bin_centers
+                    result[index] = bin_means
                 except Exception as e:
                     a = 1
                     # logging.exception("Error when interpolating, will create empty input array")
-        return np.transpose(result)
+        return np.transpose(np.nan_to_num(result))
 
-    def __prepare_input_lc(self, input_df):
+    def _prepare_input_lc(self, input_df):
         time = input_df["#time"].to_numpy()
         # We don't want time encoding because time will be used for folding and then dropped
         #input_df["#time"] = value_encode_times(time - time[0])
@@ -88,7 +89,7 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
         input_df = input_df.replace(0, self.zero_epsilon)
         return input_df
 
-    def __prepare_input_star(self, star_df):
+    def _prepare_input_star(self, star_df):
         star_df['ld_a'] = star_df['ld_a'].fillna(0.25)
         star_df['ld_b'] = star_df['ld_b'].fillna(0.25)
         star_df['Teff'] = star_df['Teff'].fillna(6000)
@@ -102,7 +103,9 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
         star_df['h'] = star_df['h'].fillna(-10)
         star_df['Teff'] = star_df['Teff'] / 40000
         star_df['radius'] = star_df['radius'] / 3
+        star_df['radius'] = star_df['radius'] if star_df['radius'].iloc[0] <= 1 else 1
         star_df['mass'] = star_df['mass'] / 3
+        star_df['mass'] = star_df['mass'] if star_df['mass'].iloc[0] <= 1 else 1
         star_df['lum'] = star_df['mass'] / 1000
         star_df['logg'] = star_df['logg'] / 100
         star_df['v'] = (7 - star_df['v']) / 27
@@ -111,7 +114,7 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
         star_df['h'] = (7 - star_df['h']) / 27
         return star_df
 
-    def __plot_df(self, df, type, scenario):
+    def _plot_df(self, df, type, scenario):
         fig, axs = plt.subplots(2, 3, figsize=(12, 6), constrained_layout=True)
         axs[0][0].scatter(df['#time'], df['flux'])
         axs[0][1].scatter(df['#time'], df['centroid_x'])
@@ -124,7 +127,7 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
         plt.clf()
         plt.close()
 
-    def __plot_input(self, input_array, type, scenario):
+    def _plot_input(self, input_array, type, scenario):
         fig, axs = plt.subplots(2, 3, figsize=(12, 6), constrained_layout=True)
         axs[0][0].scatter(np.transpose(input_array)[0], np.transpose(input_array)[1])
         axs[0][1].scatter(np.transpose(input_array)[0], np.transpose(input_array)[3])
@@ -143,15 +146,14 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
         target_indexes = np.arange(idx * self.batch_size, max_index, 1)
         target_indexes = shuffle(target_indexes)
         injected_objects_df = self.injected_objects_df.iloc[target_indexes]
-        measurements_per_point = 8
         star_array = np.empty((len(target_indexes), 11, 1))
-        global_flux_array = np.empty((len(target_indexes), 2500, measurements_per_point))
-        folded_flux_even_array = np.empty((len(target_indexes), 500, measurements_per_point))
-        folded_flux_odd_array = np.empty((len(target_indexes), 500, measurements_per_point))
-        folded_flux_even_subhar_array = np.empty((len(target_indexes), 500, measurements_per_point))
-        folded_flux_odd_subhar_array = np.empty((len(target_indexes), 500, measurements_per_point))
-        folded_flux_even_har_array = np.empty((len(target_indexes), 500, measurements_per_point))
-        folded_flux_odd_har_array = np.empty((len(target_indexes), 500, measurements_per_point))
+        global_flux_array = np.empty((len(target_indexes), 2500, self.measurements_per_point))
+        folded_flux_even_array = np.empty((len(target_indexes), 500, self.measurements_per_point))
+        folded_flux_odd_array = np.empty((len(target_indexes), 500, self.measurements_per_point))
+        folded_flux_even_subhar_array = np.empty((len(target_indexes), 500, self.measurements_per_point))
+        folded_flux_odd_subhar_array = np.empty((len(target_indexes), 500, self.measurements_per_point))
+        folded_flux_even_har_array = np.empty((len(target_indexes), 500, self.measurements_per_point))
+        folded_flux_odd_har_array = np.empty((len(target_indexes), 500, self.measurements_per_point))
         batch_data_values = np.empty((len(target_indexes), len(self.TYPE_TO_LABEL)))
         i = 0
         for df_index, target_row in injected_objects_df.iterrows():
@@ -162,10 +164,13 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
             lc_filename = str(leading_zeros_object_id) + '_lc.csv'
             star_filename = str(leading_zeros_object_id) + '_star.csv'
             star_df = pd.read_csv(self.lcs_dir + '/' + star_filename, index_col=False)
-            star_df = self.__prepare_input_star(star_df)
-            lc_df = pd.read_csv(self.lcs_dir + '/' + lc_filename, usecols=['#time', 'flux', 'flux_err', 'centroid_x',
-                                                                           'centroid_y', 'motion_x', 'motion_y', 'bck_flux'], low_memory=True)
-            lc_df = self.__prepare_input_lc(lc_df)
+            star_df = self._prepare_input_star(star_df)
+            lc_df = pd.read_csv(self.lcs_dir + '/' + lc_filename, usecols=['#time', 'flux', 'flux_0', 'flux_1',
+                                                                           'flux_2', 'flux_3', 'flux_4',
+                                                                           'flux_err', 'centroid_x',
+                                                                           'centroid_y', 'motion_x', 'motion_y',
+                                                                           'bck_flux'], low_memory=True)
+            lc_df = self._prepare_input_lc(lc_df)
             type = target_row['type']
             batch_data_values[i] = self.TYPE_TO_LABEL[type]
             not_null_times_args = np.argwhere(lc_df['#time'].to_numpy() > 0).flatten()
@@ -199,6 +204,7 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
             star_df.drop('Unnamed: 0', inplace=True, axis=1)
             star_array[i] = np.transpose(star_df.to_numpy())
             time = lc_df['#time'].to_numpy()
+            flux = lc_df['flux'].to_numpy()
             # Global flux
             # Shifting data 1/4 so that main transit and possible occultation don't get cut by the borders
             lc_df_sorted_fold = lc_df.copy()
@@ -251,7 +257,6 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
             lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
             folded_flux_odd_har_array[i] = self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[7])
-            print("TARGET IS " + str(target_id))
             assert not np.isnan(star_array[i]).any() and not np.isinf(star_array[i]).any()
             assert not np.isnan(global_flux_array[i]).any() and not np.isinf(global_flux_array[i]).any()
             assert not np.isnan(folded_flux_even_array[i]).any() and not np.isinf(folded_flux_even_array[i]).any()
@@ -305,8 +310,8 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
         input_df = input_df.replace(0, self.zero_epsilon)
         return input_df
 
-df = pd.read_csv("/mnt/DATA-2/ete6/injected_objects.csv", index_col=False)
-df = shuffle(df)
-df.reset_index(inplace=True, drop=True)
-img = IatsonModelGenerator(df, "/mnt/DATA-2/ete6/lcs", 20, [11, 2500, 500, 500, 500, 500, 500, 500])
-img.__getitem__(20)
+# df = pd.read_csv("/mnt/DATA-2/ete6/injected_objects.csv", index_col=False)
+# df = shuffle(df)
+# df.reset_index(inplace=True, drop=True)
+# img = IatsonModelGenerator(df, "/mnt/DATA-2/ete6/lcs", 20, [11, 2500, 500, 500, 500, 500, 500, 500])
+# img.__getitem__(20)
