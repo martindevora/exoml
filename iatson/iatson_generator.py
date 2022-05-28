@@ -142,7 +142,7 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
 
     def __getitem__(self, idx):
         max_index = (idx + 1) * self.batch_size
-        max_index = len(self.injected_objects_df) - 1 if max_index >= len(self.injected_objects_df) else max_index
+        max_index = len(self.injected_objects_df) if max_index > len(self.injected_objects_df) else max_index
         target_indexes = np.arange(idx * self.batch_size, max_index, 1)
         target_indexes = shuffle(target_indexes)
         injected_objects_df = self.injected_objects_df.iloc[target_indexes]
@@ -175,36 +175,14 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
             batch_data_values[i] = self.TYPE_TO_LABEL[type]
             not_null_times_args = np.argwhere(lc_df['#time'].to_numpy() > 0).flatten()
             lc_df = lc_df.iloc[not_null_times_args]
-            star_radius = star_df['radius'].iloc[0]
-            star_radius = 1 if np.isnan(star_radius) else star_radius
-            star_mass = star_df['mass'].iloc[0]
-            star_mass = 1 if np.isnan(star_mass) else star_mass
-            if type == 'none':
-                #TODO determine a period far to collision with existing periods
-                period = self.random_number_generator.uniform(self.min_period, self.max_period)
-                min_lc_time = lc_df['#time'].min()
-                epoch = self.random_number_generator.uniform(min_lc_time, min_lc_time + period)
-                duration = wotan.t14(star_radius, star_mass, period)
-            else:
-                period = target_row['period']
-                epoch = target_row['epoch']
-                duration = target_row['duration(h)'] / 24
-                if np.isnan(duration) or duration == 0:
-                    if not np.isnan(target_row['Rsec/Rpri']) and target_row['Rsec/Rpri'] > 0 and \
-                            target_row['Rsec/Rpri'] < 1:
-                        radius_secondary = star_radius * target_row['Rsec/Rpri']
-                        duration = t14(star_radius, star_mass, period, R_p=radius_secondary)
-                    elif not np.isnan(target_row['depth_secondary']) and target_row['depth_secondary'] > 0:
-                        radius_secondary = np.sqrt((target_row['depth_secondary'] / 1e6) * (star_radius ** 2))
-                        duration = t14(star_radius, star_mass, period, R_p=radius_secondary)
-                    else:
-                        duration = t14(star_radius, star_mass, period)
+            period = target_row['period']
+            epoch = target_row['epoch']
+            duration = target_row['duration(h)'] / 24
             duration_to_period = duration / period
             #['ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k'])
             star_df.drop('Unnamed: 0', inplace=True, axis=1)
             star_array[i] = np.transpose(star_df.to_numpy())
             time = lc_df['#time'].to_numpy()
-            flux = lc_df['flux'].to_numpy()
             # Global flux
             # Shifting data 1/4 so that main transit and possible occultation don't get cut by the borders
             lc_df_sorted_fold = lc_df.copy()
