@@ -1,4 +1,6 @@
 import logging
+import multiprocessing
+import numpy as np
 import pandas as pd
 import tensorflow as tf
 import keras
@@ -14,7 +16,7 @@ from ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
 from ml.callback.get_weights import GetWeights
 from iatson.iatson_generator import IatsonModelGenerator
 from ml.log.get_weights_logger import ModelWeightsLogger
-from ml.model.base_model import BaseModel
+from ml.model.base_model import BaseModel, CategoricalPredictionSetStats
 
 
 class IATSON(BaseModel):
@@ -265,14 +267,14 @@ class IATSON(BaseModel):
                          ") (steps_per_epoch," + str(steps_per_epoch) +
                          ")")
             csv_logger = BatchAwareCsvLogger(csv_log, steps_per_epoch)
-            model_path = output_dir + '/IATSON'
+            model_path = output_dir + '/IATSON_model'
             logging.info("Initializing model checkpoint with (model_path," + str(model_path) +
                          ") (steps_per_epoch," + str(steps_per_epoch) +
                          ")")
             cp_callback = tf.keras.callbacks.ModelCheckpoint(
                 filepath=model_path,
                 verbose=1,
-                save_weights_only=True,
+                save_weights_only=False,
                 save_freq=steps_per_epoch)
             early_stopping_callback = EarlyStopping(
                 monitor="val_loss",
@@ -289,6 +291,7 @@ class IATSON(BaseModel):
                          ") (steps_per_epoch," + str(steps_per_epoch) +
                          ") (model_validation_steps," + str(model_validation_steps) +
                          ")")
+            self.model.save(model_path)
             self.model.fit(x=training_batch_generator,
                            steps_per_epoch=steps_per_epoch,
                            epochs=epochs, verbose=1,
@@ -300,6 +303,68 @@ class IATSON(BaseModel):
         else:
             logging.warning("dry_run was activated and 'training' will not be launched")
 
+    def predict(self, input):
+        prediction = self.model(input, training=False)
+        return self.predict_threshold([prediction])
 
-iatson = IATSON().build().inform("IATSON.png")
-iatson.train('/mnt/DATA-2/ete6/', './', 10, 20, initial_learning_rate=0.0001, gradient_clip_norm=0.1, dry_run=False)
+    def predict_batch(self, inputs, expected_outputs=None, batch_size=20, cores=multiprocessing.cpu_count() - 1):
+        predictions = self.model.predict(inputs, use_multiprocessing=True, batch_size=batch_size, workers=cores)
+        max_prediction_indexes, max_prediction_values = self.predict_threshold(predictions)
+        if expected_outputs is not None:
+            bckeb_stats = self.test_metrics(expected_outputs, predictions, 0)
+            eb_stats = self.test_metrics(expected_outputs, predictions, 1)
+            planet_stats = self.test_metrics(expected_outputs, predictions, 2)
+            none_stats = self.test_metrics(expected_outputs, predictions, 3)
+            return max_prediction_indexes, max_prediction_values, [bckeb_stats, eb_stats, planet_stats, none_stats]
+        else:
+            return max_prediction_indexes, max_prediction_values
+
+    def predict_threshold(self, predictions, threshold=[0.8, 0.8, 0.8, 0.5]):
+        max_prediction_indexes = [np.argmax(prediction) for prediction in predictions]
+        max_prediction_values = [predictions[index][max_prediction_index]
+                                 if predictions[index][max_prediction_index] > threshold[predictions[index][max_prediction_index]]
+                                 else -1
+                                 for index, max_prediction_index in enumerate(max_prediction_indexes)]
+        max_prediction_indexes[max_prediction_values == -1] = -1
+        return max_prediction_indexes, max_prediction_values
+
+    def predict_test_set(self, training_dir, test_set_file, batch_size=20, zero_epsilon=1e-7):
+        test_dataset = pd.read_csv(test_set_file)
+        lcs_dir = training_dir + '/lcs/'
+        testing_batch_generator = IatsonModelGenerator(test_dataset, lcs_dir, batch_size, self.input_size,
+                                                       zero_epsilon)
+        expected_outputs = None
+        for i in np.arange(0, len(test_dataset) // batch_size + 1, 1):
+            input, expected_output = testing_batch_generator.__getitem__(i)
+            expected_outputs = np.concatenate((expected_outputs, expected_output)) if expected_outputs is not None else expected_output
+        return self.predict_batch(testing_batch_generator, expected_outputs, batch_size)
+
+    def test_metrics(self, expected_outputs, max_prediction_indexes, label_index):
+        set_count = len(expected_outputs)
+        max_output_indexes = [np.max(expected_output) for expected_output in expected_outputs]
+        matches_indexes = np.argwhere(max_output_indexes == max_prediction_indexes).flatten()
+        matches_count = len(matches_indexes)
+        accuracy = matches_count / set_count
+        expected_label_indexes = np.argwhere(max_output_indexes == label_index).flatten()
+        output_label_indexes = np.argwhere(max_output_indexes == label_index).flatten()
+        label_tp_indexes = np.intersect1d(expected_label_indexes, output_label_indexes)
+        label_fp_indexes = output_label_indexes[~np.isin(output_label_indexes, expected_label_indexes)]
+        label_fn_indexes = expected_label_indexes[~np.isin(expected_label_indexes, output_label_indexes)]
+        label_tp = len(label_tp_indexes)
+        label_fp = len(label_fp_indexes)
+        label_fn = len(label_fn_indexes)
+        precision = label_tp / (label_tp + label_fp)
+        recall = label_tp / (label_tp + label_fn)
+        return CategoricalPredictionSetStats(label_tp, label_fp, label_fn, accuracy, precision, recall)
+
+
+training_dir = '/mnt/DATA-2/ete6/'
+batch_size = 20
+epochs = 20
+model_dir = './'
+# iatson = IATSON().build().inform("IATSON.png")
+# iatson.train(training_dir, model_dir, batch_size, epochs, initial_learning_rate=0.000001, gradient_clip_norm=0.1,
+#              dry_run=False)
+#
+iatson = IATSON().load_model(model_dir + 'IATSON_model')
+iatson.predict_test_set(training_dir, './test_dataset.csv', batch_size)

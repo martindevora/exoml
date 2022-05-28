@@ -1,5 +1,7 @@
 import logging
 import os
+
+import tensorflow as tf
 import pandas as pd
 from abc import abstractmethod
 
@@ -91,6 +93,7 @@ class BaseModel(WithLogging):
         test_dataset_filename = output_dir + "/test_dataset.csv"
         logging.info("Storing train and test file names in " + train_dataset_filename + " and " +
                      validation_dataset_filename)
+        test_filenames = []
         if os.path.exists(train_dataset_filename):
             os.remove(train_dataset_filename)
         if os.path.exists(validation_dataset_filename):
@@ -127,3 +130,21 @@ class BaseModel(WithLogging):
         :param model: the model to be stored
         """
         self.model = model
+
+    def load_model(self, dir):
+        self.set_model(tf.keras.models.load_model(dir))
+        return self
+
+
+class CategoricalPredictionSetStats:
+    """
+    Statistics of categorical predictions.
+    """
+    def __init__(self, tp, fp, fn, accuracy, precision, recall) -> None:
+        super().__init__()
+        self.tp = tp
+        self.fp = fp
+        self.fn = fn
+        self.accuracy = accuracy
+        self.precision = precision
+        self.recall = recall
