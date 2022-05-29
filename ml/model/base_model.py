@@ -18,8 +18,9 @@ class BaseModel(WithLogging):
 
     model = None
 
-    def __init__(self) -> None:
+    def __init__(self, name) -> None:
         super().__init__()
+        self.name = name
 
     @abstractmethod
     def build(self, **kwargs):
@@ -63,17 +64,23 @@ class BaseModel(WithLogging):
         self.model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
         return self
 
-    def inform(self, image_file_name):
+    def inform(self, dir):
         """
         Creates summary and a visual plot of the model
-        :param image_file_name: the file name of the visual plot
+        :param dir: the directory to store the plot
         :return: the object itself
         """
         logging.info("Creating model plot and summary")
-        plot_model(self.model, image_file_name, show_shapes=True)
+        dir = dir + self._get_model_dir()
+        if not os.path.exists(dir):
+            os.mkdir(dir)
+        plot_model(self.model, dir + '/network.png', show_shapes=True)
         self.model.summary()
         ModelWeightsLogger().log_model_weights(self.model)
         return self
+
+    def save(self, dir):
+        self.model.save(dir + self._get_model_dir())
 
     def prepare_training_data(self, training_dir, output_dir, train_percent=0.8, validation_percent=0.1,
                               training_set_limit=None):
@@ -124,6 +131,10 @@ class BaseModel(WithLogging):
                     file.write('\n'.join(test_filenames))
         return train_filenames, validation_filenames, test_filenames
 
+    def load_model(self, dir):
+        self.set_model(tf.keras.models.load_model(dir + self._get_model_dir()))
+        return self
+
     def set_model(self, model):
         """
         Stores the model in a class attribute
@@ -131,9 +142,8 @@ class BaseModel(WithLogging):
         """
         self.model = model
 
-    def load_model(self, dir):
-        self.set_model(tf.keras.models.load_model(dir))
-        return self
+    def _get_model_dir(self):
+        return self.name + '_model/'
 
 
 class CategoricalPredictionSetStats:
