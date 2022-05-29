@@ -267,7 +267,7 @@ class IATSON(BaseModel):
                          ") (steps_per_epoch," + str(steps_per_epoch) +
                          ")")
             csv_logger = BatchAwareCsvLogger(csv_log, steps_per_epoch)
-            model_path = output_dir + '/IATSON_model'
+            model_path = output_dir + self._get_model_dir()
             logging.info("Initializing model checkpoint with (model_path," + str(model_path) +
                          ") (steps_per_epoch," + str(steps_per_epoch) +
                          ")")
@@ -291,7 +291,7 @@ class IATSON(BaseModel):
                          ") (steps_per_epoch," + str(steps_per_epoch) +
                          ") (model_validation_steps," + str(model_validation_steps) +
                          ")")
-            self.model.save(model_path)
+            self.save(output_dir)
             self.model.fit(x=training_batch_generator,
                            steps_per_epoch=steps_per_epoch,
                            epochs=epochs, verbose=1,
@@ -299,7 +299,7 @@ class IATSON(BaseModel):
                            validation_steps=model_validation_steps,
                            callbacks=[csv_logger, cp_callback, get_weights_callback, early_stopping_callback])
             logging.info("Saving model into " + model_path)
-            self.model.save(model_path)
+            self.save(output_dir)
         else:
             logging.warning("dry_run was activated and 'training' will not be launched")
 
@@ -359,12 +359,11 @@ class IATSON(BaseModel):
 
 
 training_dir = '/mnt/DATA-2/ete6/'
-batch_size = 20
+batch_size = 40
 epochs = 20
 model_dir = './'
-# iatson = IATSON().build().inform("IATSON.png")
-# iatson.train(training_dir, model_dir, batch_size, epochs, initial_learning_rate=0.000001, gradient_clip_norm=0.1,
-#              dry_run=False)
-#
-iatson = IATSON().load_model(model_dir + 'IATSON_model')
+iatson = IATSON().build().inform(model_dir)
+iatson.train(training_dir, model_dir, batch_size, epochs, initial_learning_rate=0.000001, gradient_clip_norm=0.1,
+             dry_run=False)
+iatson = IATSON().load_model(model_dir)
 iatson.predict_test_set(training_dir, './test_dataset.csv', batch_size)

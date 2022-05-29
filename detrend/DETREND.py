@@ -173,7 +173,7 @@ class DETREND(BaseModel):
                 ") (steps_per_epoch," + str(steps_per_epoch) +
                 ")")
             csv_logger = BatchAwareCsvLogger(csv_log, steps_per_epoch)
-            model_path = output_dir + '/DETREND'
+            model_path = output_dir + self._get_model_dir()
             logging.info("Initializing model checkpoint with (model_path," + str(model_path) +
                 ") (steps_per_epoch," + str(steps_per_epoch) +
                 ")")
@@ -188,6 +188,7 @@ class DETREND(BaseModel):
                 ") (steps_per_epoch," + str(steps_per_epoch) +
                 ") (model_validation_steps," + str(model_validation_steps) +
                 ")")
+            self.save(output_dir)
             self.model.fit(x=training_batch_generator,
                            steps_per_epoch=steps_per_epoch,
                            epochs=epochs, verbose=1,
@@ -195,7 +196,7 @@ class DETREND(BaseModel):
                            validation_steps=model_validation_steps,
                            callbacks=[csv_logger, cp_callback, get_weights_callback])
             logging.info("Saving model into " + model_path)
-            self.model.save(model_path)
+            self.save(output_dir)
         else:
             logging.warning("dry_run was activated and 'training' will not be launched")
 
