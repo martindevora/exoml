@@ -21,7 +21,7 @@ from ml.model.base_model import BaseModel, CategoricalPredictionSetStats
 
 class IATSON(BaseModel):
     def __init__(self) -> None:
-        super().__init__()
+        super().__init__('IATSON')
         self.input_size = [11, 2500, 500, 500, 500, 500, 500, 500]
 
     def _get_flux_conv_branch(self, name):
