@@ -32,7 +32,9 @@ def create_injection_dataframe(injections_dir, lcs_dir):
         leading_zeros_object_id = '{:09}'.format(object_id)
         star_df = pd.read_csv(lcs_dir + '/' + leading_zeros_object_id + '_star.csv')
         star_radius = star_df['radius'].iloc[0]
+        star_radius = 1 if np.isnan(star_radius) else star_radius
         star_mass = star_df['mass'].iloc[0]
+        star_mass = 1 if np.isnan(star_mass) else star_mass
         min_period = 0.5
         max_period = 10
         period = random_number_generator.uniform(min_period, max_period)
@@ -116,8 +118,6 @@ def create_injection_dataframe(injections_dir, lcs_dir):
                     duration = t14(star_radius, star_mass, period, R_p=radius_secondary)
                 else:
                     duration = t14(star_radius, star_mass, period)
-            else:
-                duration = 0
             duration = duration * 24
             df = df.append({'TIC ID': target_row['TIC ID'], 'type': 'planet', 'period': period,
                        'epoch': epoch,
@@ -314,5 +314,5 @@ lcs_dir = root_dir + 'lcs/'
 #uncompress_data('/mnt/DATA-2/ete6/ebs/EBs/')
 #uncompress_data('/mnt/DATA-2/ete6/planets/Planets/')
 #create_star_csvs(root_dir, lcs_dir)
-#create_injection_dataframe(root_dir, lcs_dir)
-create_target_csvs(lcs_dir, root_dir)
+create_injection_dataframe(root_dir, lcs_dir)
+#create_target_csvs(lcs_dir, root_dir)
