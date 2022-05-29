@@ -22,7 +22,7 @@ thread_config.setup_threads(5)
 
 class DETREND(BaseModel):
     def __init__(self, input_size=(20610, 8)):
-        super().__init__()
+        super().__init__('DETREND')
         self.input_size = input_size
 
     def build(self):
@@ -136,8 +136,11 @@ class DETREND(BaseModel):
             ") (test_percent," + str(test_percent) +
             ") (training_set_limit," + str(training_set_limit) +
             ")")
+        model_path = output_dir + self._get_model_dir()
+        if not os.path.exists(model_path):
+            os.mkdir(model_path)
         train_filenames, validation_filenames, test_filenames = \
-            self.prepare_training_data(training_dir, output_dir, train_percent,test_percent, training_set_limit)
+            self.prepare_training_data(training_dir, model_path, train_percent,test_percent, training_set_limit)
         # The optimizer is executed once for every batch, hence optimizer steps per epoch are
         train_dataset_size = len(train_filenames)
         test_dataset_size = len(validation_filenames)
@@ -168,12 +171,11 @@ class DETREND(BaseModel):
                 ")")
             training_batch_generator = DetrendModelGenerator(train_filenames, batch_size, self.input_size, zero_epsilon)
             validation_batch_generator = DetrendModelGenerator(validation_filenames, batch_size, self.input_size, zero_epsilon)
-            csv_log = output_dir + '/training_log.csv'
+            csv_log = model_path + '/training_log.csv'
             logging.info("Initializing csv logger with (csv_log," + str(csv_log) +
                 ") (steps_per_epoch," + str(steps_per_epoch) +
                 ")")
             csv_logger = BatchAwareCsvLogger(csv_log, steps_per_epoch)
-            model_path = output_dir + self._get_model_dir()
             logging.info("Initializing model checkpoint with (model_path," + str(model_path) +
                 ") (steps_per_epoch," + str(steps_per_epoch) +
                 ")")

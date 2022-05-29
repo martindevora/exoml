@@ -1,5 +1,7 @@
 import logging
 import multiprocessing
+import os
+
 import numpy as np
 import pandas as pd
 import tensorflow as tf
@@ -29,15 +31,15 @@ class IATSON(BaseModel):
         # flux model by transit params and stellar params
         leaky_relu_alpha = 0.01
         flux_input = keras.Input(shape=(2500, 13), name=name)
-        flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_input)
-        flux_branch = keras.layers.SpatialDropout1D(rate=0.1)(flux_branch)
+        #flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_input)
+        flux_branch = keras.layers.SpatialDropout1D(rate=0.1)(flux_input)
         flux_branch = keras.layers.Conv1D(filters=128, kernel_size=9, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
         flux_branch = keras.layers.MaxPooling1D(pool_size=10, strides=6)(flux_branch)
         flux_branch = keras.layers.Dropout(rate=0.1)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=64, kernel_size=7, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
-        flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
+        #flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
         flux_branch = keras.layers.MaxPooling1D(pool_size=4, strides=3)(flux_branch)
         flux_branch = keras.layers.Dropout(rate=0.1)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=32, kernel_size=5, padding="same",
@@ -47,7 +49,7 @@ class IATSON(BaseModel):
         flux_branch = keras.layers.Conv1D(filters=16, kernel_size=3, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
         flux_branch = keras.layers.MaxPooling1D(pool_size=2, strides=2)(flux_branch)
-        flux_branch = keras.layers.LayerNormalization()(flux_branch)
+        #flux_branch = keras.layers.LayerNormalization()(flux_branch)
         return flux_input, flux_branch
 
     def _get_flux_model_branch(self):
@@ -56,14 +58,14 @@ class IATSON(BaseModel):
         flux_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
         flux_branch = keras.layers.Dropout(rate=0.1)(flux_branch)
         flux_branch = keras.layers.Dense(16, activation='linear')(flux_branch)
-        flux_branch = keras.layers.LayerNormalization()(flux_branch)
+        #flux_branch = keras.layers.LayerNormalization()(flux_branch)
         flux_branch = keras.Model(inputs=[flux_input], outputs=flux_branch)
         return flux_branch
 
     def _get_focus_flux_branch(self, name):
         leaky_relu_alpha = 0.01
         focus_flux_input = keras.Input(shape=(500, 13), name=name)
-        focus_flux_input = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_input)
+        #focus_flux_input = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_input)
         # (time, flux, detrended_flux1... detrended_flux5, flux_model, centroidx, centroidy, motionx, motiony, bck)
         # flux model by transit params and stellar params
         focus_flux_branch = keras.layers.SpatialDropout1D(rate=0.1)(focus_flux_input)
@@ -75,11 +77,11 @@ class IATSON(BaseModel):
         focus_flux_branch = keras.layers.Conv1D(filters=32, kernel_size=3, padding="same",
                                                 activation=LeakyReLU(leaky_relu_alpha), use_bias=True)(
             focus_flux_branch)
-        focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_branch)
+        #focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_branch)
         focus_flux_branch = keras.layers.MaxPooling1D(pool_size=3, strides=3)(focus_flux_branch)
         focus_flux_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha))(focus_flux_branch)
         focus_flux_branch = keras.layers.Dropout(rate=0.1)(focus_flux_branch)
-        focus_flux_branch = keras.layers.LayerNormalization()(focus_flux_branch)
+        #focus_flux_branch = keras.layers.LayerNormalization()(focus_flux_branch)
         return focus_flux_input, focus_flux_branch
 
     def _get_focus_flux_model_branch(self):
@@ -102,8 +104,8 @@ class IATSON(BaseModel):
         even_flux_branch = keras.layers.Dropout(rate=0.1)(even_flux_branch)
         odd_flux_branch = keras.layers.Dense(32, activation='linear')(odd_flux_branch)
         even_flux_branch = keras.layers.Dense(32, activation='linear')(even_flux_branch)
-        odd_flux_branch = keras.layers.LayerNormalization()(odd_flux_branch)
-        even_flux_branch = keras.layers.LayerNormalization()(even_flux_branch)
+        # odd_flux_branch = keras.layers.LayerNormalization()(odd_flux_branch)
+        # even_flux_branch = keras.layers.LayerNormalization()(even_flux_branch)
         focus_flux_branch = keras.layers.Add()([odd_flux_branch, even_flux_branch])
         focus_flux_branch = keras.layers.Dense(24, activation=LeakyReLU(leaky_relu_alpha))(focus_flux_branch)
         focus_flux_branch = keras.layers.Dropout(rate=0.1)(focus_flux_branch)
@@ -230,8 +232,11 @@ class IATSON(BaseModel):
                      ") (test_percent," + str(validation_percent) +
                      ") (training_set_limit," + str(training_set_limit) +
                      ")")
+        model_path = output_dir + self._get_model_dir()
+        if not os.path.exists(model_path):
+            os.mkdir(model_path)
         train_filenames, validation_filenames, test_filenames = \
-            self.prepare_training_data(training_dir, output_dir, train_percent, validation_percent, training_set_limit)
+            self.prepare_training_data(training_dir, model_path, train_percent, validation_percent, training_set_limit)
         # The optimizer is executed once for every batch, hence optimizer steps per epoch are
         train_dataset_size = len(train_filenames)
         test_dataset_size = len(validation_filenames)
@@ -262,7 +267,7 @@ class IATSON(BaseModel):
                                                             zero_epsilon)
             validation_batch_generator = IatsonModelGenerator(validation_filenames, lcs_dir, batch_size, self.input_size,
                                                               zero_epsilon)
-            csv_log = output_dir + '/training_log.csv'
+            csv_log = model_path + '/training_log.csv'
             logging.info("Initializing csv logger with (csv_log," + str(csv_log) +
                          ") (steps_per_epoch," + str(steps_per_epoch) +
                          ")")
@@ -359,11 +364,11 @@ class IATSON(BaseModel):
 
 
 training_dir = '/mnt/DATA-2/ete6/'
-batch_size = 40
+batch_size = 200
 epochs = 20
 model_dir = './'
 iatson = IATSON().build().inform(model_dir)
-iatson.train(training_dir, model_dir, batch_size, epochs, initial_learning_rate=0.000001, gradient_clip_norm=0.1,
+iatson.train(training_dir, model_dir, batch_size, epochs, initial_learning_rate=0.01, gradient_clip_norm=0.1,
              dry_run=False)
 iatson = IATSON().load_model(model_dir)
 iatson.predict_test_set(training_dir, './test_dataset.csv', batch_size)
