@@ -127,86 +127,23 @@ class DETREND(BaseModel):
         training_dir = kwargs.get('training_dir')
         return [str(file) for file in list(pathlib.Path(training_dir).glob('*_lc.csv'))]
 
-    def train(self, training_dir, output_dir, batch_size=20, epochs=20, initial_learning_rate=0.00001,
-              dataset_iterations_per_epoch=1, train_percent=0.8,
-              test_percent=0.2, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
-              gradient_clip_norm=0.01, cores=0):
-        logging.info("Preparing training data with (training_dir," + str(training_dir) +
-            ") (train_percent," + str(train_percent) +
-            ") (test_percent," + str(test_percent) +
-            ") (training_set_limit," + str(training_set_limit) +
-            ")")
-        model_path = output_dir + self._get_model_dir()
-        if not os.path.exists(model_path):
-            os.mkdir(model_path)
-        train_filenames, validation_filenames, test_filenames = \
-            self.prepare_training_data(training_dir, model_path, train_percent,test_percent, training_set_limit)
-        # The optimizer is executed once for every batch, hence optimizer steps per epoch are
-        train_dataset_size = len(train_filenames)
-        test_dataset_size = len(validation_filenames)
-        steps_per_epoch = int(dataset_iterations_per_epoch * train_dataset_size // batch_size)
-        total_steps = steps_per_epoch * epochs
-        learning_rate_decay_steps = total_steps // 100
-        learning_rate_decay_steps = learning_rate_decay_steps if learning_rate_decay_steps > epochs else epochs
-        logging.info("Initializing optimizer with (initial_learning_rate," + str(initial_learning_rate) +
-            ") (learning_rate_decay_steps," + str(learning_rate_decay_steps) +
-            ") (gradient_clip_norm," + str(gradient_clip_norm) +
-            ")")
-        leaning_rate_schedule = ExponentialDecay(initial_learning_rate, decay_steps=learning_rate_decay_steps, decay_rate=0.95)
-        optimizer = tf.keras.optimizers.Adam(leaning_rate_schedule, beta_1=0.9, beta_2=0.98, epsilon=1e-9,
-                                             clipnorm=gradient_clip_norm)
-        # Autoencoders have a linear output layer and hence, cross entropy is not good (better for softmax
-        # classification tasks
+    def instance_generator(self, dataset, dir, batch_size, input_sizes, zero_epsilon):
+        return DetrendModelGenerator(dataset, batch_size, input_sizes, zero_epsilon)
+
+    def instance_loss_accuracy(self):
         loss = tf.keras.losses.MeanAbsolutePercentageError(reduction=losses_utils.ReductionV2.AUTO)
-        self.compile(optimizer, loss, metrics=[FixedMean(), "mean_squared_error",
-                                                "mean_absolute_error",
-                                                "mean_absolute_percentage_error",
-                                                "mean_squared_logarithmic_error",
-                                                "cosine_proximity"])
-        model_weights_logger = ModelWeightsLogger()
-        if not dry_run:
-            logging.info("Initializing training and validation generators with (batch_size," + str(batch_size) +
-                ") (self.input_size," + str(self.input_size) +
-                ") (zero_epsilon," + str(zero_epsilon) +
-                ")")
-            training_batch_generator = DetrendModelGenerator(train_filenames, batch_size, self.input_size, zero_epsilon)
-            validation_batch_generator = DetrendModelGenerator(validation_filenames, batch_size, self.input_size, zero_epsilon)
-            csv_log = model_path + '/training_log.csv'
-            logging.info("Initializing csv logger with (csv_log," + str(csv_log) +
-                ") (steps_per_epoch," + str(steps_per_epoch) +
-                ")")
-            csv_logger = BatchAwareCsvLogger(csv_log, steps_per_epoch)
-            logging.info("Initializing model checkpoint with (model_path," + str(model_path) +
-                ") (steps_per_epoch," + str(steps_per_epoch) +
-                ")")
-            cp_callback = tf.keras.callbacks.ModelCheckpoint(
-                filepath=model_path,
-                verbose=1,
-                save_weights_only=True,
-                save_freq=epochs)
-            get_weights_callback = GetWeights(model_weights_logger)
-            model_validation_steps = int(test_dataset_size // batch_size)
-            logging.info("Initializing training with (epochs," + str(epochs) +
-                ") (steps_per_epoch," + str(steps_per_epoch) +
-                ") (model_validation_steps," + str(model_validation_steps) +
-                ")")
-            self.save(output_dir)
-            self.model.fit(x=training_batch_generator,
-                           steps_per_epoch=steps_per_epoch,
-                           epochs=epochs, verbose=1,
-                           validation_data=validation_batch_generator,
-                           validation_steps=model_validation_steps,
-                           callbacks=[csv_logger, cp_callback, get_weights_callback],
-                           use_multiprocessing=cores > 0, workers=1 if cores <= 0 else cores)
-            self.save(output_dir)
-        else:
-            logging.warning("dry_run was activated and 'training' will not be launched")
+        accuracy = FixedMean()
+        return loss, accuracy
 
 
-
-auto_encoder = DETREND().build()
+detrend = DETREND().build()
 #auto_encoder.inform("DETREND.png")
-auto_encoder.train("/mnt/DATA-2/ete6/lcs/", os.getcwd(), 5, 50, dry_run=False, training_set_limit=100)
+detrend.train("/mnt/DATA-2/ete6/lcs/", os.getcwd(), 5, 50, dry_run=False, training_set_limit=100,
+              metrics=["mean_squared_error",
+                            "mean_absolute_error",
+                            "mean_absolute_percentage_error",
+                            "mean_squared_logarithmic_error",
+                            "cosine_proximity"])
 # lc_filenames = [str(file) for file in list(pathlib.Path("/mnt/DATA-2/ete6/lcs/").glob('*_lc.csv'))]
 # lc_filenames.sort()
 # lc_filenames = shuffle(lc_filenames)

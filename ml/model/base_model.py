@@ -5,8 +5,12 @@ import tensorflow as tf
 import pandas as pd
 from abc import abstractmethod
 
+from keras.callbacks import EarlyStopping
+from keras.optimizer_v2.learning_rate_schedule import ExponentialDecay
 from keras.utils.vis_utils import plot_model
 
+from ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
+from ml.callback.get_weights import GetWeights
 from ml.log.get_weights_logger import ModelWeightsLogger
 from ml.log.with_logging import WithLogging
 
@@ -18,9 +22,10 @@ class BaseModel(WithLogging):
 
     model = None
 
-    def __init__(self, name) -> None:
+    def __init__(self, name, input_size) -> None:
         super().__init__()
         self.name = name
+        self.input_size = input_size
 
     @abstractmethod
     def build(self, **kwargs):
@@ -28,14 +33,6 @@ class BaseModel(WithLogging):
         Should be used to create all the model layers and related capabilities to be used in the training and subsequent
         tasks.
         :param kwargs:
-        """
-        pass
-
-    @abstractmethod
-    def train(self, **kwargs):
-        """
-        Launches the model training with the case-specific kwargs
-        :param kwargs: the case-specific arguments
         """
         pass
 
@@ -133,6 +130,98 @@ class BaseModel(WithLogging):
                     file.write('file_name')
                     file.write('\n'.join(test_filenames))
         return train_filenames, validation_filenames, test_filenames
+
+    @abstractmethod
+    def instance_generator(self, dataset, dir, batch_size, input_sizes, zero_epsilon):
+        pass
+
+    @abstractmethod
+    def instance_loss_accuracy(self):
+        pass
+
+    def train(self, training_dir, output_dir, batch_size=20, epochs=20, initial_learning_rate=0.01,
+              learning_rate_decay_base=0.98, dataset_iterations_per_epoch=1, train_percent=0.8,
+              validation_percent=0.1, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
+              gradient_clip_norm=0.01, cores=0, metrics=[]):
+        logging.info("Preparing training data with (training_dir," + str(training_dir) +
+                     ") (train_percent," + str(train_percent) +
+                     ") (test_percent," + str(validation_percent) +
+                     ") (training_set_limit," + str(training_set_limit) +
+                     ")")
+        model_path = output_dir + self._get_model_dir()
+        if not os.path.exists(model_path):
+            os.mkdir(model_path)
+        train_filenames, validation_filenames, test_filenames = \
+            self.prepare_training_data(training_dir, model_path, train_percent, validation_percent, training_set_limit)
+        # The optimizer is executed once for every batch, hence optimizer steps per epoch are
+        train_dataset_size = len(train_filenames)
+        test_dataset_size = len(validation_filenames)
+        steps_per_epoch = int(dataset_iterations_per_epoch * train_dataset_size // batch_size)
+        total_steps = steps_per_epoch * epochs
+        learning_rate_decay_steps = total_steps // 100
+        learning_rate_decay_steps = learning_rate_decay_steps if learning_rate_decay_steps > epochs else epochs
+        logging.info("Initializing optimizer with (initial_learning_rate," + str(initial_learning_rate) +
+                     ") (learning_rate_decay_steps," + str(learning_rate_decay_steps) +
+                     ") (gradient_clip_norm," + str(gradient_clip_norm) +
+                     ")")
+        leaning_rate_schedule = ExponentialDecay(initial_learning_rate, decay_steps=learning_rate_decay_steps,
+                                                 decay_rate=learning_rate_decay_base)
+        optimizer = tf.keras.optimizers.Adam(leaning_rate_schedule, beta_1=0.9, beta_2=0.98, epsilon=1e-9,
+                                             clipnorm=gradient_clip_norm)
+        # We don't use SparseCategoricalCrossentropy because our targets are one-hot encoded
+        loss, accuracy = self.instance_loss_accuracy()
+        self.compile(optimizer, loss, metrics=[accuracy] + metrics)
+        model_weights_logger = ModelWeightsLogger()
+        if not dry_run:
+            logging.info("Initializing training and validation generators with (batch_size," + str(batch_size) +
+                         ") (self.input_size," + str(self.input_size) +
+                         ") (zero_epsilon," + str(zero_epsilon) +
+                         ")")
+            lcs_dir = training_dir + '/lcs/'
+            training_batch_generator = self.instance_generator(train_filenames, lcs_dir, batch_size,
+                                                               self.input_size, zero_epsilon)
+            validation_batch_generator = self.instance_generator(validation_filenames, lcs_dir, batch_size,
+                                                                 self.input_size, zero_epsilon)
+            csv_log = model_path + '/training_log.csv'
+            logging.info("Initializing csv logger with (csv_log," + str(csv_log) +
+                         ") (steps_per_epoch," + str(steps_per_epoch) +
+                         ")")
+            csv_logger = BatchAwareCsvLogger(csv_log, steps_per_epoch)
+            model_path = output_dir + self._get_model_dir()
+            logging.info("Initializing model checkpoint with (model_path," + str(model_path) +
+                         ") (steps_per_epoch," + str(steps_per_epoch) +
+                         ")")
+            cp_callback = tf.keras.callbacks.ModelCheckpoint(
+                filepath=model_path,
+                verbose=1,
+                save_weights_only=False,
+                save_freq=epochs)
+            early_stopping_callback = EarlyStopping(
+                monitor="val_loss",
+                min_delta=0.01,
+                patience=5,
+                verbose=0,
+                mode="auto",
+                baseline=None,
+                restore_best_weights=False,
+            )
+            get_weights_callback = GetWeights(model_weights_logger)
+            model_validation_steps = int(test_dataset_size // batch_size)
+            logging.info("Initializing training with (epochs," + str(epochs) +
+                         ") (steps_per_epoch," + str(steps_per_epoch) +
+                         ") (model_validation_steps," + str(model_validation_steps) +
+                         ")")
+            self.save(output_dir)
+            self.model.fit(x=training_batch_generator,
+                           steps_per_epoch=steps_per_epoch,
+                           epochs=epochs, verbose=1,
+                           validation_data=validation_batch_generator,
+                           validation_steps=model_validation_steps,
+                           callbacks=[csv_logger, cp_callback, get_weights_callback, early_stopping_callback],
+                           use_multiprocessing=cores > 0, workers=1 if cores <= 0 else cores)
+            self.save(output_dir)
+        else:
+            logging.warning("dry_run was activated and 'training' will not be launched")
 
     def load_model(self, dir):
         self.set_model(tf.keras.models.load_model(dir + self._get_model_dir()))
