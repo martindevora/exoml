@@ -80,7 +80,10 @@ class BaseModel(WithLogging):
         return self
 
     def save(self, dir):
+        dest_dir = dir + '/' + self._get_model_dir()
+        logging.info("Saving model into %s", dest_dir)
         self.model.save(dir + self._get_model_dir())
+        logging.info("Saved model")
 
     def prepare_training_data(self, training_dir, output_dir, train_percent=0.8, validation_percent=0.1,
                               training_set_limit=None):
