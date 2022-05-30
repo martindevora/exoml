@@ -30,7 +30,7 @@ class TranspotModelGenerator(tf.keras.utils.Sequence):
     def _prepare_input_lc(self, input_df):
         time = input_df["#time"].to_numpy()
         # We don't want time encoding because time will be used for folding and then dropped
-        #input_df["#time"] = value_encode_times(time - time[0])
+        input_df["#time"] = value_encode_times(time - time[0])
         dif = time[1:] - time[:-1]
         jumps = np.where(np.abs(dif) > 0.25)[0]
         jumps = np.append(jumps, len(input_df))
