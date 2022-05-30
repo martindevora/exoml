@@ -130,7 +130,7 @@ class DETREND(BaseModel):
     def train(self, training_dir, output_dir, batch_size=20, epochs=20, initial_learning_rate=0.00001,
               dataset_iterations_per_epoch=1, train_percent=0.8,
               test_percent=0.2, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
-              gradient_clip_norm=0.01):
+              gradient_clip_norm=0.01, cores=0):
         logging.info("Preparing training data with (training_dir," + str(training_dir) +
             ") (train_percent," + str(train_percent) +
             ") (test_percent," + str(test_percent) +
@@ -183,7 +183,7 @@ class DETREND(BaseModel):
                 filepath=model_path,
                 verbose=1,
                 save_weights_only=True,
-                save_freq=steps_per_epoch)
+                save_freq=epochs)
             get_weights_callback = GetWeights(model_weights_logger)
             model_validation_steps = int(test_dataset_size // batch_size)
             logging.info("Initializing training with (epochs," + str(epochs) +
@@ -196,8 +196,8 @@ class DETREND(BaseModel):
                            epochs=epochs, verbose=1,
                            validation_data=validation_batch_generator,
                            validation_steps=model_validation_steps,
-                           callbacks=[csv_logger, cp_callback, get_weights_callback])
-            logging.info("Saving model into " + model_path)
+                           callbacks=[csv_logger, cp_callback, get_weights_callback],
+                           use_multiprocessing=cores > 0, workers=1 if cores <= 0 else cores)
             self.save(output_dir)
         else:
             logging.warning("dry_run was activated and 'training' will not be launched")
@@ -206,7 +206,7 @@ class DETREND(BaseModel):
 
 auto_encoder = DETREND().build()
 #auto_encoder.inform("DETREND.png")
-auto_encoder.train("/mnt/DATA-2/ete6/lcs/", os.getcwd(), 10, 50, dry_run=True, training_set_limit=100)
+auto_encoder.train("/mnt/DATA-2/ete6/lcs/", os.getcwd(), 5, 50, dry_run=False, training_set_limit=100)
 # lc_filenames = [str(file) for file in list(pathlib.Path("/mnt/DATA-2/ete6/lcs/").glob('*_lc.csv'))]
 # lc_filenames.sort()
 # lc_filenames = shuffle(lc_filenames)

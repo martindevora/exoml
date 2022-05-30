@@ -226,7 +226,7 @@ class IATSON(BaseModel):
     def train(self, training_dir, output_dir, batch_size=20, epochs=20, initial_learning_rate=0.01,
               dataset_iterations_per_epoch=1, train_percent=0.8,
               validation_percent=0.1, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
-              gradient_clip_norm=0.01):
+              gradient_clip_norm=0.01, cores=0):
         logging.info("Preparing training data with (training_dir," + str(training_dir) +
                      ") (train_percent," + str(train_percent) +
                      ") (test_percent," + str(validation_percent) +
@@ -280,7 +280,7 @@ class IATSON(BaseModel):
                 filepath=model_path,
                 verbose=1,
                 save_weights_only=False,
-                save_freq=steps_per_epoch)
+                save_freq=epochs)
             early_stopping_callback = EarlyStopping(
                 monitor="val_loss",
                 min_delta=0.01,
@@ -302,8 +302,8 @@ class IATSON(BaseModel):
                            epochs=epochs, verbose=1,
                            validation_data=validation_batch_generator,
                            validation_steps=model_validation_steps,
-                           callbacks=[csv_logger, cp_callback, get_weights_callback, early_stopping_callback])
-            logging.info("Saving model into " + model_path)
+                           callbacks=[csv_logger, cp_callback, get_weights_callback, early_stopping_callback],
+                           use_multiprocessing=cores > 0, workers=1 if cores <= 0 else cores)
             self.save(output_dir)
         else:
             logging.warning("dry_run was activated and 'training' will not be launched")
@@ -369,6 +369,6 @@ epochs = 20
 model_dir = './'
 iatson = IATSON().build().inform(model_dir)
 iatson.train(training_dir, model_dir, batch_size, epochs, initial_learning_rate=0.01, gradient_clip_norm=0.1,
-             dry_run=False)
+             dry_run=False, cores=os.cpu_count() - 1)
 iatson = IATSON().load_model(model_dir)
 iatson.predict_test_set(training_dir, './test_dataset.csv', batch_size)
