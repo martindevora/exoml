@@ -6,25 +6,19 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 import keras
-from keras.callbacks import EarlyStopping
 from keras.layers import LeakyReLU
 from keras.losses import BinaryCrossentropy
 from keras.metrics import BinaryAccuracy
-from keras.optimizer_v2.learning_rate_schedule import ExponentialDecay
 from keras.utils import losses_utils
 from sklearn.utils import shuffle
 
-from ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
-from ml.callback.get_weights import GetWeights
-from ml.log.get_weights_logger import ModelWeightsLogger
+from ml import thread_config
 from ml.model.base_model import BaseModel, CategoricalPredictionSetStats
 from transpot.transpot_generator import TranspotModelGenerator
 
-
 class TRANSPOT(BaseModel):
-    def __init__(self) -> None:
-        super().__init__('TRANSPOT')
-        self.input_size = (20610, 13)
+    def __init__(self, input_size=(20610, 13)) -> None:
+        super().__init__('TRANSPOT', input_size)
 
     def _get_flux_conv_branch(self):
         # (time, flux, [detrended_flux1 ... detrended_flux5], flux_model, centroidx, centroidy, motionx, motiony, bck)
@@ -182,14 +176,3 @@ class TRANSPOT(BaseModel):
         precision = label_tp / (label_tp + label_fp)
         recall = label_tp / (label_tp + label_fn)
         return CategoricalPredictionSetStats(label_tp, label_fp, label_fn, accuracy, precision, recall)
-
-
-training_dir = '/mnt/DATA-2/ete6/'
-batch_size = 5
-epochs = 20
-model_dir = './'
-transpot = TRANSPOT().build().inform(model_dir)
-transpot.train(training_dir, model_dir, batch_size, epochs, initial_learning_rate=0.001, learning_rate_decay_base=0.98,
-               gradient_clip_norm=0.1, dry_run=False)
-transpot = TRANSPOT().load_model(model_dir)
-transpot.predict_test_set(training_dir, './test_dataset.csv', batch_size)

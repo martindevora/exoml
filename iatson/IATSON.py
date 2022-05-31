@@ -1,30 +1,21 @@
-import logging
 import multiprocessing
-import os
 
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 import keras
-from keras.callbacks import EarlyStopping
 from keras.layers import LeakyReLU
 from keras.losses import CategoricalCrossentropy
 from keras.metrics import CategoricalAccuracy
-from keras.optimizer_v2.learning_rate_schedule import ExponentialDecay
 from keras.utils import losses_utils
 from sklearn.utils import shuffle
 
-from ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
-from ml.callback.get_weights import GetWeights
 from iatson.iatson_generator import IatsonModelGenerator
-from ml.log.get_weights_logger import ModelWeightsLogger
 from ml.model.base_model import BaseModel, CategoricalPredictionSetStats
 
 
 class IATSON(BaseModel):
     def __init__(self) -> None:
-        super().__init__('IATSON')
-        self.input_size = [11, 2500, 500, 500, 500, 500, 500, 500]
+        super().__init__('IATSON', [11, 2500, 500, 500, 500, 500, 500, 500])
 
     def _get_flux_conv_branch(self, name):
         # (time, flux, [detrended_flux1 ... detrended_flux5], flux_model, centroidx, centroidy, motionx, motiony, bck)
@@ -284,14 +275,3 @@ class IATSON(BaseModel):
         precision = label_tp / (label_tp + label_fp)
         recall = label_tp / (label_tp + label_fn)
         return CategoricalPredictionSetStats(label_tp, label_fp, label_fn, accuracy, precision, recall)
-
-
-training_dir = '/mnt/DATA-2/ete6/'
-batch_size = 200
-epochs = 20
-model_dir = './'
-iatson = IATSON().build().inform(model_dir)
-iatson.train(training_dir, model_dir, batch_size, epochs, initial_learning_rate=0.01, gradient_clip_norm=0.1,
-             dry_run=False, cores=os.cpu_count() - 1)
-iatson = IATSON().load_model(model_dir)
-iatson.predict_test_set(training_dir, './test_dataset.csv', batch_size)

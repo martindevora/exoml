@@ -140,9 +140,9 @@ class BaseModel(WithLogging):
         pass
 
     def train(self, training_dir, output_dir, batch_size=20, epochs=20, initial_learning_rate=0.01,
-              learning_rate_decay_base=0.98, dataset_iterations_per_epoch=1, train_percent=0.8,
+              dataset_iterations_per_epoch=1, train_percent=0.8,
               validation_percent=0.1, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
-              gradient_clip_norm=0.01, cores=0, metrics=[]):
+              gradient_clip_norm=0.01, cores=0, metrics=[], learning_rate_schedule=None):
         logging.info("Preparing training data with (training_dir," + str(training_dir) +
                      ") (train_percent," + str(train_percent) +
                      ") (test_percent," + str(validation_percent) +
@@ -158,15 +158,16 @@ class BaseModel(WithLogging):
         test_dataset_size = len(validation_filenames)
         steps_per_epoch = int(dataset_iterations_per_epoch * train_dataset_size // batch_size)
         total_steps = steps_per_epoch * epochs
-        learning_rate_decay_steps = total_steps // 100
-        learning_rate_decay_steps = learning_rate_decay_steps if learning_rate_decay_steps > epochs else epochs
-        logging.info("Initializing optimizer with (initial_learning_rate," + str(initial_learning_rate) +
-                     ") (learning_rate_decay_steps," + str(learning_rate_decay_steps) +
-                     ") (gradient_clip_norm," + str(gradient_clip_norm) +
-                     ")")
-        leaning_rate_schedule = ExponentialDecay(initial_learning_rate, decay_steps=learning_rate_decay_steps,
-                                                 decay_rate=learning_rate_decay_base)
-        optimizer = tf.keras.optimizers.Adam(leaning_rate_schedule, beta_1=0.9, beta_2=0.98, epsilon=1e-9,
+        if learning_rate_schedule is None:
+            learning_rate_decay_steps = total_steps // 100
+            learning_rate_decay_steps = learning_rate_decay_steps if learning_rate_decay_steps > epochs else epochs
+            logging.info("Initializing optimizer with learning_rate_decay_steps," + str(learning_rate_decay_steps) +
+                         ") (gradient_clip_norm," + str(gradient_clip_norm) +
+                         ")")
+            learning_rate_schedule = ExponentialDecay(initial_learning_rate, decay_steps=learning_rate_decay_steps,
+                                                      decay_rate=0.98, staircase=True)
+        logging.info("Initializing optimizer with (initial_learning_rate," + str(initial_learning_rate) + ")")
+        optimizer = tf.keras.optimizers.Adam(learning_rate_schedule, beta_1=0.9, beta_2=0.98, epsilon=1e-9,
                                              clipnorm=gradient_clip_norm)
         # We don't use SparseCategoricalCrossentropy because our targets are one-hot encoded
         loss, accuracy = self.instance_loss_accuracy()
@@ -194,8 +195,8 @@ class BaseModel(WithLogging):
             cp_callback = tf.keras.callbacks.ModelCheckpoint(
                 filepath=model_path,
                 verbose=1,
-                save_weights_only=False,
-                save_freq=epochs)
+                save_weights_only=True,
+                save_freq='epoch')
             early_stopping_callback = EarlyStopping(
                 monitor="val_loss",
                 min_delta=0.01,
