@@ -11,6 +11,7 @@ from keras.utils.vis_utils import plot_model
 
 from ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
 from ml.callback.get_weights import GetWeights
+from ml.callback.training_data_aware import ValidationDataAwareCallback, ModelDirDataAwareCallback
 from ml.log.get_weights_logger import ModelWeightsLogger
 from ml.log.with_logging import WithLogging
 
@@ -142,7 +143,7 @@ class BaseModel(WithLogging):
     def train(self, training_dir, output_dir, batch_size=20, epochs=20, initial_learning_rate=0.01,
               dataset_iterations_per_epoch=1, train_percent=0.8,
               validation_percent=0.1, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
-              gradient_clip_norm=0.01, cores=0, metrics=[], learning_rate_schedule=None):
+              gradient_clip_norm=0.01, cores=0, metrics=[], callbacks=[], learning_rate_schedule=None):
         logging.info("Preparing training data with (training_dir," + str(training_dir) +
                      ") (train_percent," + str(train_percent) +
                      ") (test_percent," + str(validation_percent) +
@@ -192,6 +193,11 @@ class BaseModel(WithLogging):
             logging.info("Initializing model checkpoint with (model_path," + str(model_path) +
                          ") (steps_per_epoch," + str(steps_per_epoch) +
                          ")")
+            for callback in callbacks:
+                if issubclass(callback.__class__, ModelDirDataAwareCallback):
+                    callback.set_model_dir(model_path)
+                if issubclass(callback.__class__, ValidationDataAwareCallback):
+                    callback.set_validation_data(validation_batch_generator)
             cp_callback = tf.keras.callbacks.ModelCheckpoint(
                 filepath=model_path,
                 verbose=1,
@@ -218,7 +224,8 @@ class BaseModel(WithLogging):
                            epochs=epochs, verbose=1,
                            validation_data=validation_batch_generator,
                            validation_steps=model_validation_steps,
-                           callbacks=[csv_logger, cp_callback, get_weights_callback, early_stopping_callback],
+                           callbacks=[csv_logger, cp_callback, get_weights_callback, early_stopping_callback] +
+                                     callbacks,
                            use_multiprocessing=cores > 0, workers=1 if cores <= 0 else cores)
             self.save(output_dir)
         else:
