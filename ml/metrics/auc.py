@@ -4,8 +4,6 @@ import csv
 import pandas
 import tensorflow as tf
 import numpy as np
-from keras.callbacks import Callback
-from sklearn.metrics import auc
 import tensorflow.keras.backend as K
 
 from ml.callback.training_data_aware import ValidationDataAwareCallback
