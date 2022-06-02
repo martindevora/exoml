@@ -1,5 +1,6 @@
 import collections
 import csv
+import logging
 
 import pandas
 import tensorflow as tf
@@ -119,6 +120,7 @@ class ConfusionMatrixStatisticsCallback(ValidationDataAwareCallback):
         # confusion_matrix, accuracy, error_rate, precision, recall, f1_score = self.confusion_matrix(y_train, y_pred)
         # logs['F1_score_train'] = np.round(f1_score, 5)
         # if self.validation:
+        logging.info("Computing AUC metrics")
         batches = len(self.validation_data)
         y_valid = None
         for batch in range(batches):
@@ -174,3 +176,4 @@ class ConfusionMatrixStatisticsCallback(ValidationDataAwareCallback):
                                                   'precision': precisions[precision_index],
                                                   'thresholds': thresholds[precision_index]}, ignore_index=True)
         self.roc_df.to_csv(self.model_dir + '/precision_recall.csv', index=False)
+        logging.info("Computed AUC metrics")
