@@ -247,8 +247,8 @@ class IATSON(BaseModel):
         max_prediction_indexes[max_prediction_values == -1] = -1
         return max_prediction_indexes, max_prediction_values
 
-    def predict_test_set(self, training_dir, test_set_file, batch_size=20, zero_epsilon=1e-7):
-        test_dataset = pd.read_csv(test_set_file)
+    def predict_test_set(self, training_dir, model_dir, batch_size=20, zero_epsilon=1e-7):
+        test_dataset = pd.read_csv(model_dir + '/test_dataset.csv')
         lcs_dir = training_dir + '/lcs/'
         testing_batch_generator = IatsonModelGenerator(test_dataset, lcs_dir, batch_size, self.input_size,
                                                        zero_epsilon)
