@@ -1,6 +1,6 @@
 import logging
 import os
-
+import numpy as np
 import tensorflow as tf
 import pandas as pd
 from abc import abstractmethod
@@ -12,6 +12,7 @@ from keras.utils.vis_utils import plot_model
 from ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
 from ml.callback.get_weights import GetWeights
 from ml.callback.training_data_aware import ValidationDataAwareCallback, ModelDirDataAwareCallback
+from ml.learning_rate.schedulers import ExponentialRescaleDecay
 from ml.log.get_weights_logger import ModelWeightsLogger
 from ml.log.with_logging import WithLogging
 
@@ -160,13 +161,19 @@ class BaseModel(WithLogging):
         steps_per_epoch = int(dataset_iterations_per_epoch * train_dataset_size // batch_size)
         total_steps = steps_per_epoch * epochs
         if learning_rate_schedule is None:
-            learning_rate_decay_steps = total_steps // 100
-            learning_rate_decay_steps = learning_rate_decay_steps if learning_rate_decay_steps > epochs else epochs
+            learning_rate_decay_steps = steps_per_epoch // 2
+            learning_rate_decay_steps = learning_rate_decay_steps if learning_rate_decay_steps > steps_per_epoch else steps_per_epoch
             logging.info("Initializing optimizer with learning_rate_decay_steps," + str(learning_rate_decay_steps) +
                          ") (gradient_clip_norm," + str(gradient_clip_norm) +
                          ")")
-            learning_rate_schedule = ExponentialDecay(initial_learning_rate, decay_steps=learning_rate_decay_steps,
-                                                      decay_rate=0.98, staircase=True)
+            exponential_decay_base = 0.95
+            powers_for_half_learning_rate_decay = np.log(0.95/2) // np.log(0.95)
+            learning_rate_schedule = ExponentialRescaleDecay(initial_learning_rate,
+                                                             decay_steps=learning_rate_decay_steps,
+                                                             decay_rate=exponential_decay_base,
+                                                             restore_steps=learning_rate_decay_steps * powers_for_half_learning_rate_decay,
+                                                             restore_rate=1.5,
+                                                             staircase=True)
         logging.info("Initializing optimizer with (initial_learning_rate," + str(initial_learning_rate) + ")")
         optimizer = tf.keras.optimizers.Adam(learning_rate_schedule, beta_1=0.9, beta_2=0.98, epsilon=1e-9,
                                              clipnorm=gradient_clip_norm)
@@ -203,15 +210,15 @@ class BaseModel(WithLogging):
                 verbose=1,
                 save_weights_only=True,
                 save_freq='epoch')
-            early_stopping_callback = EarlyStopping(
-                monitor="val_loss",
-                min_delta=0.01,
-                patience=5,
-                verbose=0,
-                mode="auto",
-                baseline=None,
-                restore_best_weights=False,
-            )
+            # early_stopping_callback = EarlyStopping(
+            #     monitor="val_loss",
+            #     min_delta=0.01,
+            #     patience=5,
+            #     verbose=0,
+            #     mode="auto",
+            #     baseline=None,
+            #     restore_best_weights=False,
+            # )
             get_weights_callback = GetWeights(model_weights_logger)
             model_validation_steps = int(test_dataset_size // batch_size)
             logging.info("Initializing training with (epochs," + str(epochs) +
@@ -224,7 +231,7 @@ class BaseModel(WithLogging):
                            epochs=epochs, verbose=1,
                            validation_data=validation_batch_generator,
                            validation_steps=model_validation_steps,
-                           callbacks=[csv_logger, cp_callback, get_weights_callback, early_stopping_callback] +
+                           callbacks=[csv_logger, cp_callback, get_weights_callback] +
                                      callbacks,
                            use_multiprocessing=cores > 0, workers=1 if cores <= 0 else cores)
             self.save(output_dir)
@@ -232,7 +239,8 @@ class BaseModel(WithLogging):
             logging.warning("dry_run was activated and 'training' will not be launched")
 
     def load_model(self, dir):
-        self.set_model(tf.keras.models.load_model(dir + self._get_model_dir()))
+        self.set_model(tf.keras.models.load_model(dir,
+                                                  custom_objects={'ExponentialRescaleDecay': ExponentialRescaleDecay}))
         return self
 
     def set_model(self, model):
