@@ -6,7 +6,6 @@ import pandas as pd
 from abc import abstractmethod
 
 from keras.callbacks import EarlyStopping
-from keras.optimizer_v2.learning_rate_schedule import ExponentialDecay
 from keras.utils.vis_utils import plot_model
 
 from ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
