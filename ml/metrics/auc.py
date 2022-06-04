@@ -1,13 +1,89 @@
-import collections
-import csv
-import logging
-
-import pandas
 import tensorflow as tf
 import numpy as np
 import tensorflow.keras.backend as K
 
-from ml.callback.training_data_aware import ValidationDataAwareCallback
+
+@tf.function
+def tp_tf(y_true, y_pred, label_index=0, threshold=0.5):
+    y_true_label = tf.gather(y_true, [label_index], axis=1)
+    y_pred_label = tf.gather(y_pred, [label_index], axis=1)
+    y_true_label = y_true_label[:, 0]
+    y_pred_label = y_pred_label[:, 0]
+    real_positive_indexes_mask = tf.math.greater(y_true_label, 0)
+    predicted_positive_indexes_mask = tf.math.greater(y_pred_label, threshold)
+    positive_indexes_intersect_mask = tf.math.logical_and(predicted_positive_indexes_mask, real_positive_indexes_mask)
+    predicted_positives = tf.cast(tf.size(tf.where(predicted_positive_indexes_mask)), tf.float32)
+    predicted_positives_in_true_set = tf.cast(tf.size(tf.where(positive_indexes_intersect_mask)), tf.float32)
+    tp = predicted_positives_in_true_set / (predicted_positives + tf.keras.backend.epsilon())
+    return tp
+
+
+@tf.function
+def fp_tf(y_true, y_pred, label_index=0, threshold=0.5):
+    y_true_label = tf.gather(y_true, [label_index], axis=1)
+    y_pred_label = tf.gather(y_pred, [label_index], axis=1)
+    y_true_label = y_true_label[:, 0]
+    y_pred_label = y_pred_label[:, 0]
+    real_positive_indexes_mask = tf.math.greater(y_true_label, 0)
+    predicted_positive_indexes_mask = tf.math.greater(y_pred_label, threshold)
+    positive_indexes_intersect_mask = tf.math.logical_and(predicted_positive_indexes_mask, real_positive_indexes_mask)
+    predicted_positives = tf.cast(tf.size(tf.where(predicted_positive_indexes_mask)), tf.float32)
+    predicted_positives_in_true_set = tf.cast(tf.size(tf.where(positive_indexes_intersect_mask)), tf.float32)
+    fp = (predicted_positives - predicted_positives_in_true_set) / (predicted_positives + K.epsilon())
+    return fp
+
+
+@tf.function
+def fn_tf(y_true, y_pred, label_index=0, threshold=0.5):
+    y_true_label = tf.gather(y_true, [label_index], axis=1)
+    y_pred_label = tf.gather(y_pred, [label_index], axis=1)
+    y_true_label = y_true_label[:, 0]
+    y_pred_label = y_pred_label[:, 0]
+    real_negative_indexes_mask = tf.math.equal(y_true_label, 0)
+    predicted_negative_indexes_mask = tf.math.less_equal(y_pred_label, threshold)
+    negative_indexes_intersect_mask = tf.math.logical_and(predicted_negative_indexes_mask, real_negative_indexes_mask)
+    predicted_negative_indexes_mask = tf.math.less_equal(y_pred_label, threshold)
+    predicted_negatives = tf.cast(tf.size(tf.where(predicted_negative_indexes_mask)), tf.float32)
+    predicted_negatives_in_true_set = tf.cast(tf.size(tf.where(negative_indexes_intersect_mask)), tf.float32)
+    fn = (predicted_negatives - predicted_negatives_in_true_set) / (predicted_negatives + K.epsilon())
+    return fn
+
+
+@tf.function
+def tn_tf(y_true, y_pred, label_index=0, threshold=0.5):
+    y_true_label = tf.gather(y_true, [label_index], axis=1)
+    y_pred_label = tf.gather(y_pred, [label_index], axis=1)
+    y_true_label = y_true_label[:, 0]
+    y_pred_label = y_pred_label[:, 0]
+    real_negative_indexes_mask = tf.math.equal(y_true_label, 0)
+    predicted_negative_indexes_mask = tf.math.less_equal(y_pred_label, threshold)
+    negative_indexes_intersect_mask = tf.math.logical_and(predicted_negative_indexes_mask, real_negative_indexes_mask)
+    predicted_negative_indexes_mask = tf.math.less_equal(y_pred_label, threshold)
+    predicted_negatives = tf.cast(tf.size(tf.where(predicted_negative_indexes_mask)), tf.float32)
+    predicted_negatives_in_true_set = tf.cast(tf.size(tf.where(negative_indexes_intersect_mask)), tf.float32)
+    tn = predicted_negatives_in_true_set / (predicted_negatives + tf.keras.backend.epsilon())
+    return tn
+
+
+@tf.function
+def precision_tf(y_true, y_pred, label_index=0, threshold=0.5):
+    tp = tp_tf(y_true, y_pred, label_index, threshold)
+    fp = fp_tf(y_true, y_pred, label_index, threshold)
+    return tp / (tp + fp + K.epsilon())
+
+
+@tf.function
+def recall_tf(y_true, y_pred, label_index=0, threshold=0.5):
+    tp = tp_tf(y_true, y_pred, label_index, threshold)
+    fn = fn_tf(y_true, y_pred, label_index, threshold)
+    return tp / (tp + fn + K.epsilon())
+
+
+@tf.function
+def f1_score_tf(y_true, y_pred, label_index=0, threshold=0.5):
+    precision = precision_tf(y_true, y_pred, label_index, threshold)
+    recall = recall_tf(y_true, y_pred, label_index, threshold)
+    return 2 * precision * recall / (precision + recall + K.epsilon())
 
 
 @tf.function
@@ -43,6 +119,7 @@ def confusion_matrix_values_tf(y_true, y_pred, label_index=0, threshold=0.5):
         f1_score = 2 * precision * recall / (precision + recall + K.epsilon())
         return [[tp, fp], [fn, tn]], accuracy, error_rate, precision, recall, f1_score, np.nan
 
+
 def confusion_matrix_values(y_true, y_pred, label_index=0, threshold=0.5):
     y_true_label = np.transpose(y_true)[label_index]
     y_pred_label = np.transpose(y_pred)[label_index]
@@ -65,7 +142,7 @@ def confusion_matrix_values(y_true, y_pred, label_index=0, threshold=0.5):
     if predicted_positives == 0:
         return [[np.nan, np.nan], [np.nan, np.nan]], accuracy, error_rate, np.nan, np.nan, np.nan
     else:
-        tn = predicted_negatives_in_true_set / (predicted_negatives + tf.keras.backend.epsilon())
+        tn = predicted_negatives_in_true_set / (predicted_negatives + K.epsilon())
         fp = (predicted_positives - predicted_positives_in_true_set) / (predicted_positives + K.epsilon())
         fn = (predicted_negatives - predicted_negatives_in_true_set) / (predicted_negatives + K.epsilon())
         precision = tp / (tp + fp + K.epsilon())
@@ -89,3 +166,19 @@ def area_under_curve(y_true, y_pred, label_index=0, thresholds=100, method='roc'
     y = precisions[~nan_values]
     threshold_values = threshold_values[~nan_values]
     return x, y, threshold_values, np.trapz(y, x)
+
+class CategoricalClassMetric(tf.keras.metrics.Metric):
+    def __init__(self, class_index, metric_function, batch_size, name="categorical_class_metric", metric_threshold=0.5,
+                 **kwargs):
+        super(CategoricalClassMetric, self).__init__(name=name, **kwargs)
+        self.batch_size = batch_size
+        self.metric_function = metric_function
+        self.metric_threshold = metric_threshold
+        self.class_index = class_index
+        self.metric = 0
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        self.metric = self.metric_function(y_true, y_pred, self.class_index, self.metric_threshold)
+
+    def result(self):
+        return self.metric
