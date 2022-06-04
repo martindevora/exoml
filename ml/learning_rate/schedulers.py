@@ -54,9 +54,13 @@ class ExponentialRescaleDecay(LearningRateSchedule):
             # Mod is enforcing float64
             steps_since_last_rescale = tf.math.mod(step_double, restore_steps)
             restores_done = tf.math.floordiv(step_double, restore_steps)
-            restores_done = tf.cond(tf.math.equal(restores_done, 0), lambda: 1, lambda: restores_done + 1)
-            restores_done_by_rate = tf.cond(tf.math.equal(restores_done, 1), lambda: restores_done,
-                                    lambda: tf.divide(restores_done, restore_rate))
+            one_tensor = tf.cast(tf.constant(1), dtype)
+            restores_done = tf.cond(tf.math.equal(restores_done, 0),
+                                    lambda: one_tensor,
+                                    lambda: restores_done + one_tensor)
+            restores_done_by_rate = tf.cond(tf.math.equal(restores_done, 1),
+                                            lambda: restores_done,
+                                            lambda: tf.divide(restores_done, restore_rate))
             p = steps_since_last_rescale / decay_steps
             if self.staircase:
                 p = tf.floor(p)
