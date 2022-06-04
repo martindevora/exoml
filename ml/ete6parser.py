@@ -3,11 +3,14 @@ import multiprocessing
 import os
 import pathlib
 import shutil
+import traceback
 from multiprocessing import Pool
-
+import astropy.units as u
 import pandas as pd
 import numpy as np
 import wotan
+from astropy.coordinates import SkyCoord
+from astroquery.mast import Catalogs
 from lcbuilder.star.TicStarCatalog import TicStarCatalog
 from lightkurve import TessLightCurve
 from numpy.random import default_rng
@@ -140,6 +143,9 @@ def create_injection_dataframe(injections_dir, lcs_dir):
     df.to_csv(injections_dir + '/injected_objects.csv')
 
 def create_star_csvs(lcs_dir):
+    search_radius = 10
+    pixel_size = 20.25*u.arcsec
+    count = 0
     for lc_file in list(pathlib.Path(lcs_dir).glob('*.fits')):
         lc = TessLightCurve.read(lc_file)
         object_id = lc.meta['OBJECT']
@@ -150,18 +156,77 @@ def create_star_csvs(lcs_dir):
             try:
                 star_info = TicStarCatalog().catalog_info(object_id)
                 star_df = pd.DataFrame(
-                    columns=['ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k'])
-                star_df = star_df.append({'ld_a': star_info[0][0], 'ld_b': star_info[0][1], 'Teff': star_info[1],
+                    columns=['id', 'ra,', 'dec', 'ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k',
+                             'dist_arcsec'])
+                star_df = star_df.append({'id': object_id, 'ra': star_info[11], 'dec': star_info[12],
+                                          'ld_a': star_info[0][0],
+                                          'ld_b': star_info[0][1], 'Teff': star_info[1],
                                           'lum': star_info[2], 'logg': star_info[3], 'radius': star_info[5],
                                           'mass': star_info[8], 'v': star_info[13], 'j': star_info[15],
                                           'h': star_info[17],
-                                          'k': star_info[19]}, ignore_index=True)
-                star_df.to_csv(lcs_dir + '/' + leading_zeros_object_id + '_star.csv')
+                                          'k': star_info[19], 'dist_arcsec': 0}, ignore_index=True)
                 break
             except Exception as e:
                 print(e)
                 tries = tries + 1
         assert tries < 3
+        try: # Acquiring neighbours parameters
+            ra = star_df['ra'].iloc[0]
+            dec = star_df['dec'].iloc[0]
+            if ra is not None and dec is not None:
+                ticid = Catalogs.query_region(
+                    SkyCoord(ra, dec, unit="deg"),
+                    radius=search_radius * pixel_size,
+                    catalog="TIC"
+                )[0]["ID"]
+            df = Catalogs.query_object(
+                "TIC"+str(ticid),
+                radius=search_radius*pixel_size,
+                catalog="TIC"
+                )
+            stars = df.to_pandas()
+            sep = [0]
+            pa = [0]
+            c_target = SkyCoord(
+                stars["ra"].values[0],
+                stars["dec"].values[0],
+                unit="deg"
+            )
+            for i in range(1, len(stars)):
+                c_star = SkyCoord(
+                    stars["ra"].values[i],
+                    stars["dec"].values[i],
+                    unit="deg"
+                )
+                sep.append(
+                    np.round(
+                        c_target.separation(c_star).to(u.arcsec).value,
+                        3
+                    )
+                )
+                pa.append(
+                    np.round(
+                        c_target.position_angle(c_star).to(u.deg).value,
+                        3
+                    )
+                )
+            stars["dist_arcsec"] = sep
+            stars["PA (E of N)"] = pa #TODO should we use this?
+            for index, star in stars.iterrows():
+                star_df = star_df.append({'id': star['ID'], 'ra': star['ra'], 'dec': star['dec'], 'ld_a': 0,
+                                          'ld_b': 0, 'Teff': star['Teff'],
+                                          'lum': star['lum'], 'logg': star['logg'], 'radius': star['rad'],
+                                          'mass': star['mass'], 'v': star['Vmag'], 'j': star['Jmag'],
+                                          'h': star['Hmag'],
+                                          'k': star['Kmag'], 'dist_arcsec': star['dist_arcsec']}, ignore_index=True)
+            star_df = star_df.sort_values(["dist_arcsec"], ascending=True)
+        except Exception as e:
+            print('Something failed when retrieving neighbours info')
+            traceback.print_exc()
+        star_df.to_csv(lcs_dir + '/' + leading_zeros_object_id + '_star.csv')
+        count = count + 1
+        if count % 100 == 99:
+            print('Processed ' + str(count) + ' stars')
 
 def smooth_and_detrend(time_array, flux_array, detrend_window, time_threshold=0.0001, window_len=11,
                         window='blackman'):
@@ -313,6 +378,6 @@ lcs_dir = root_dir + 'lcs/'
 #uncompress_data('/mnt/DATA-2/ete6/backebs/BackEBs/')
 #uncompress_data('/mnt/DATA-2/ete6/ebs/EBs/')
 #uncompress_data('/mnt/DATA-2/ete6/planets/Planets/')
-#create_star_csvs(root_dir, lcs_dir)
-create_injection_dataframe(root_dir, lcs_dir)
+create_star_csvs(lcs_dir)
+#create_injection_dataframe(root_dir, lcs_dir)
 #create_target_csvs(lcs_dir, root_dir)
