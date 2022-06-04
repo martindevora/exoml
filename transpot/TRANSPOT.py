@@ -1,22 +1,17 @@
 import logging
 import multiprocessing
-import os
 
 import numpy as np
 import pandas as pd
-import tensorflow as tf
 import keras
 from keras.layers import LeakyReLU
-from keras.losses import BinaryCrossentropy
-from keras.metrics import BinaryAccuracy
-from keras.utils import losses_utils
 from sklearn.utils import shuffle
 
-from ml import thread_config
-from ml.model.base_model import BaseModel, CategoricalPredictionSetStats
+from ml.model.base_model import CategoricalPredictionSetStats
+from ml.model.binary_model import BinaryModel
 from transpot.transpot_generator import TranspotModelGenerator
 
-class TRANSPOT(BaseModel):
+class TRANSPOT(BinaryModel):
     def __init__(self, input_size=(20610, 13)) -> None:
         super().__init__('TRANSPOT', input_size)
 
@@ -114,14 +109,8 @@ class TRANSPOT(BaseModel):
         injected_objects_df.reset_index(inplace=True, drop=True)
         return injected_objects_df
 
-
     def instance_generator(self, dataset, dir, batch_size, input_sizes, zero_epsilon):
         return TranspotModelGenerator(dataset, dir, batch_size, input_sizes, zero_epsilon)
-
-    def instance_loss_accuracy(self):
-        loss = BinaryCrossentropy(reduction=losses_utils.ReductionV2.AUTO)
-        accuracy = BinaryAccuracy()
-        return loss, accuracy
 
     def predict(self, input):
         prediction = self.model(input, training=False)
@@ -139,7 +128,7 @@ class TRANSPOT(BaseModel):
         else:
             return max_prediction_indexes, max_prediction_values
 
-    def predict_threshold(self, predictions, threshold=[0.8, 0.8, 0.8, 0.5]):
+    def predict_threshold(self, predictions, threshold=[0.5, 0.5, 0.5, 0.5]):
         max_prediction_indexes = [np.argmax(prediction) for prediction in predictions]
         max_prediction_values = [predictions[index][max_prediction_index]
                                  if predictions[index][max_prediction_index] > threshold[predictions[index][max_prediction_index]]
