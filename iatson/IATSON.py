@@ -4,18 +4,18 @@ import numpy as np
 import pandas as pd
 import keras
 from keras.layers import LeakyReLU
-from keras.losses import CategoricalCrossentropy
-from keras.metrics import CategoricalAccuracy
 from keras.utils import losses_utils
 from sklearn.utils import shuffle
 
 from iatson.iatson_generator import IatsonModelGenerator
-from ml.model.base_model import BaseModel, CategoricalPredictionSetStats
+from ml.model.base_model import CategoricalPredictionSetStats
+from ml.model.categorical_model import CategoricalModel
 
 
-class IATSON(BaseModel):
-    def __init__(self) -> None:
-        super().__init__('IATSON', [11, 2500, 500, 500, 500, 500, 500, 500])
+class IATSON(CategoricalModel):
+    def __init__(self, class_names=[]) -> None:
+        super().__init__(class_names, 'IATSON', [11, 2500, 500, 500, 500, 500, 500, 500])
+        self.class_names = class_names
 
     def _get_flux_conv_branch(self, name):
         # (time, flux, [detrended_flux1 ... detrended_flux5], flux_model, centroidx, centroidy, motionx, motiony, bck)
@@ -216,11 +216,6 @@ class IATSON(BaseModel):
 
     def instance_generator(self, dataset, dir, batch_size, input_sizes, zero_epsilon):
         return IatsonModelGenerator(dataset, dir, batch_size, input_sizes, zero_epsilon)
-
-    def instance_loss_accuracy(self):
-        loss = CategoricalCrossentropy(reduction=losses_utils.ReductionV2.AUTO)
-        accuracy = CategoricalAccuracy()
-        return loss, accuracy
 
     def predict(self, input):
         prediction = self.model(input, training=False)
