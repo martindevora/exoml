@@ -140,6 +140,10 @@ class BaseModel(WithLogging):
     def instance_loss_accuracy(self):
         pass
 
+    @abstractmethod
+    def instance_metrics(self):
+        pass
+
     def train(self, training_dir, output_dir, batch_size=20, epochs=20, initial_learning_rate=0.01,
               dataset_iterations_per_epoch=1, train_percent=0.8,
               validation_percent=0.1, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
@@ -178,7 +182,7 @@ class BaseModel(WithLogging):
                                              clipnorm=gradient_clip_norm)
         # We don't use SparseCategoricalCrossentropy because our targets are one-hot encoded
         loss, accuracy = self.instance_loss_accuracy()
-        self.compile(optimizer, loss, metrics=[accuracy] + metrics)
+        self.compile(optimizer, loss, metrics=[accuracy] + self.instance_metrics() + metrics)
         model_weights_logger = ModelWeightsLogger()
         if not dry_run:
             logging.info("Initializing training and validation generators with (batch_size," + str(batch_size) +
