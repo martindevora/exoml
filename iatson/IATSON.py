@@ -14,7 +14,7 @@ from ml.model.categorical_model import CategoricalModel
 
 class IATSON(CategoricalModel):
     def __init__(self, class_names=[]) -> None:
-        super().__init__(class_names, 'IATSON', [11, 2500, 500, 500, 500, 500, 500, 500])
+        super().__init__(class_names, 'IATSON', [11, 9 * 15, 2500, 500, 500, 500, 500, 500, 500])
         self.class_names = class_names
 
     def _get_flux_conv_branch(self, name):
@@ -189,21 +189,32 @@ class IATSON(CategoricalModel):
     def build(self):
         leaky_relu_alpha = 0.01
         stellar_model_input = keras.Input(shape=(11, 1), name="stellar_model")
-        stellar_model_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha), name="stellar-first")(stellar_model_input)
+        stellar_model_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha), name="stellar-first")(
+            stellar_model_input)
         stellar_model_branch = keras.layers.Dropout(rate=0.1, name="stellar-first-dropout-0.1")(stellar_model_branch)
-        stellar_model_branch = keras.layers.Dense(16, activation="relu", name="stellar-refinement")(
+        stellar_model_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha), name="stellar-refinement")(
             stellar_model_branch)
+        #(TEFF, lum, 4 magnitudes, distance, radius, mass) * 15 stars
+        stellar_neighbours_input = keras.Input(shape=(9 * 15, 1), name="stellar_neighbours_model")
+        stellar_neighbours_branch = keras.layers.Dense(100, activation=LeakyReLU(leaky_relu_alpha), name="stellar-neighbours-1")(
+            stellar_neighbours_input)
+        stellar_neighbours_branch = keras.layers.Dropout(rate=0.1, name="stellar-neighbours-1-dropout-0.1")(stellar_neighbours_branch)
+        stellar_neighbours_branch = keras.layers.Dense(50, activation=LeakyReLU(leaky_relu_alpha), name="stellar-neighbours-2")(
+            stellar_neighbours_branch)
+        stellar_neighbours_branch = keras.layers.Dropout(rate=0.1, name="stellar-neighbours-2-dropout-0.1")(stellar_neighbours_branch)
+        stellar_neighbours_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha), name="stellar-neighbours_3")(
+            stellar_neighbours_branch)
         flux_model_branch = self._get_flux_model_branch()
         focus_flux_model_branch = self._get_focus_flux_model_branch()
         final_branch = keras.layers.Concatenate(axis=1)(
-            [stellar_model_branch, flux_model_branch.output, focus_flux_model_branch.output])
+            [stellar_model_branch, stellar_neighbours_branch, flux_model_branch.output, focus_flux_model_branch.output])
         final_branch = keras.layers.GlobalAveragePooling1D()(final_branch)
         final_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha), name="final-dense1")(final_branch)
         final_branch = keras.layers.Dropout(rate=0.1)(final_branch)
         final_branch = keras.layers.Dense(32, activation=LeakyReLU(leaky_relu_alpha), name="final-dense2")(final_branch)
         final_branch = keras.layers.Dropout(rate=0.1)(final_branch)
         final_branch = keras.layers.Dense(4, activation="softmax", name="final-dense-softmax")(final_branch)
-        inputs = [stellar_model_input] + flux_model_branch.inputs + focus_flux_model_branch.inputs
+        inputs = [stellar_model_input, stellar_neighbours_input] + flux_model_branch.inputs + focus_flux_model_branch.inputs
         self.set_model(keras.Model(inputs=inputs, outputs=final_branch, name="IATSON"))
         return self
 
