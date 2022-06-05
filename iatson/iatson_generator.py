@@ -10,6 +10,8 @@ import tensorflow as tf
 import numpy as np
 import pandas as pd
 
+from ml.functions.functions import sigmoid
+
 
 class IatsonModelGenerator(tf.keras.utils.Sequence):
     TYPE_TO_LABEL = {'bckEB': [1, 0, 0, 0], 'EB': [0, 1, 0, 0], 'planet': [0, 0, 1, 0], 'none': [0, 0, 0, 1]}
@@ -87,6 +89,10 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
     def _prepare_input_star(self, star_df):
         star_df.drop('id', inplace=True, axis=1)
         star_df.drop('Unnamed: 0', inplace=True, axis=1)
+        star_df.drop('ra', inplace=True, axis=1)
+        star_df.drop('ra,', inplace=True, axis=1)
+        star_df.drop('dec', inplace=True, axis=1)
+        star_df.drop('dist_arcsec', inplace=True, axis=1)
         star_df['ld_a'] = star_df['ld_a'].fillna(0.25)
         star_df['ld_b'] = star_df['ld_b'].fillna(0.25)
         star_df['Teff'] = star_df['Teff'].fillna(6000)
@@ -103,12 +109,12 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
         star_df['radius'] = star_df['radius'] if star_df['radius'].iloc[0] <= 1 else 1
         star_df['mass'] = star_df['mass'] / 3
         star_df['mass'] = star_df['mass'] if star_df['mass'].iloc[0] <= 1 else 1
-        star_df['lum'] = star_df['mass'] / 1000
-        star_df['logg'] = star_df['logg'] / 100
-        star_df['v'] = (7 - star_df['v']) / 27
-        star_df['j'] = (7 - star_df['j']) / 27
-        star_df['k'] = (7 - star_df['k']) / 27
-        star_df['h'] = (7 - star_df['h']) / 27
+        star_df['lum'] = sigmoid(star_df['lum'])
+        star_df['logg'] = sigmoid(star_df['logg'])
+        star_df['v'] = (30 - star_df['v']) / 40
+        star_df['j'] = (30 - star_df['j']) / 40
+        star_df['k'] = (30 - star_df['k']) / 40
+        star_df['h'] = (30 - star_df['h']) / 40
         star_df = star_df.iloc[0]
         return star_df
 
@@ -219,7 +225,7 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
             neighbours_array = star_neighbours_df.to_numpy().flatten()
             star_neighbours_array[i] = np.transpose([neighbours_array if len(neighbours_array) == 9 * 15 \
                 else neighbours_array + np.zeros(9 * 15 - len(neighbours_array))])
-            star_array[i] = np.transpose(star_df.to_numpy())
+            star_array[i] = np.transpose([star_df.to_numpy()])
             time = lc_df['#time'].to_numpy()
             # Global flux
             # Shifting data 1/4 so that main transit and possible occultation don't get cut by the borders
@@ -298,7 +304,7 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
             # logging.info("GENERATOR Folded Odd Har Inputs max " + str(np.max(folded_flux_odd_har_array[i])) +
             #              " and min " + str(np.min(folded_flux_odd_har_array[i])))
             i = i + 1
-        return [star_array, global_flux_array, folded_flux_even_array, folded_flux_odd_array,
+        return [star_array, star_neighbours_array, global_flux_array, folded_flux_even_array, folded_flux_odd_array,
                 folded_flux_even_subhar_array, folded_flux_odd_subhar_array, folded_flux_even_har_array,
                 folded_flux_odd_har_array], batch_data_values
 
