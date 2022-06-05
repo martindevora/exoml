@@ -201,9 +201,9 @@ class IatsonModelGenerator(tf.keras.utils.Sequence):
             leading_zeros_object_id = '{:09}'.format(target_id)
             lc_filename = str(leading_zeros_object_id) + '_lc.csv'
             star_filename = str(leading_zeros_object_id) + '_star.csv'
-            star_neighbours_df = pd.read_csv(self.lcs_dir + '/' + star_filename, usecols=['Teff', 'lum', 'v', 'j',
-                                                                           'k', 'h', 'radius', 'mass', 'dist_arcsec'],
-                                             index_col=False)
+            star_neighbours_df = pd.read_csv(self.lcs_dir + '/' + star_filename,
+                                             usecols=['Teff', 'lum', 'v', 'j', 'k', 'h', 'radius', 'mass',
+                                                      'dist_arcsec'], index_col=False)
             star_neighbours_df = self._prepare_input_neighbour_stars(star_neighbours_df)
             star_df = pd.read_csv(self.lcs_dir + '/' + star_filename, index_col=False)
             star_df = self._prepare_input_star(star_df)
