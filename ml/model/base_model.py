@@ -144,6 +144,10 @@ class BaseModel(WithLogging):
     def instance_metrics(self):
         pass
 
+    @abstractmethod
+    def plot_metrics(self):
+        pass
+
     def train(self, training_dir, output_dir, batch_size=20, epochs=20, initial_learning_rate=0.01,
               dataset_iterations_per_epoch=1, train_percent=0.8,
               validation_percent=0.1, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
@@ -229,7 +233,7 @@ class BaseModel(WithLogging):
                          ") (model_validation_steps," + str(model_validation_steps) +
                          ")")
             self.save(output_dir)
-            self.model.fit(x=training_batch_generator,
+            fit_history = self.model.fit(x=training_batch_generator,
                            steps_per_epoch=steps_per_epoch,
                            epochs=epochs, verbose=1,
                            validation_data=validation_batch_generator,
@@ -237,6 +241,13 @@ class BaseModel(WithLogging):
                            callbacks=[csv_logger, cp_callback, get_weights_callback] +
                                      callbacks,
                            use_multiprocessing=cores > 0, workers=1 if cores <= 0 else cores)
+            val_history = {}
+            val_history['epoch'] = fit_history['epoch']
+            for key, value in fit_history:
+                if 'val_' in key:
+                    val_history[key] = value
+            history_df = pd.DataFrame.from_dict(fit_history)
+            history_df.to_csv(model_path + '/val_log.csv', index=False)
             self.save(output_dir)
         else:
             logging.warning("dry_run was activated and 'training' will not be launched")
