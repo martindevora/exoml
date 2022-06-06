@@ -1,16 +1,19 @@
+import matplotlib.pyplot as plt
 from numpy.random import default_rng
 
 from ete6.ete6_generator import Ete6ModelGenerator
 from ml.encoding.time_position import value_encode_times
 from sklearn.utils import shuffle
+import tensorflow as tf
 import numpy as np
 import pandas as pd
+
+from ml.physics.transit_functions import t14
 
 
 class TranspotModelGenerator(Ete6ModelGenerator):
     def __init__(self, injected_objects_df, lcs_dir, batch_size, input_sizes, zero_epsilon=1e-7,
                  measurements_per_point=13):
-        super().__init__()
         self.injected_objects_df = injected_objects_df
         self.lcs_dir = lcs_dir
         self.batch_size = batch_size
@@ -57,6 +60,12 @@ class TranspotModelGenerator(Ete6ModelGenerator):
             assert np.max(global_flux_array[i]) < 2
             i = i + 1
         return [star_array, global_flux_array], batch_data_values
+
+    def __prepare_input_data(self, input_df):
+        result_df = super().__prepare_input_data(input_df)
+        time = result_df["#time"].to_numpy()
+        result_df["#time"] = value_encode_times(time - time[0])
+        return result_df
 
 # df = pd.read_csv("/mnt/DATA-2/ete6/injected_objects.csv", index_col=False)
 # df = shuffle(df)
