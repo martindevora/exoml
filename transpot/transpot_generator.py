@@ -10,6 +10,7 @@ import pandas as pd
 class TranspotModelGenerator(Ete6ModelGenerator):
     def __init__(self, injected_objects_df, lcs_dir, batch_size, input_sizes, zero_epsilon=1e-7,
                  measurements_per_point=13):
+        super().__init__()
         self.injected_objects_df = injected_objects_df
         self.lcs_dir = lcs_dir
         self.batch_size = batch_size
