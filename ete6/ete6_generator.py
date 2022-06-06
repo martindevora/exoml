@@ -57,15 +57,15 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         previous_jump_index = 0
         for jumpIndex in jumps:
             token = input_df["centroid_x"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["centroid_x"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 2
+            input_df["centroid_x"][previous_jump_index:jumpIndex] = sigmoid(token - np.nanmedian(token))
             token = input_df["centroid_y"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["centroid_y"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 2
+            input_df["centroid_y"][previous_jump_index:jumpIndex] = sigmoid(token - np.nanmedian(token))
             token = input_df["motion_x"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["motion_x"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 2
+            input_df["motion_x"][previous_jump_index:jumpIndex] = sigmoid(token - np.nanmedian(token))
             token = input_df["motion_y"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["motion_y"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 2
+            input_df["motion_y"][previous_jump_index:jumpIndex] = sigmoid(token - np.nanmedian(token))
             token = input_df["bck_flux"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["bck_flux"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 3
+            input_df["bck_flux"][previous_jump_index:jumpIndex] = sigmoid(token - np.nanmedian(token))
             previous_jump_index = jumpIndex
         input_df = input_df.fillna(self.zero_epsilon)
         input_df = input_df.replace(0.0, self.zero_epsilon)
