@@ -139,12 +139,12 @@ class IatsonModelGenerator(Ete6ModelGenerator):
             lc_df_focus = lc_df.copy()
             lc_df_focus['#time'] = foldedleastsquares.fold(time, period, epoch)
             lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-            lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                      (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
+            lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 2) &
+                                      (lc_df_focus['#time'] < 0.5 + duration_to_period * 2)]
             folded_flux_even_array[i] = self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[3])
-            if type != "none":
-                self._plot_df(lc_df_focus, type, "even")
-                self._plot_input(folded_flux_even_array[i], type, "even")
+            # if type != "none":
+            #     self._plot_df(lc_df_focus, type, "even")
+            #     self._plot_input(folded_flux_even_array[i], type, "even")
             # Focus flux odd
             lc_df_focus = lc_df.copy()
             lc_df_focus['#time'] = foldedleastsquares.fold(time, period, epoch + period / 2)
@@ -152,9 +152,9 @@ class IatsonModelGenerator(Ete6ModelGenerator):
             lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
             folded_flux_odd_array[i] = self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[4])
-            if type != "none":
-                self._plot_df(lc_df_focus, type, "odd")
-                self._plot_input(folded_flux_odd_array[i], type, "odd")
+            # if type != "none":
+            #     self._plot_df(lc_df_focus, type, "odd")
+            #     self._plot_input(folded_flux_odd_array[i], type, "odd")
             # Focus flux sub-harmonic even
             lc_df_focus = lc_df.copy()
             lc_df_focus['#time'] = foldedleastsquares.fold(time, period / 2, epoch)
@@ -211,30 +211,6 @@ class IatsonModelGenerator(Ete6ModelGenerator):
         return [star_array, star_neighbours_array, global_flux_array, folded_flux_even_array, folded_flux_odd_array,
                 folded_flux_even_subhar_array, folded_flux_odd_subhar_array, folded_flux_even_har_array,
                 folded_flux_odd_har_array], batch_data_values
-
-    def __prepare_input_data(self, input_df):
-        time = input_df["#time"].to_numpy()
-        input_df["#time"] = value_encode_times(time - time[0])
-        dif = time[1:] - time[:-1]
-        jumps = np.where(np.abs(dif) > 0.25)[0]
-        jumps = np.append(jumps, len(input_df))
-        previous_jump_index = 0
-        for jumpIndex in jumps:
-            token = input_df["centroid_x"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["centroid_x"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 2
-            token = input_df["centroid_y"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["centroid_y"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 2
-            token = input_df["motion_x"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["motion_x"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 2
-            token = input_df["motion_y"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["motion_y"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 2
-            token = input_df["bck_flux"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["bck_flux"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 3
-            previous_jump_index = jumpIndex
-        input_df = input_df.fillna(self.zero_epsilon)
-        input_df = input_df.replace(0.0, self.zero_epsilon)
-        input_df = input_df.replace(0, self.zero_epsilon)
-        return input_df
 
 # df = pd.read_csv("/mnt/DATA-2/ete6/injected_objects.csv", index_col=False)
 # df = shuffle(df)
