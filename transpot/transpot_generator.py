@@ -1,19 +1,16 @@
-import matplotlib.pyplot as plt
 from numpy.random import default_rng
 
 from ete6.ete6_generator import Ete6ModelGenerator
 from ml.encoding.time_position import value_encode_times
 from sklearn.utils import shuffle
-import tensorflow as tf
 import numpy as np
 import pandas as pd
-
-from ml.physics.transit_functions import t14
 
 
 class TranspotModelGenerator(Ete6ModelGenerator):
     def __init__(self, injected_objects_df, lcs_dir, batch_size, input_sizes, zero_epsilon=1e-7,
                  measurements_per_point=13):
+        super().__init__()
         self.injected_objects_df = injected_objects_df
         self.lcs_dir = lcs_dir
         self.batch_size = batch_size
