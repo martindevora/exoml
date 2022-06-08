@@ -174,7 +174,7 @@ class BaseModel(WithLogging):
             logging.info("Initializing optimizer with learning_rate_decay_steps," + str(learning_rate_decay_steps) +
                          ") (gradient_clip_norm," + str(gradient_clip_norm) +
                          ")")
-            powers_for_half_learning_rate_decay = np.log(learning_rate_decay/2) // np.log(learning_rate_decay)
+            powers_for_half_learning_rate_decay = np.log(learning_rate_decay / 2) // np.log(learning_rate_decay)
             learning_rate_schedule = ExponentialRescaleDecay(initial_learning_rate,
                                                              decay_steps=learning_rate_decay_steps,
                                                              decay_rate=learning_rate_decay,
