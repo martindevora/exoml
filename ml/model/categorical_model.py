@@ -16,8 +16,8 @@ class CategoricalModel(BaseModel):
         metrics = []
         for index, class_name in enumerate(self.class_names):
             class_name_string = str(class_name)
-            metrics = metrics + [Precision(class_id=index, name=class_name_string + "_precision"),
-                                 Recall(class_id=index, name=class_name_string + "_recall"),
+            metrics = metrics + [Precision(class_id=index, name=class_name_string + "_precision", thresholds=0.5),
+                                 Recall(class_id=index, name=class_name_string + "_recall", thresholds=0.5),
                                  RecallAtPrecision(0.99, class_id=index, name=class_name_string + "_r@p")]
         return metrics + [AUC(multi_label=True, num_labels=len(self.class_names), name="roc_auc"),
                           AUC(multi_label=True, curve="PR", num_labels=len(self.class_names), name="pr_auc")]

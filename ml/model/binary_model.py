@@ -14,7 +14,7 @@ class BinaryModel(BaseModel):
         return binary_focal_loss, BinaryAccuracy()
 
     def instance_metrics(self):
-        return [Precision(), Recall(), AUC(name="roc")]
+        return [Precision(), Recall(), AUC(name="roc_auc"), AUC(curve="PR", name="pr_auc")]
 
     def plot_metrics(self, model_dir, steps_per_epoch):
         training_log_df = pd.read_csv(model_dir + '/training_log.csv')
