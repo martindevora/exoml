@@ -183,6 +183,7 @@ class IatsonModelGenerator(Ete6ModelGenerator):
             lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
             folded_flux_odd_har_array[i] = self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[8])
+            assert np.max(global_flux_array[i]) < 2
             assert not np.isnan(star_array[i]).any() and not np.isinf(star_array[i]).any()
             assert not np.isnan(global_flux_array[i]).any() and not np.isinf(global_flux_array[i]).any()
             assert not np.isnan(folded_flux_even_array[i]).any() and not np.isinf(folded_flux_even_array[i]).any()
