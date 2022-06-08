@@ -145,13 +145,14 @@ class BaseModel(WithLogging):
         pass
 
     @abstractmethod
-    def plot_metrics(self):
+    def plot_metrics(self, steps_per_epoch):
         pass
 
     def train(self, training_dir, output_dir, batch_size=20, epochs=20, initial_learning_rate=0.01,
               dataset_iterations_per_epoch=1, train_percent=0.8,
               validation_percent=0.1, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
-              gradient_clip_norm=0.01, cores=0, metrics=[], callbacks=[], learning_rate_schedule=None):
+              gradient_clip_norm=0.01, cores=0, metrics=[], callbacks=[], learning_rate_decay=0.95,
+              learning_rate_schedule=None):
         logging.info("Preparing training data with (training_dir," + str(training_dir) +
                      ") (train_percent," + str(train_percent) +
                      ") (test_percent," + str(validation_percent) +
@@ -173,11 +174,10 @@ class BaseModel(WithLogging):
             logging.info("Initializing optimizer with learning_rate_decay_steps," + str(learning_rate_decay_steps) +
                          ") (gradient_clip_norm," + str(gradient_clip_norm) +
                          ")")
-            exponential_decay_base = 0.95
-            powers_for_half_learning_rate_decay = np.log(0.95/2) // np.log(0.95)
+            powers_for_half_learning_rate_decay = np.log(learning_rate_decay/2) // np.log(learning_rate_decay)
             learning_rate_schedule = ExponentialRescaleDecay(initial_learning_rate,
                                                              decay_steps=learning_rate_decay_steps,
-                                                             decay_rate=exponential_decay_base,
+                                                             decay_rate=learning_rate_decay,
                                                              restore_steps=learning_rate_decay_steps * powers_for_half_learning_rate_decay,
                                                              restore_rate=1.5,
                                                              staircase=True)
