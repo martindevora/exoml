@@ -47,21 +47,26 @@ class TranspotModelGenerator(Ete6ModelGenerator):
             lc_df = self._prepare_input_lc(lc_df)
             type = target_row['type']
             batch_data_values[i] = 0 if type == 'none' else 1
-            not_null_times_args = np.argwhere(lc_df['#time'].to_numpy() > 0).flatten()
-            lc_df = lc_df.iloc[not_null_times_args]
-            star_df.drop('Unnamed: 0', inplace=True, axis=1)
-            star_array[i] = np.transpose(star_df.to_numpy())
+            # not_null_times_args = np.argwhere(lc_df['#time'].to_numpy() > 0).flatten()
+            # lc_df = lc_df.iloc[not_null_times_args]
+            star_array[i] = np.transpose([star_df.to_numpy()])
             global_flux_array[i] = lc_df.to_numpy()
             assert not np.isnan(star_array[i]).any() and not np.isinf(star_array[i]).any()
             assert not np.isnan(global_flux_array[i]).any() and not np.isinf(global_flux_array[i]).any()
+            if np.max(global_flux_array[i]) >= 2:
+                print("MAX FLUX VALUE OVERCAME BY " + target_ids
+                      )
             assert np.max(global_flux_array[i]) < 2
             i = i + 1
         return [star_array, global_flux_array], batch_data_values
 
-    def __prepare_input_data(self, input_df):
-        result_df = super().__prepare_input_data(input_df)
+    def _prepare_input_lc(self, input_df):
+        result_df = super()._prepare_input_lc(input_df)
+        args_zero = np.argwhere(result_df["#time"].to_numpy() <= self.zero_epsilon).flatten()
+        first_non_zero_arg = np.argwhere(result_df["#time"].to_numpy() > self.zero_epsilon).flatten()[0]
         time = result_df["#time"].to_numpy()
-        result_df["#time"] = value_encode_times(time - time[0])
+        result_df["#time"] = value_encode_times(time - time[first_non_zero_arg], max_time=100)
+        result_df["#time"].iloc[args_zero] = self.zero_epsilon
         return result_df
 
 # df = pd.read_csv("/mnt/DATA-2/ete6/injected_objects.csv", index_col=False)
