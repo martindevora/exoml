@@ -1,4 +1,5 @@
 from keras.metrics import Precision, Recall, AUC, BinaryAccuracy, RecallAtPrecision
+from tensorflow_addons.metrics import F1Score
 
 from ml.loss.cross_entropy import binary_focal_loss
 from ml.model.base_model import BaseModel
@@ -14,7 +15,7 @@ class BinaryModel(BaseModel):
         return binary_focal_loss, BinaryAccuracy()
 
     def instance_metrics(self):
-        return [Precision(), Recall(), RecallAtPrecision(precision=0.99), AUC(name="roc_auc"),
+        return [Precision(), Recall(), RecallAtPrecision(precision=0.99), F1Score(), AUC(name="roc_auc"),
                 AUC(curve="PR", name="pr_auc")]
 
     def plot_metrics(self, model_dir, steps_per_epoch):

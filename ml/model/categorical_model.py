@@ -2,6 +2,7 @@ from abc import abstractmethod
 
 from keras.losses import CategoricalCrossentropy
 from keras.metrics import CategoricalAccuracy, Precision, Recall, AUC, RecallAtPrecision
+from tensorflow_addons.metrics import F1Score
 
 from ml.loss.cross_entropy import categorical_focal_loss
 from ml.model.base_model import BaseModel
@@ -22,8 +23,10 @@ class CategoricalModel(BaseModel):
             metrics = metrics + [Precision(class_id=index, name=class_name_string + "_precision", thresholds=0.5),
                                  Recall(class_id=index, name=class_name_string + "_recall", thresholds=0.5),
                                  RecallAtPrecision(0.99, class_id=index, name=class_name_string + "_r@p")]
-        return metrics + [AUC(multi_label=True, num_labels=len(self.class_names), name="roc_auc"),
-                          AUC(multi_label=True, curve="PR", num_labels=len(self.class_names), name="pr_auc")]
+        classes_count = len(self.class_names)
+        return metrics + [F1Score(num_classes=classes_count, average='weighted'),
+                          AUC(multi_label=True, num_labels=classes_count, name="roc_auc"),
+                          AUC(multi_label=True, curve="PR", num_labels=classes_count, name="pr_auc")]
 
     def plot_metrics(self, steps_per_epoch):
         pass
