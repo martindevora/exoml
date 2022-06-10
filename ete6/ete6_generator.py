@@ -1,3 +1,5 @@
+from abc import abstractmethod
+
 import matplotlib.pyplot as plt
 import foldedleastsquares
 import scipy
@@ -67,6 +69,18 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
             token = input_df["bck_flux"][previous_jump_index:jumpIndex].to_numpy()
             input_df["bck_flux"][previous_jump_index:jumpIndex] = sigmoid(token - np.nanmedian(token))
             previous_jump_index = jumpIndex
+        input_df['flux'] = input_df['flux'] / 2
+        input_df['flux'][input_df['flux'] > 1] = 1
+        input_df['flux_0'] = input_df['flux_0'] / 2
+        input_df['flux_0'][input_df['flux_0'] > 1] = 1
+        input_df['flux_1'] = input_df['flux_1'] / 2
+        input_df['flux_1'][input_df['flux_1'] > 1] = 1
+        input_df['flux_2'] = input_df['flux_2'] / 2
+        input_df['flux_2'][input_df['flux_2'] > 1] = 1
+        input_df['flux_3'] = input_df['flux_3'] / 2
+        input_df['flux_3'][input_df['flux_3'] > 1] = 1
+        input_df['flux_4'] = input_df['flux_4'] / 2
+        input_df['flux_4'][input_df['flux_4'] > 1] = 1
         input_df = input_df.fillna(self.zero_epsilon)
         input_df = input_df.replace(0.0, self.zero_epsilon)
         input_df = input_df.replace(0, self.zero_epsilon)
@@ -156,6 +170,10 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         input_df = input_df.replace(0.0, self.zero_epsilon)
         input_df = input_df.replace(0, self.zero_epsilon)
         return input_df
+
+    @abstractmethod
+    def class_weights(self):
+        pass
 
 # df = pd.read_csv("/mnt/DATA-2/ete6/injected_objects.csv", index_col=False)
 # df = shuffle(df)
