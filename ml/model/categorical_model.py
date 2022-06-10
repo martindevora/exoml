@@ -1,3 +1,6 @@
+from abc import abstractmethod
+
+from keras.losses import CategoricalCrossentropy
 from keras.metrics import CategoricalAccuracy, Precision, Recall, AUC, RecallAtPrecision
 
 from ml.loss.cross_entropy import categorical_focal_loss
@@ -10,7 +13,7 @@ class CategoricalModel(BaseModel):
         self.class_names = class_names
 
     def instance_loss_accuracy(self):
-        return categorical_focal_loss, CategoricalAccuracy()
+        return CategoricalCrossentropy(), CategoricalAccuracy()
 
     def instance_metrics(self):
         metrics = []
