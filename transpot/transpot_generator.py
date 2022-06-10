@@ -57,7 +57,7 @@ class TranspotModelGenerator(Ete6ModelGenerator):
             assert not np.isnan(star_array[i]).any() and not np.isinf(star_array[i]).any()
             assert not np.isnan(global_flux_array[i]).any() and not np.isinf(global_flux_array[i]).any()
             if np.max(global_flux_array[i]) >= 2:
-                print("MAX FLUX VALUE OVERCAME BY " + str(target_ids))
+                print("MAX FLUX VALUE OVERCAME BY " + str(target_id))
             assert np.max(global_flux_array[i]) < 2
             i = i + 1
         return [star_array, global_flux_array], batch_data_values
