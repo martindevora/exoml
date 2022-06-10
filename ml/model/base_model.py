@@ -5,7 +5,6 @@ import tensorflow as tf
 import pandas as pd
 from abc import abstractmethod
 
-from keras.callbacks import EarlyStopping
 from keras.utils.vis_utils import plot_model
 
 from ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
@@ -235,7 +234,7 @@ class BaseModel(WithLogging):
             self.save(output_dir)
             fit_history = self.model.fit(x=training_batch_generator,
                            steps_per_epoch=steps_per_epoch,
-                           epochs=epochs, verbose=1,
+                           epochs=epochs, verbose=1, class_weight=training_batch_generator.class_weights(),
                            validation_data=validation_batch_generator,
                            validation_steps=model_validation_steps,
                            callbacks=[csv_logger, cp_callback, get_weights_callback] +
