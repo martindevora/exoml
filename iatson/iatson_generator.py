@@ -25,6 +25,9 @@ class IatsonModelGenerator(Ete6ModelGenerator):
     def __len__(self):
         return (np.ceil(len(self.injected_objects_df) / float(self.batch_size))).astype(int)
 
+    def class_weights(self):
+        return {0: 60, 1: 20, 2: 10, 3: 1}
+
     def _plot_df(self, df, type, scenario):
         fig, axs = plt.subplots(2, 3, figsize=(12, 6), constrained_layout=True)
         axs[0][0].scatter(df['#time'], df['flux'])
@@ -97,7 +100,7 @@ class IatsonModelGenerator(Ete6ModelGenerator):
         i = 0
         for df_index, target_row in injected_objects_df.iterrows():
             target_id = int(target_row['TIC ID'])
-            # target_id = 356110099
+            target_id = 413874159
             # target_row = self.injected_objects_df[self.injected_objects_df['TIC ID'] == 356110099].iloc[0]
             leading_zeros_object_id = '{:09}'.format(target_id)
             lc_filename = str(leading_zeros_object_id) + '_lc.csv'
@@ -135,6 +138,7 @@ class IatsonModelGenerator(Ete6ModelGenerator):
             lc_df_sorted_fold = lc_df_sorted_fold.sort_values(by=['#time'])
             lc_df_sorted_fold = lc_df_sorted_fold.sort_values(by=['#time'])
             global_flux_array[i] = self.bin_by_time(lc_df_sorted_fold.to_numpy(), self.input_sizes[2])
+            #self._plot_input(global_flux_array[i], type, "even")
             # Focus flux even
             lc_df_focus = lc_df.copy()
             lc_df_focus['#time'] = foldedleastsquares.fold(time, period, epoch)

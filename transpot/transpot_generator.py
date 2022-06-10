@@ -22,6 +22,9 @@ class TranspotModelGenerator(Ete6ModelGenerator):
     def __len__(self):
         return (np.ceil(len(self.injected_objects_df) / float(self.batch_size))).astype(int)
 
+    def class_weights(self):
+        return {0: 1, 1: 5}
+
     def __getitem__(self, idx):
         max_index = (idx + 1) * self.batch_size
         max_index = len(self.injected_objects_df) if max_index > len(self.injected_objects_df) else max_index
@@ -54,8 +57,7 @@ class TranspotModelGenerator(Ete6ModelGenerator):
             assert not np.isnan(star_array[i]).any() and not np.isinf(star_array[i]).any()
             assert not np.isnan(global_flux_array[i]).any() and not np.isinf(global_flux_array[i]).any()
             if np.max(global_flux_array[i]) >= 2:
-                print("MAX FLUX VALUE OVERCAME BY " + target_ids
-                      )
+                print("MAX FLUX VALUE OVERCAME BY " + str(target_ids))
             assert np.max(global_flux_array[i]) < 2
             i = i + 1
         return [star_array, global_flux_array], batch_data_values
