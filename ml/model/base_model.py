@@ -7,6 +7,7 @@ from abc import abstractmethod
 
 from keras.utils.vis_utils import plot_model
 
+from ml.callback.basemodel_aware_callback import MetricsPlotCallback
 from ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
 from ml.callback.get_weights import GetWeights
 from ml.callback.training_data_aware import ValidationDataAwareCallback, ModelDirDataAwareCallback
@@ -144,7 +145,7 @@ class BaseModel(WithLogging):
         pass
 
     @abstractmethod
-    def plot_metrics(self, steps_per_epoch):
+    def plot_metrics(self, model_dir, steps_per_epoch, with_validation=False):
         pass
 
     def train(self, training_dir, output_dir, batch_size=20, epochs=20, initial_learning_rate=0.01,
@@ -237,8 +238,9 @@ class BaseModel(WithLogging):
                            epochs=epochs, verbose=1, class_weight=training_batch_generator.class_weights(),
                            validation_data=validation_batch_generator,
                            validation_steps=model_validation_steps,
-                           callbacks=[csv_logger, cp_callback, get_weights_callback] +
-                                     callbacks,
+                           callbacks=[csv_logger, cp_callback, get_weights_callback,
+                                      MetricsPlotCallback(self, model_path, steps_per_epoch)] +
+                                      callbacks,
                            use_multiprocessing=cores > 0, workers=1 if cores <= 0 else cores)
             val_history = {}
             val_history['epoch'] = fit_history['epoch']
