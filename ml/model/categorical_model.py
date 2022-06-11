@@ -24,7 +24,7 @@ class CategoricalModel(BaseModel):
                                  Recall(class_id=index, name=class_name_string + "_recall", thresholds=0.5),
                                  RecallAtPrecision(0.99, class_id=index, name=class_name_string + "_r@p")]
         classes_count = len(self.class_names)
-        return metrics + [F1Score(num_classes=classes_count, average='weighted'),
+        return metrics + [F1Score(num_classes=classes_count, average='macro'),
                           AUC(multi_label=True, num_labels=classes_count, name="roc_auc"),
                           AUC(multi_label=True, curve="PR", num_labels=classes_count, name="pr_auc")]
 
