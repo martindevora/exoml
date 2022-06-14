@@ -12,8 +12,8 @@ from ml.model.binary_model import BinaryModel
 from transpot.transpot_generator import TranspotModelGenerator
 
 class TRANSPOT(BinaryModel):
-    def __init__(self, input_size=(20610, 13)) -> None:
-        super().__init__('TRANSPOT', input_size)
+    def __init__(self, class_ids, input_size=(20610, 13)) -> None:
+        super().__init__('TRANSPOT', input_size, class_ids)
 
     def _get_flux_conv_branch(self):
         # (time, flux, [detrended_flux1 ... detrended_flux5], flux_model, centroidx, centroidy, motionx, motiony, bck)
@@ -103,8 +103,14 @@ class TRANSPOT(BinaryModel):
     def load_training_set(self, **kwargs):
         training_dir = kwargs.get('training_dir')
         injected_objects_df = pd.read_csv(training_dir + "/injected_objects.csv", index_col=None)
-        #TODO remove 'none' types when there is more than one entry for same TIC
-        injected_objects_df = injected_objects_df.drop_duplicates(subset='TIC ID', keep="last")
+        injected_objects_df = injected_objects_df.sort_values(by=['TIC ID', 'type'])
+        #TODO remove 'none' types when there is more than one entry for same TIC (keeping first as none is the latest
+        #  from bckEB, EB, planet and none
+        injected_objects_df['type'] = injected_objects_df['type'].astype('category')
+        injected_objects_df['type'] = injected_objects_df['type'].cat.set_categories(['bckEB', 'EB', 'planet', 'none'],
+                                                                                     ordered=True)
+        injected_objects_df.sort_values(by=['TIC ID', 'type'], inplace=True)
+        injected_objects_df = injected_objects_df.drop_duplicates(subset='TIC ID', keep="first")
         injected_objects_df = shuffle(injected_objects_df)
         injected_objects_df.reset_index(inplace=True, drop=True)
         return injected_objects_df

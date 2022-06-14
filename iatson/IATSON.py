@@ -13,8 +13,8 @@ from ml.model.categorical_model import CategoricalModel
 
 
 class IATSON(CategoricalModel):
-    def __init__(self, class_names=[]) -> None:
-        super().__init__(class_names, 'IATSON', [11, 9 * 15, 2500, 500, 500, 500, 500, 500, 500])
+    def __init__(self, class_ids, class_names) -> None:
+        super().__init__(class_names, 'IATSON', [11, 9 * 15, 2500, 500, 500, 500, 500, 500, 500], class_ids)
         self.class_names = class_names
 
     def _get_flux_conv_branch(self, name):
