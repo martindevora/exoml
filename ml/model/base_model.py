@@ -6,6 +6,7 @@ import pandas as pd
 from abc import abstractmethod
 
 from keras.utils.vis_utils import plot_model
+from sklearn.utils import shuffle
 
 from ml.callback.basemodel_aware_callback import MetricsPlotCallback
 from ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
@@ -23,10 +24,14 @@ class BaseModel(WithLogging):
 
     model = None
 
-    def __init__(self, name, input_size) -> None:
+    def __init__(self, name, input_size, class_ids) -> None:
         super().__init__()
         self.name = name
         self.input_size = input_size
+        for class_id in class_ids.keys():
+            class_ids[class_id] = class_ids[class_id] if isinstance(class_ids[class_id], (list, np.ndarray)) \
+                else [class_ids[class_id]]
+        self.class_ids = class_ids
 
     @abstractmethod
     def build(self, **kwargs):
@@ -45,6 +50,48 @@ class BaseModel(WithLogging):
         :return: either a list or a Pandas Dataframe
         """
         pass
+
+    @abstractmethod
+    def instance_generator(self, dataset, dir, batch_size, input_sizes, zero_epsilon):
+        pass
+
+    @abstractmethod
+    def instance_loss_accuracy(self):
+        pass
+
+    @abstractmethod
+    def instance_metrics(self):
+        pass
+
+    @abstractmethod
+    def plot_metrics(self, model_dir, steps_per_epoch, with_validation=False):
+        pass
+
+    def balance_dataset(self, training_set, class_id):
+        assert class_id in self.class_ids.keys()
+        if not isinstance(training_set, pd.DataFrame):
+            logging.warning("Cannot balance dataset because the input is not a dataframe")
+            return training_set
+        classes_counts = [len(training_set[training_set['type'].isin(labels)]) for labels in self.class_ids.values()]
+        classes_sampling = [1 if id == class_id else classes_counts[class_id] / count
+                            for id, count in enumerate(classes_counts)]
+        for id, sampling in enumerate(classes_sampling):
+            labels = self.class_ids[id]
+            class_count = classes_counts[id]
+            class_expected_size = class_count * sampling
+            if sampling > 1:
+                rows_for_type = training_set[training_set['type'].isin(labels)]
+                sampling = sampling - 1
+                training_set = training_set.append([rows_for_type] * np.floor(sampling).astype(int), ignore_index=True)
+                class_expected_size_remainder = np.round(np.mod(sampling, 1) * class_count).astype(int)
+                training_set = training_set.append(training_set[training_set['type'].isin(labels)]
+                                                   .iloc[0:class_expected_size_remainder], ignore_index=True)
+            elif sampling < 1:
+                class_expected_size = np.round(class_expected_size).astype(int)
+                type_subset_df = training_set[training_set['type'].isin(labels)].iloc[0:class_expected_size]
+                training_set.drop(training_set[training_set['type'].isin(labels)].index, inplace=True)
+                training_set = training_set.append([type_subset_df], ignore_index=True)
+        return training_set
 
     def compile(self, optimizer, loss, metrics=None):
         """
@@ -84,8 +131,10 @@ class BaseModel(WithLogging):
         logging.info("Saved model")
 
     def prepare_training_data(self, training_dir, output_dir, train_percent=0.8, validation_percent=0.1,
-                              training_set_limit=None):
+                              training_set_limit=None, balance_class_id=None):
         training_dataset = self.load_training_set(training_dir=training_dir)
+        if balance_class_id is not None:
+            training_dataset = shuffle(self.balance_dataset(training_dataset, balance_class_id))
         if training_set_limit is not None:
             if isinstance(training_dataset, pd.DataFrame):
                 training_dataset = training_dataset[:training_set_limit]
@@ -132,27 +181,11 @@ class BaseModel(WithLogging):
                     file.write('\n'.join(test_filenames))
         return train_filenames, validation_filenames, test_filenames
 
-    @abstractmethod
-    def instance_generator(self, dataset, dir, batch_size, input_sizes, zero_epsilon):
-        pass
-
-    @abstractmethod
-    def instance_loss_accuracy(self):
-        pass
-
-    @abstractmethod
-    def instance_metrics(self):
-        pass
-
-    @abstractmethod
-    def plot_metrics(self, model_dir, steps_per_epoch, with_validation=False):
-        pass
-
     def train(self, training_dir, output_dir, batch_size=20, epochs=20, initial_learning_rate=0.01,
               dataset_iterations_per_epoch=1, train_percent=0.8,
               validation_percent=0.1, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
               gradient_clip_norm=0.01, cores=0, metrics=[], callbacks=[], learning_rate_decay=0.95,
-              learning_rate_schedule=None):
+              learning_rate_schedule=None, balance_class_id=None):
         logging.info("Preparing training data with (training_dir," + str(training_dir) +
                      ") (train_percent," + str(train_percent) +
                      ") (test_percent," + str(validation_percent) +
@@ -162,7 +195,8 @@ class BaseModel(WithLogging):
         if not os.path.exists(model_path):
             os.mkdir(model_path)
         train_filenames, validation_filenames, test_filenames = \
-            self.prepare_training_data(training_dir, model_path, train_percent, validation_percent, training_set_limit)
+            self.prepare_training_data(training_dir, model_path, train_percent, validation_percent, training_set_limit,
+                                       balance_class_id)
         # The optimizer is executed once for every batch, hence optimizer steps per epoch are
         train_dataset_size = len(train_filenames)
         test_dataset_size = len(validation_filenames)

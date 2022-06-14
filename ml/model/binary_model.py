@@ -8,14 +8,14 @@ import matplotlib.pyplot as plt
 
 
 class BinaryModel(BaseModel):
-    def __init__(self, name, input_size) -> None:
-        super().__init__(name, input_size)
+    def __init__(self, name, input_size, class_ids) -> None:
+        super().__init__(name, input_size, class_ids)
 
     def instance_loss_accuracy(self):
         return binary_focal_loss, BinaryAccuracy()
 
     def instance_metrics(self):
-        return [Precision(), Recall(), RecallAtPrecision(precision=0.99), F1Score(), AUC(name="roc_auc"),
+        return [Precision(), Recall(), RecallAtPrecision(precision=0.99), F1Score(num_classes=1), AUC(name="roc_auc"),
                 AUC(curve="PR", name="pr_auc")]
 
     def plot_metrics(self, model_dir, steps_per_epoch, with_validation=False):

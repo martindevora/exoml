@@ -9,8 +9,8 @@ from ml.model.base_model import BaseModel
 
 
 class CategoricalModel(BaseModel):
-    def __init__(self, class_names, name, input_size) -> None:
-        super().__init__(name, input_size)
+    def __init__(self, class_names, name, input_size, class_ids) -> None:
+        super().__init__(name, input_size, class_ids)
         self.class_names = class_names
 
     def instance_loss_accuracy(self):
@@ -28,5 +28,5 @@ class CategoricalModel(BaseModel):
                           AUC(multi_label=True, num_labels=classes_count, name="roc_auc"),
                           AUC(multi_label=True, curve="PR", num_labels=classes_count, name="pr_auc")]
 
-    def plot_metrics(self, steps_per_epoch):
+    def plot_metrics(self, model_dir, steps_per_epoch, with_validation=False):
         pass
