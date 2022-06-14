@@ -23,7 +23,7 @@ class TranspotModelGenerator(Ete6ModelGenerator):
         return (np.ceil(len(self.injected_objects_df) / float(self.batch_size))).astype(int)
 
     def class_weights(self):
-        return {0: 1, 1: 5}
+        return {0: 1, 1: 1}
 
     def __getitem__(self, idx):
         max_index = (idx + 1) * self.batch_size

@@ -26,7 +26,7 @@ class IatsonModelGenerator(Ete6ModelGenerator):
         return (np.ceil(len(self.injected_objects_df) / float(self.batch_size))).astype(int)
 
     def class_weights(self):
-        return {0: 60, 1: 20, 2: 10, 3: 1}
+        return {0: 1, 1: 1, 2: 1, 3: 1}
 
     def _plot_df(self, df, type, scenario):
         fig, axs = plt.subplots(2, 3, figsize=(12, 6), constrained_layout=True)
