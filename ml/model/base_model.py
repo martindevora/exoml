@@ -67,14 +67,8 @@ class BaseModel(WithLogging):
     def plot_metrics(self, model_dir, steps_per_epoch, with_validation=False):
         pass
 
-    def balance_dataset(self, training_set, class_id):
-        assert class_id in self.class_ids.keys()
-        if not isinstance(training_set, pd.DataFrame):
-            logging.warning("Cannot balance dataset because the input is not a dataframe")
-            return training_set
+    def balance_dataset_with_sampling(self, training_set, classes_sampling):
         classes_counts = [len(training_set[training_set['type'].isin(labels)]) for labels in self.class_ids.values()]
-        classes_sampling = [1 if id == class_id else classes_counts[class_id] / count
-                            for id, count in enumerate(classes_counts)]
         for id, sampling in enumerate(classes_sampling):
             labels = self.class_ids[id]
             class_count = classes_counts[id]
@@ -92,6 +86,16 @@ class BaseModel(WithLogging):
                 training_set.drop(training_set[training_set['type'].isin(labels)].index, inplace=True)
                 training_set = training_set.append([type_subset_df], ignore_index=True)
         return training_set
+
+    def balance_dataset_from_class(self, training_set, class_id):
+        assert class_id in self.class_ids.keys()
+        if not isinstance(training_set, pd.DataFrame):
+            logging.warning("Cannot balance dataset because the input is not a dataframe")
+            return training_set
+        classes_counts = [len(training_set[training_set['type'].isin(labels)]) for labels in self.class_ids.values()]
+        classes_sampling = [1 if id == class_id else classes_counts[class_id] / count
+                            for id, count in enumerate(classes_counts)]
+        return self.balance_dataset_with_sampling(training_set, classes_sampling)
 
     def compile(self, optimizer, loss, metrics=None):
         """
@@ -131,10 +135,12 @@ class BaseModel(WithLogging):
         logging.info("Saved model")
 
     def prepare_training_data(self, training_dir, output_dir, train_percent=0.8, validation_percent=0.1,
-                              training_set_limit=None, balance_class_id=None):
+                              training_set_limit=None, balance_class_id=None, balance_class_sampling=None):
         training_dataset = self.load_training_set(training_dir=training_dir)
-        if balance_class_id is not None:
-            training_dataset = shuffle(self.balance_dataset(training_dataset, balance_class_id))
+        if balance_class_sampling is not None:
+            training_dataset = shuffle(self.balance_dataset_with_sampling(training_dataset, balance_class_sampling))
+        elif balance_class_id is not None:
+            training_dataset = shuffle(self.balance_dataset_from_class(training_dataset, balance_class_id))
         if training_set_limit is not None:
             if isinstance(training_dataset, pd.DataFrame):
                 training_dataset = training_dataset[:training_set_limit]
@@ -185,7 +191,8 @@ class BaseModel(WithLogging):
               dataset_iterations_per_epoch=1, train_percent=0.8,
               validation_percent=0.1, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
               gradient_clip_norm=0.01, cores=0, metrics=[], callbacks=[], learning_rate_decay=0.95,
-              learning_rate_schedule=None, balance_class_id=None):
+              learning_rate_schedule=None, balance_class_id=None, balance_class_sampling=None,
+              class_loss_weights=None):
         logging.info("Preparing training data with (training_dir," + str(training_dir) +
                      ") (train_percent," + str(train_percent) +
                      ") (test_percent," + str(validation_percent) +
@@ -196,7 +203,7 @@ class BaseModel(WithLogging):
             os.mkdir(model_path)
         train_filenames, validation_filenames, test_filenames = \
             self.prepare_training_data(training_dir, model_path, train_percent, validation_percent, training_set_limit,
-                                       balance_class_id)
+                                       balance_class_id, balance_class_sampling)
         # The optimizer is executed once for every batch, hence optimizer steps per epoch are
         train_dataset_size = len(train_filenames)
         test_dataset_size = len(validation_filenames)
@@ -262,6 +269,8 @@ class BaseModel(WithLogging):
             # )
             get_weights_callback = GetWeights(model_weights_logger)
             model_validation_steps = int(test_dataset_size // batch_size)
+            class_weights = class_loss_weights if class_loss_weights is not None \
+                else training_batch_generator.class_weights()
             logging.info("Initializing training with (epochs," + str(epochs) +
                          ") (steps_per_epoch," + str(steps_per_epoch) +
                          ") (model_validation_steps," + str(model_validation_steps) +
@@ -269,7 +278,7 @@ class BaseModel(WithLogging):
             self.save(output_dir)
             fit_history = self.model.fit(x=training_batch_generator,
                            steps_per_epoch=steps_per_epoch,
-                           epochs=epochs, verbose=1, class_weight=training_batch_generator.class_weights(),
+                           epochs=epochs, verbose=1, class_weight=class_weights,
                            validation_data=validation_batch_generator,
                            validation_steps=model_validation_steps,
                            callbacks=[csv_logger, cp_callback, get_weights_callback,
