@@ -23,7 +23,7 @@ class BinaryModel(BaseModel):
     def plot_metrics(self, model_dir, steps_per_epoch, with_validation=False):
         logging.info("Plotting metrics")
         training_log_df = pd.read_csv(model_dir + '/training_log.csv')
-        training_log_df['batch_total'] = training_log_df['batch'] * training_log_df['epoch']
+        training_log_df['batch_total'] = training_log_df['batch'] + (training_log_df['epoch'] * steps_per_epoch)
         if with_validation:
             validation_log_df = pd.read_csv(model_dir + '/val_log.csv')
         fig, axs = plt.subplots(2, 3, figsize=(25, 7), constrained_layout=True)
@@ -55,16 +55,28 @@ class BinaryModel(BaseModel):
                            label='Val. ROC AUC')
             axs[1][1].plot(validation_log_df['epoch'] * steps_per_epoch, training_log_df['val_pr_auc'], color='green',
                            label='Val. PR AUC')
-        axs[0][0].set_xlabel("Batch no.")
+        axs[0][0].set_xlabel("Batch")
+        secx = axs[0][0].secondary_xaxis('top',
+                                         functions=(lambda x: x / steps_per_epoch, lambda x: x / steps_per_epoch))
+        secx.set_xlabel('Epoch')
         axs[0][0].set_ylabel("Learning rate")
         axs[0][0].legend(loc='upper right')
-        axs[0][1].set_xlabel("Batch no.")
+        axs[0][1].set_xlabel("Batch")
+        secx = axs[0][1].secondary_xaxis('top',
+                                         functions=(lambda x: x / steps_per_epoch, lambda x: x / steps_per_epoch))
+        secx.set_xlabel('Epoch')
         axs[0][1].set_ylabel("Loss")
         axs[0][1].legend(loc='upper right')
-        axs[1][0].set_xlabel("Batch no.")
+        axs[1][0].set_xlabel("Batch")
+        secx = axs[1][0].secondary_xaxis('top',
+                                         functions=(lambda x: x / steps_per_epoch, lambda x: x / steps_per_epoch))
+        secx.set_xlabel('Epoch')
         axs[1][0].set_ylabel("Precision/Recall/R@P")
         axs[1][0].legend(loc='upper left')
-        axs[1][1].set_xlabel("Batch no.")
+        axs[1][1].set_xlabel("Batch")
+        secx = axs[1][1].secondary_xaxis('top',
+                                         functions=(lambda x: x / steps_per_epoch, lambda x: x / steps_per_epoch))
+        secx.set_xlabel('Epoch')
         axs[1][1].set_ylabel("Accuracy/F1/AUCs")
         axs[1][1].legend(loc='upper left')
         plt.savefig(model_dir + '/metrics.png')
