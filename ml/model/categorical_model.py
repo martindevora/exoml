@@ -38,6 +38,7 @@ class CategoricalModel(BaseModel):
         if with_validation:
             validation_log_df = pd.read_csv(model_dir + '/val_log.csv')
         fig, axs = plt.subplots(3, 2, figsize=(25, 12), constrained_layout=True)
+        fig.suptitle(self.name + ' Model Metrics', fontsize=14)
         axs[0][0].plot(training_log_df['batch_total'], training_log_df['learning_rate'])
         axs[0][0].set_title("Learning rate")
         axs[0][0].set_xlabel("Batch")
