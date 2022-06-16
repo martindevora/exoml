@@ -35,8 +35,7 @@ class CategoricalModel(BaseModel):
         logging.info("Plotting metrics")
         training_log_df = pd.read_csv(model_dir + '/training_log.csv')
         training_log_df['batch_total'] = training_log_df['batch'] + (training_log_df['epoch'] * steps_per_epoch)
-        if with_validation:
-            validation_log_df = pd.read_csv(model_dir + '/val_log.csv')
+        validation_log_df = training_log_df.dropna()
         fig, axs = plt.subplots(3, 2, figsize=(25, 12), constrained_layout=True)
         fig.suptitle(self.name + ' Model Metrics', fontsize=14)
         axs[0][0].plot(training_log_df['batch_total'], training_log_df['learning_rate'])
@@ -56,26 +55,19 @@ class CategoricalModel(BaseModel):
                        color='cyan', label='Train ROC AUC')
         axs[2][1].plot(training_log_df['batch_total'], training_log_df['pr_auc'],
                        color='mediumaquamarine', label='Train PR AUC')
-        axs[2][1].set_title("Accuracy, F1 Score, ROC and PR AUCs")
-        axs[2][1].set_xlabel("Batch")
-        secx = axs[2][1].secondary_xaxis('top',
-                                         functions=(lambda x: x / steps_per_epoch, lambda x: x / steps_per_epoch))
-        secx.set_xlabel('Epoch')
-        axs[2][1].set_ylabel("Accuracy/F1/AUCs")
-        axs[2][1].legend(loc='upper left')
         if with_validation:
             axs[0][1].plot(validation_log_df['epoch'] * steps_per_epoch, validation_log_df['val_loss'], color='red',
                            label='Val. loss')
             axs[2][1].plot(validation_log_df['epoch'] * steps_per_epoch, validation_log_df['val_categorical_accuracy'],
                            color='gray', label='Val. acc.')
             axs[2][1].plot(validation_log_df['epoch'] * steps_per_epoch,
-                           training_log_df['val_f1_score'], color='red',
+                           validation_log_df['val_f1_score'], color='red',
                            label='Val. F1')
             axs[2][1].plot(validation_log_df['epoch'] * steps_per_epoch,
-                           training_log_df['val_roc_auc'], color='blue',
+                           validation_log_df['val_roc_auc'], color='blue',
                            label='Val. ROC AUC')
             axs[2][1].plot(validation_log_df['epoch'] * steps_per_epoch,
-                           training_log_df['val_pr_auc'], color='green', label='Val. PR AUC')
+                           validation_log_df['val_pr_auc'], color='green', label='Val. PR AUC')
         axs[0][1].set_title("Loss")
         axs[0][1].set_xlabel("Batch")
         secx = axs[0][1].secondary_xaxis('top',
@@ -83,7 +75,13 @@ class CategoricalModel(BaseModel):
         secx.set_xlabel('Epoch')
         axs[0][1].set_ylabel("Loss")
         axs[0][1].legend(loc='upper right')
-        # TODO are we interested into plotting categorical accuracy?
+        axs[2][1].set_title("Accuracy, F1 Score, ROC and PR AUCs")
+        axs[2][1].set_xlabel("Batch")
+        secx = axs[2][1].secondary_xaxis('top',
+                                         functions=(lambda x: x / steps_per_epoch, lambda x: x / steps_per_epoch))
+        secx.set_xlabel('Epoch')
+        axs[2][1].set_ylabel("Accuracy/F1/AUCs")
+        axs[2][1].legend(loc='upper left')
         colors = cm.rainbow(np.linspace(0, 1, len(self.class_names)))
         val_colors = [hsv_to_rgb([(i * 0.618033988749895) % 1.0, 1, 1]) for i in range(len(self.class_names))]
         for index, class_name in enumerate(self.class_names):
@@ -96,13 +94,13 @@ class CategoricalModel(BaseModel):
                            color=colors[index], label='Train ' + class_name_string + ' r@p.')
             if with_validation:
                 axs[1][0].plot(validation_log_df['epoch'] * steps_per_epoch,
-                               training_log_df['val' + class_name_string + '_precision'], color=val_colors[index],
+                               validation_log_df['val_' + class_name_string + '_precision'], color=val_colors[index],
                                label='Val. ' + class_name_string + ' prec.')
                 axs[1][1].plot(validation_log_df['epoch'] * steps_per_epoch,
-                               training_log_df['val' + class_name_string + '_recall'], color=val_colors[index],
+                               validation_log_df['val_' + class_name_string + '_recall'], color=val_colors[index],
                                label='Val. ' + class_name_string + ' recall.')
                 axs[2][0].plot(validation_log_df['epoch'] * steps_per_epoch,
-                               training_log_df['val' + class_name_string + '_r@p'], color=val_colors[index],
+                               validation_log_df['val_' + class_name_string + '_r@p'], color=val_colors[index],
                                label='Val. ' + class_name_string + ' r@p')
         axs[1][0].set_title("Precision (threshold = 0.5)")
         axs[1][0].set_xlabel("Batch")
