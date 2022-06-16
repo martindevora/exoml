@@ -32,11 +32,11 @@ class BinaryModel(BaseModel):
         if with_validation:
             axs[0][1].plot(validation_log_df['epoch'] * steps_per_epoch, validation_log_df['val_loss'], color='red',
                            label='Val. loss')
-        axs[1][0].plot(training_log_df['batch_total'], training_log_df['precision'], color='firebrick', label='Train Prec.')
+        axs[1][0].plot(training_log_df['batch_total'], training_log_df['precision'], color='orange', label='Train Prec.')
         axs[1][0].plot(training_log_df['batch_total'], training_log_df['recall'], color='cyan', label='Train Recall.')
         axs[1][0].plot(training_log_df['batch_total'], training_log_df['r@p'], color='mediumaquamarine', label='Train r@p.')
         axs[1][1].plot(training_log_df['batch_total'], training_log_df['accuracy'], color='black', label='Train Acc.')
-        axs[1][1].plot(training_log_df['batch_total'], training_log_df['f1_score'], color='firebrick', label='Train F1')
+        axs[1][1].plot(training_log_df['batch_total'], training_log_df['f1_score'], color='orange', label='Train F1')
         axs[1][1].plot(training_log_df['batch_total'], training_log_df['roc_auc'], color='cyan', label='Train ROC AUC')
         axs[1][1].plot(training_log_df['batch_total'], training_log_df['pr_auc'], color='mediumaquamarine',
                        label='Train PR AUC')
