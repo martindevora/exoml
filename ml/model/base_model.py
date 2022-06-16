@@ -285,13 +285,6 @@ class BaseModel(WithLogging):
                                       MetricsPlotCallback(self, model_path, steps_per_epoch)] +
                                       callbacks,
                            use_multiprocessing=cores > 0, workers=1 if cores <= 0 else cores)
-            val_history = {}
-            val_history['epoch'] = fit_history['epoch']
-            for key, value in fit_history:
-                if 'val_' in key:
-                    val_history[key] = value
-            history_df = pd.DataFrame.from_dict(fit_history)
-            history_df.to_csv(model_path + '/val_log.csv', index=False)
             self.save(output_dir)
         else:
             logging.warning("dry_run was activated and 'training' will not be launched")
