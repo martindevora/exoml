@@ -32,29 +32,29 @@ class BinaryModel(BaseModel):
         if with_validation:
             axs[0][1].plot(validation_log_df['epoch'] * steps_per_epoch, validation_log_df['val_loss'], color='red',
                            label='Val. loss')
-        axs[1][0].plot(training_log_df['batch_total'], training_log_df['precision'], color='orange', label='Train Prec.')
-        axs[1][0].plot(training_log_df['batch_total'], training_log_df['recall'], color='cyan', label='Train Recall.')
-        axs[1][0].plot(training_log_df['batch_total'], training_log_df['r@p'], color='mediumaquamarine', label='Train r@p.')
+        axs[1][0].plot(training_log_df['batch_total'], training_log_df['precision'], color='red', label='Train Prec.')
+        axs[1][0].plot(training_log_df['batch_total'], training_log_df['recall'], color='blue', label='Train Recall.')
+        axs[1][0].plot(training_log_df['batch_total'], training_log_df['r@p'], color='green', label='Train r@p.')
         axs[1][1].plot(training_log_df['batch_total'], training_log_df['accuracy'], color='black', label='Train Acc.')
-        axs[1][1].plot(training_log_df['batch_total'], training_log_df['f1_score'], color='orange', label='Train F1')
-        axs[1][1].plot(training_log_df['batch_total'], training_log_df['roc_auc'], color='cyan', label='Train ROC AUC')
-        axs[1][1].plot(training_log_df['batch_total'], training_log_df['pr_auc'], color='mediumaquamarine',
+        axs[1][1].plot(training_log_df['batch_total'], training_log_df['f1_score'], color='red', label='Train F1')
+        axs[1][1].plot(training_log_df['batch_total'], training_log_df['roc_auc'], color='blue', label='Train ROC AUC')
+        axs[1][1].plot(training_log_df['batch_total'], training_log_df['pr_auc'], color='green',
                        label='Train PR AUC')
         if with_validation:
-            axs[1][0].plot(validation_log_df['epoch'] * steps_per_epoch, validation_log_df['val_precision'], color='red',
-                           label='Val. prec.')
-            axs[1][0].plot(validation_log_df['epoch'] * steps_per_epoch, validation_log_df['val_recall'], color='blue',
-                           label='Val. recall.')
-            axs[1][0].plot(validation_log_df['epoch'] * steps_per_epoch, validation_log_df['val_r@p'], color='green',
-                           label='Val. r@p')
-            axs[1][1].plot(validation_log_df['epoch'] * steps_per_epoch, validation_log_df['val_accuracy'], color='gray',
-                           label='Val. acc.')
-            axs[1][1].plot(validation_log_df['epoch'] * steps_per_epoch, validation_log_df['val_f1_score'], color='red',
-                           label='Val. F1')
-            axs[1][1].plot(validation_log_df['epoch'] * steps_per_epoch, validation_log_df['val_roc_auc'], color='blue',
-                           label='Val. ROC AUC')
-            axs[1][1].plot(validation_log_df['epoch'] * steps_per_epoch, validation_log_df['val_pr_auc'], color='green',
-                           label='Val. PR AUC')
+            axs[1][0].plot(validation_log_df['batch_total'], validation_log_df['val_precision'],
+                           color='red', label='Val. prec.', linestyle='--')
+            axs[1][0].plot(validation_log_df['batch_total'], validation_log_df['val_recall'],
+                           color='blue', label='Val. recall.', linestyle='--')
+            axs[1][0].plot(validation_log_df['batch_total'], validation_log_df['val_r@p'],
+                           color='green', label='Val. r@p', linestyle='--')
+            axs[1][1].plot(validation_log_df['batch_total'], validation_log_df['val_accuracy'],
+                           color='black', label='Val. acc.', linestyle='--')
+            axs[1][1].plot(validation_log_df['batch_total'], validation_log_df['val_f1_score'],
+                           color='red', label='Val. F1', linestyle='--')
+            axs[1][1].plot(validation_log_df['batch_total'], validation_log_df['val_roc_auc'],
+                           color='blue', label='Val. ROC AUC', linestyle='--')
+            axs[1][1].plot(validation_log_df['batch_total'], validation_log_df['val_pr_auc'],
+                           color='green', label='Val. PR AUC', linestyle='--')
         axs[0][0].set_xlabel("Batch")
         secx = axs[0][0].secondary_xaxis('top',
                                          functions=(lambda x: x / steps_per_epoch, lambda x: x / steps_per_epoch))

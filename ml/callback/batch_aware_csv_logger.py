@@ -14,7 +14,7 @@ class BatchAwareCsvLogger(CSVLogger):
         self.current_epoch = 0
 
     def on_epoch_end(self, epoch, logs=None):
-        self.__store_log(logs, self.steps_per_epoch * (epoch + 1), epoch, False)
+        self.__store_log(logs, self.steps_per_epoch - 1, self.current_epoch, False)
 
     def on_epoch_begin(self, epoch, logs=None):
         self.current_epoch = epoch
