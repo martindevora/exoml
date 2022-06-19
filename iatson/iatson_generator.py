@@ -100,7 +100,6 @@ class IatsonModelGenerator(Ete6ModelGenerator):
         i = 0
         for df_index, target_row in injected_objects_df.iterrows():
             target_id = int(target_row['TIC ID'])
-            target_id = 413874159
             # target_row = self.injected_objects_df[self.injected_objects_df['TIC ID'] == 356110099].iloc[0]
             leading_zeros_object_id = '{:09}'.format(target_id)
             lc_filename = str(leading_zeros_object_id) + '_lc.csv'
@@ -146,9 +145,8 @@ class IatsonModelGenerator(Ete6ModelGenerator):
             lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 2) &
                                       (lc_df_focus['#time'] < 0.5 + duration_to_period * 2)]
             folded_flux_even_array[i] = self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[3])
-            # if type != "none":
-            #     self._plot_df(lc_df_focus, type, "even")
-            #     self._plot_input(folded_flux_even_array[i], type, "even")
+            self._plot_df(lc_df_focus, type, "even")
+            self._plot_input(folded_flux_even_array[i], type, "even")
             # Focus flux odd
             lc_df_focus = lc_df.copy()
             lc_df_focus['#time'] = foldedleastsquares.fold(time, period, epoch + period / 2)
@@ -156,9 +154,8 @@ class IatsonModelGenerator(Ete6ModelGenerator):
             lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
             folded_flux_odd_array[i] = self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[4])
-            # if type != "none":
-            #     self._plot_df(lc_df_focus, type, "odd")
-            #     self._plot_input(folded_flux_odd_array[i], type, "odd")
+            self._plot_df(lc_df_focus, type, "odd")
+            self._plot_input(folded_flux_odd_array[i], type, "odd")
             # Focus flux sub-harmonic even
             lc_df_focus = lc_df.copy()
             lc_df_focus['#time'] = foldedleastsquares.fold(time, period / 2, epoch)
