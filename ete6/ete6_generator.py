@@ -147,30 +147,6 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         star_df['dist_arcsec'] = star_df['dist_arcsec'].fillna(max_distance)
         return star_df
 
-    def __prepare_input_data(self, input_df):
-        time = input_df["#time"].to_numpy()
-        #input_df["#time"] = value_encode_times(time - time[0])
-        dif = time[1:] - time[:-1]
-        jumps = np.where(np.abs(dif) > 0.25)[0]
-        jumps = np.append(jumps, len(input_df))
-        previous_jump_index = 0
-        for jumpIndex in jumps:
-            token = input_df["centroid_x"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["centroid_x"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 2
-            token = input_df["centroid_y"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["centroid_y"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 2
-            token = input_df["motion_x"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["motion_x"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 2
-            token = input_df["motion_y"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["motion_y"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 2
-            token = input_df["bck_flux"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["bck_flux"][previous_jump_index:jumpIndex] = (np.tanh(token - np.nanmedian(token)) + 1) / 3
-            previous_jump_index = jumpIndex
-        input_df = input_df.fillna(self.zero_epsilon)
-        input_df = input_df.replace(0.0, self.zero_epsilon)
-        input_df = input_df.replace(0, self.zero_epsilon)
-        return input_df
-
     @abstractmethod
     def class_weights(self):
         pass
