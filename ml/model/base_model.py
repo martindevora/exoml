@@ -69,6 +69,7 @@ class BaseModel(WithLogging):
 
     def balance_dataset_with_sampling(self, training_set, classes_sampling):
         classes_counts = [len(training_set[training_set['type'].isin(labels)]) for labels in self.class_ids.values()]
+        dropped_samples = training_set.iloc[:0, :].copy()
         for id, sampling in enumerate(classes_sampling):
             labels = self.class_ids[id]
             class_count = classes_counts[id]
@@ -82,10 +83,12 @@ class BaseModel(WithLogging):
                                                    .iloc[0:class_expected_size_remainder], ignore_index=True)
             elif sampling < 1:
                 class_expected_size = np.round(class_expected_size).astype(int)
-                type_subset_df = training_set[training_set['type'].isin(labels)].iloc[0:class_expected_size]
+                samples_to_keep = training_set[training_set['type'].isin(labels)].iloc[0:class_expected_size]
+                samples_to_remove = training_set[training_set['type'].isin(labels)].iloc[class_expected_size:]
+                dropped_samples = dropped_samples.append([samples_to_remove])
                 training_set.drop(training_set[training_set['type'].isin(labels)].index, inplace=True)
-                training_set = training_set.append([type_subset_df], ignore_index=True)
-        return training_set
+                training_set = training_set.append([samples_to_keep], ignore_index=True)
+        return training_set, dropped_samples
 
     def balance_dataset_from_class(self, training_set, class_id):
         assert class_id in self.class_ids.keys()
@@ -137,10 +140,14 @@ class BaseModel(WithLogging):
     def prepare_training_data(self, training_dir, output_dir, train_percent=0.8, validation_percent=0.1,
                               training_set_limit=None, balance_class_id=None, balance_class_sampling=None):
         training_dataset = self.load_training_set(training_dir=training_dir)
+        test_dataset = None
         if balance_class_sampling is not None:
-            training_dataset = shuffle(self.balance_dataset_with_sampling(training_dataset, balance_class_sampling))
+            training_dataset, test_dataset = \
+                self.balance_dataset_with_sampling(training_dataset, balance_class_sampling)
+            training_dataset = shuffle()
         elif balance_class_id is not None:
-            training_dataset = shuffle(self.balance_dataset_from_class(training_dataset, balance_class_id))
+            training_dataset, test_dataset = \
+                self.balance_dataset_from_class(training_dataset, balance_class_id)
         if training_set_limit is not None:
             if isinstance(training_dataset, pd.DataFrame):
                 training_dataset = training_dataset[:training_set_limit]
@@ -169,7 +176,9 @@ class BaseModel(WithLogging):
             train_filenames.to_csv(train_dataset_filename)
             validation_filenames.to_csv(validation_dataset_filename)
             if validation_last_index != test_last_index:
-                test_filenames = training_dataset.iloc[validation_last_index:test_last_index]
+                test_filenames = test_dataset if test_dataset is not None else train_filenames.iloc[:0, :].copy()
+                test_filenames = test_filenames.append(training_dataset.iloc[validation_last_index:test_last_index],
+                                                       ignore_index=True)
                 test_filenames.to_csv(test_dataset_filename)
         else:
             train_filenames = training_dataset[0:train_last_index]
