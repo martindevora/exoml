@@ -145,8 +145,8 @@ class IatsonModelGenerator(Ete6ModelGenerator):
             lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 2) &
                                       (lc_df_focus['#time'] < 0.5 + duration_to_period * 2)]
             folded_flux_even_array[i] = self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[3])
-            self._plot_df(lc_df_focus, type, "even")
-            self._plot_input(folded_flux_even_array[i], type, "even")
+            # self._plot_df(lc_df_focus, type, "even")
+            # self._plot_input(folded_flux_even_array[i], type, "even")
             # Focus flux odd
             lc_df_focus = lc_df.copy()
             lc_df_focus['#time'] = foldedleastsquares.fold(time, period, epoch + period / 2)
@@ -154,8 +154,8 @@ class IatsonModelGenerator(Ete6ModelGenerator):
             lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
                                       (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
             folded_flux_odd_array[i] = self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[4])
-            self._plot_df(lc_df_focus, type, "odd")
-            self._plot_input(folded_flux_odd_array[i], type, "odd")
+            # self._plot_df(lc_df_focus, type, "odd")
+            # self._plot_input(folded_flux_odd_array[i], type, "odd")
             # Focus flux sub-harmonic even
             lc_df_focus = lc_df.copy()
             lc_df_focus['#time'] = foldedleastsquares.fold(time, period / 2, epoch)
