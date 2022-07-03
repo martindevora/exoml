@@ -137,17 +137,17 @@ class BaseModel(WithLogging):
         self.model.save(dir + self._get_model_dir())
         logging.info("Saved model")
 
-    def prepare_training_data(self, training_dir, output_dir, train_percent=0.8, validation_percent=0.1,
+    def prepare_training_data(self, training_dir, output_dir, batch_size, train_percent=0.8, validation_percent=0.1,
                               training_set_limit=None, balance_class_id=None, balance_class_sampling=None):
         training_dataset = self.load_training_set(training_dir=training_dir)
         test_dataset = None
         if balance_class_sampling is not None:
             training_dataset, test_dataset = \
                 self.balance_dataset_with_sampling(training_dataset, balance_class_sampling)
-            training_dataset = shuffle()
         elif balance_class_id is not None:
             training_dataset, test_dataset = \
                 self.balance_dataset_from_class(training_dataset, balance_class_id)
+        training_dataset = shuffle(training_dataset)
         if training_set_limit is not None:
             if isinstance(training_dataset, pd.DataFrame):
                 training_dataset = training_dataset[:training_set_limit]
@@ -155,6 +155,7 @@ class BaseModel(WithLogging):
                 training_dataset = training_dataset[:training_set_limit]
         dataset_length = len(training_dataset)
         train_last_index = int(dataset_length * train_percent)
+        train_last_index = train_last_index - train_last_index % batch_size
         validation_last_index = train_last_index + int(dataset_length * validation_percent)
         validation_last_index = validation_last_index if validation_last_index < dataset_length else dataset_length
         test_last_index = dataset_length - 1
@@ -211,8 +212,8 @@ class BaseModel(WithLogging):
         if not os.path.exists(model_path):
             os.mkdir(model_path)
         train_filenames, validation_filenames, test_filenames = \
-            self.prepare_training_data(training_dir, model_path, train_percent, validation_percent, training_set_limit,
-                                       balance_class_id, balance_class_sampling)
+            self.prepare_training_data(training_dir, model_path, batch_size, train_percent, validation_percent,
+                                       training_set_limit, balance_class_id, balance_class_sampling)
         # The optimizer is executed once for every batch, hence optimizer steps per epoch are
         train_dataset_size = len(train_filenames)
         test_dataset_size = len(validation_filenames)
