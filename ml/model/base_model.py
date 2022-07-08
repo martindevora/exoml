@@ -200,7 +200,7 @@ class BaseModel(WithLogging):
     def train(self, training_dir, output_dir, batch_size=20, epochs=20, initial_learning_rate=0.01,
               dataset_iterations_per_epoch=1, train_percent=0.8,
               validation_percent=0.1, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
-              gradient_clip_norm=0.01, cores=0, metrics=[], callbacks=[], learning_rate_decay=0.95,
+              gradient_clip_norm=0.01, cores=0, metrics=[], callbacks=[], learning_rate_decay=0.98,
               learning_rate_schedule=None, balance_class_id=None, balance_class_sampling=None,
               class_loss_weights=None):
         logging.info("Preparing training data with (training_dir," + str(training_dir) +
