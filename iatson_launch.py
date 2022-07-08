@@ -10,7 +10,7 @@ batch_size = 100
 epochs = 50
 model_dir = './'
 cores = 0
-lr = 0.001
+lr = 0.01
 iatson = IATSON({0: 'bckEB', 1: 'EB', 2: 'planet', 3: 'none'}, ['bckEB', 'EB', 'planet', 'none']).build()#.inform(model_dir)
 #iatson.load_model("./IATSON_model")
 iatson.train(training_dir, model_dir, batch_size, epochs, initial_learning_rate=lr, gradient_clip_norm=0.1,
