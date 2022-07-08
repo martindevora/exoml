@@ -25,7 +25,11 @@ class CategoricalModel(BaseModel):
             class_name_string = str(class_name)
             metrics = metrics + [Precision(class_id=index, name=class_name_string + "_precision", thresholds=0.5),
                                  Recall(class_id=index, name=class_name_string + "_recall", thresholds=0.5),
-                                 RecallAtPrecision(0.99, class_id=index, name=class_name_string + "_r@p")]
+                                 RecallAtPrecision(0.99, class_id=index, name=class_name_string + "_r@p99"),
+                                 RecallAtPrecision(0.975, class_id=index, name=class_name_string + "_r@p975"),
+                                 RecallAtPrecision(0.95, class_id=index, name=class_name_string + "_r@p95"),
+                                 Precision(class_id=index, name=class_name_string + "_p@k200", thresholds=0.5, top_k=200),
+                                 Precision(class_id=index, name=class_name_string + "_p@k1000", thresholds=0.5, top_k=1000)]
         classes_count = len(self.class_names)
         return metrics + [F1Score(num_classes=classes_count, average='macro'),
                           AUC(multi_label=True, num_labels=classes_count, name="roc_auc"),
@@ -90,7 +94,7 @@ class CategoricalModel(BaseModel):
                            color=colors[index], label='Train ' + class_name_string + ' Prec.')
             axs[1][1].plot(training_log_df['batch_total'], training_log_df[class_name_string + '_recall'],
                            color=colors[index], label='Train ' + class_name_string + ' Recall.')
-            axs[2][0].plot(training_log_df['batch_total'], training_log_df[class_name_string + '_r@p'],
+            axs[2][0].plot(training_log_df['batch_total'], training_log_df[class_name_string + '_r@p99'],
                            color=colors[index], label='Train ' + class_name_string + ' r@p.')
             if with_validation:
                 axs[1][0].plot(validation_log_df['batch_total'],
@@ -100,7 +104,7 @@ class CategoricalModel(BaseModel):
                                validation_log_df['val_' + class_name_string + '_recall'],
                                color=colors[index], label='Val. ' + class_name_string + ' recall.', linestyle='--')
                 axs[2][0].plot(validation_log_df['batch_total'],
-                               validation_log_df['val_' + class_name_string + '_r@p'],
+                               validation_log_df['val_' + class_name_string + '_r@p99'],
                                color=colors[index], label='Val. ' + class_name_string + ' r@p', linestyle='--')
         axs[1][0].set_title("Precision (threshold = 0.5)")
         axs[1][0].set_xlabel("Batch")

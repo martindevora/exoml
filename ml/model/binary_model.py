@@ -17,7 +17,12 @@ class BinaryModel(BaseModel):
         return binary_focal_loss, BinaryAccuracy()
 
     def instance_metrics(self):
-        return [Precision(), Recall(), RecallAtPrecision(precision=0.99), F1Score(num_classes=1), AUC(name="roc_auc"),
+        return [Precision(), Recall(), RecallAtPrecision(precision=0.99, name="_r@p99"),
+                RecallAtPrecision(0.975, name="r@p975"),
+                RecallAtPrecision(0.95, name="r@p95"),
+                Precision(name="p@k200", thresholds=0.5, top_k=200),
+                Precision(name="p@k1000", thresholds=0.5, top_k=1000),
+                F1Score(num_classes=1), AUC(name="roc_auc"),
                 AUC(curve="PR", name="pr_auc")]
 
     def plot_metrics(self, model_dir, steps_per_epoch, with_validation=False):
@@ -34,7 +39,7 @@ class BinaryModel(BaseModel):
                            label='Val. loss')
         axs[1][0].plot(training_log_df['batch_total'], training_log_df['precision'], color='red', label='Train Prec.')
         axs[1][0].plot(training_log_df['batch_total'], training_log_df['recall'], color='blue', label='Train Recall.')
-        axs[1][0].plot(training_log_df['batch_total'], training_log_df['r@p'], color='green', label='Train r@p.')
+        axs[1][0].plot(training_log_df['batch_total'], training_log_df['r@p99'], color='green', label='Train r@p.')
         axs[1][1].plot(training_log_df['batch_total'], training_log_df['accuracy'], color='black', label='Train Acc.')
         axs[1][1].plot(training_log_df['batch_total'], training_log_df['f1_score'], color='red', label='Train F1')
         axs[1][1].plot(training_log_df['batch_total'], training_log_df['roc_auc'], color='blue', label='Train ROC AUC')
@@ -45,7 +50,7 @@ class BinaryModel(BaseModel):
                            color='red', label='Val. prec.', linestyle='--')
             axs[1][0].plot(validation_log_df['batch_total'], validation_log_df['val_recall'],
                            color='blue', label='Val. recall.', linestyle='--')
-            axs[1][0].plot(validation_log_df['batch_total'], validation_log_df['val_r@p'],
+            axs[1][0].plot(validation_log_df['batch_total'], validation_log_df['val_r@p99'],
                            color='green', label='Val. r@p', linestyle='--')
             axs[1][1].plot(validation_log_df['batch_total'], validation_log_df['val_accuracy'],
                            color='black', label='Val. acc.', linestyle='--')
