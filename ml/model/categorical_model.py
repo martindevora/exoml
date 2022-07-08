@@ -27,9 +27,7 @@ class CategoricalModel(BaseModel):
                                  Recall(class_id=index, name=class_name_string + "_recall", thresholds=0.5),
                                  RecallAtPrecision(0.99, class_id=index, name=class_name_string + "_r@p99"),
                                  RecallAtPrecision(0.975, class_id=index, name=class_name_string + "_r@p975"),
-                                 RecallAtPrecision(0.95, class_id=index, name=class_name_string + "_r@p95"),
-                                 Precision(class_id=index, name=class_name_string + "_p@k200", thresholds=0.5, top_k=200),
-                                 Precision(class_id=index, name=class_name_string + "_p@k1000", thresholds=0.5, top_k=1000)]
+                                 RecallAtPrecision(0.95, class_id=index, name=class_name_string + "_r@p95")]
         classes_count = len(self.class_names)
         return metrics + [F1Score(num_classes=classes_count, average='macro'),
                           AUC(multi_label=True, num_labels=classes_count, name="roc_auc"),

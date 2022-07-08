@@ -20,8 +20,6 @@ class BinaryModel(BaseModel):
         return [Precision(), Recall(), RecallAtPrecision(precision=0.99, name="_r@p99"),
                 RecallAtPrecision(0.975, name="r@p975"),
                 RecallAtPrecision(0.95, name="r@p95"),
-                Precision(name="p@k200", thresholds=0.5, top_k=200),
-                Precision(name="p@k1000", thresholds=0.5, top_k=1000),
                 F1Score(num_classes=1), AUC(name="roc_auc"),
                 AUC(curve="PR", name="pr_auc")]
 
