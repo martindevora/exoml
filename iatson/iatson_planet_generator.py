@@ -96,7 +96,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
         folded_flux_odd_subhar_array = np.empty((len(target_indexes), 500, self.measurements_per_point))
         folded_flux_even_har_array = np.empty((len(target_indexes), 500, self.measurements_per_point))
         folded_flux_odd_har_array = np.empty((len(target_indexes), 500, self.measurements_per_point))
-        batch_data_values = np.empty((len(target_indexes), len(self.TYPE_TO_LABEL)))
+        batch_data_values = np.empty((len(target_indexes), 1))
         i = 0
         for df_index, target_row in injected_objects_df.iterrows():
             target_id = int(target_row['TIC ID'])
