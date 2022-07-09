@@ -1,9 +1,9 @@
 import logging
 
+from keras.losses import BinaryCrossentropy
 from keras.metrics import Precision, Recall, AUC, BinaryAccuracy, RecallAtPrecision
 from tensorflow_addons.metrics import F1Score
 
-from ml.loss.cross_entropy import binary_focal_loss
 from ml.model.base_model import BaseModel
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -14,10 +14,10 @@ class BinaryModel(BaseModel):
         super().__init__(name, input_size, class_ids)
 
     def instance_loss_accuracy(self):
-        return binary_focal_loss, BinaryAccuracy()
+        return BinaryCrossentropy(), BinaryAccuracy()
 
     def instance_metrics(self):
-        return [Precision(), Recall(), RecallAtPrecision(precision=0.99, name="_r@p99"),
+        return [Precision(), Recall(), RecallAtPrecision(precision=0.99, name="r@p99"),
                 RecallAtPrecision(0.975, name="r@p975"),
                 RecallAtPrecision(0.95, name="r@p95"),
                 F1Score(num_classes=1), AUC(name="roc_auc"),
@@ -28,7 +28,7 @@ class BinaryModel(BaseModel):
         training_log_df = pd.read_csv(model_dir + '/training_log.csv')
         training_log_df['batch_total'] = training_log_df['batch'] + (training_log_df['epoch'] * steps_per_epoch)
         validation_log_df = training_log_df.dropna()
-        fig, axs = plt.subplots(2, 3, figsize=(25, 7), constrained_layout=True)
+        fig, axs = plt.subplots(2, 2, figsize=(25, 7), constrained_layout=True)
         fig.suptitle(self.name + ' Model Metrics', fontsize=14)
         axs[0][0].plot(training_log_df['batch_total'], training_log_df['learning_rate'])
         axs[0][1].plot(training_log_df['batch_total'], training_log_df['loss'], color='blue', label='Train loss')
@@ -38,7 +38,7 @@ class BinaryModel(BaseModel):
         axs[1][0].plot(training_log_df['batch_total'], training_log_df['precision'], color='red', label='Train Prec.')
         axs[1][0].plot(training_log_df['batch_total'], training_log_df['recall'], color='blue', label='Train Recall.')
         axs[1][0].plot(training_log_df['batch_total'], training_log_df['r@p99'], color='green', label='Train r@p.')
-        axs[1][1].plot(training_log_df['batch_total'], training_log_df['accuracy'], color='black', label='Train Acc.')
+        axs[1][1].plot(training_log_df['batch_total'], training_log_df['binary_accuracy'], color='black', label='Train Acc.')
         axs[1][1].plot(training_log_df['batch_total'], training_log_df['f1_score'], color='red', label='Train F1')
         axs[1][1].plot(training_log_df['batch_total'], training_log_df['roc_auc'], color='blue', label='Train ROC AUC')
         axs[1][1].plot(training_log_df['batch_total'], training_log_df['pr_auc'], color='green',
@@ -50,7 +50,7 @@ class BinaryModel(BaseModel):
                            color='blue', label='Val. recall.', linestyle='--')
             axs[1][0].plot(validation_log_df['batch_total'], validation_log_df['val_r@p99'],
                            color='green', label='Val. r@p', linestyle='--')
-            axs[1][1].plot(validation_log_df['batch_total'], validation_log_df['val_accuracy'],
+            axs[1][1].plot(validation_log_df['batch_total'], validation_log_df['val_binary_accuracy'],
                            color='black', label='Val. acc.', linestyle='--')
             axs[1][1].plot(validation_log_df['batch_total'], validation_log_df['val_f1_score'],
                            color='red', label='Val. F1', linestyle='--')
