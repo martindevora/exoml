@@ -52,6 +52,8 @@ class BatchAwareCsvLogger(CSVLogger):
         learning_rate = K.eval(self.model.optimizer._decayed_lr(tf.float64))
         row_dict = {'epoch': epoch, 'batch': batch, 'learning_rate': learning_rate}
         for metric_key in metric_fieldnames:
-            row_dict[metric_key] = handle_value(logs[metric_key]) if metric_key in logs else np.nan
+            row_dict[metric_key] = handle_value(logs[metric_key][0]
+                                                if isinstance(logs[metric_key], (list, np.ndarray))
+                                                else logs[metric_key]) if metric_key in logs else np.nan
         self.writer.writerow(row_dict)
         self.csv_file.flush()
