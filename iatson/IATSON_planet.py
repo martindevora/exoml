@@ -183,7 +183,7 @@ class IATSON_planet(BinaryModel):
             [tpf_branch.output, mc_branch.output, bck_branch.output, flux_branch.output], axis=1)
         final_branch = keras.layers.Dense(64, activation="relu", name="final-dense1")(final_branch)
         final_branch = keras.layers.Dense(32, activation="relu", name="final-dense2")(final_branch)
-        final_branch = keras.layers.Dense(1, activation="softmax", name="final-dense-softmax")(final_branch)
+        final_branch = keras.layers.Dense(1, activation="sigmoid", name="final-dense-sigmoid")(final_branch)
         inputs = tpf_branch.inputs + mc_branch.inputs + bck_branch.inputs + flux_branch.inputs
         model = keras.Model(inputs=inputs, outputs=final_branch, name="mnist_model")
         keras.utils.vis_utils.plot_model(model, "IATSON_model.png", show_shapes=True)
@@ -215,7 +215,7 @@ class IATSON_planet(BinaryModel):
         final_branch = keras.layers.Dropout(rate=0.1)(final_branch)
         final_branch = keras.layers.Dense(32, activation=LeakyReLU(leaky_relu_alpha), name="final-dense2")(final_branch)
         final_branch = keras.layers.Dropout(rate=0.1)(final_branch)
-        final_branch = keras.layers.Dense(1, activation="softmax", name="final-dense-softmax")(final_branch)
+        final_branch = keras.layers.Dense(1, activation="sigmoid", name="final-dense-sigmoid")(final_branch)
         inputs = [stellar_model_input, stellar_neighbours_input] + flux_model_branch.inputs + focus_flux_model_branch.inputs
         self.set_model(keras.Model(inputs=inputs, outputs=final_branch, name="IATSON"))
         return self
