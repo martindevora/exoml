@@ -10,6 +10,7 @@ from sklearn.utils import shuffle
 
 from ml.callback.basemodel_aware_callback import MetricsPlotCallback
 from ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
+from ml.callback.early_stopping import ExoMlEarlyStopping
 from ml.callback.get_weights import GetWeights
 from ml.callback.training_data_aware import ValidationDataAwareCallback, ModelDirDataAwareCallback
 from ml.learning_rate.schedulers import ExponentialRescaleDecay
@@ -202,7 +203,7 @@ class BaseModel(WithLogging):
               validation_percent=0.1, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
               gradient_clip_norm=0.01, cores=0, metrics=[], callbacks=[], learning_rate_decay=0.98,
               learning_rate_schedule=None, balance_class_id=None, balance_class_sampling=None,
-              class_loss_weights=None):
+              class_loss_weights=None, early_stopping_delta=0.01, early_stopping_patience=3):
         logging.info("Preparing training data with (training_dir," + str(training_dir) +
                      ") (train_percent," + str(train_percent) +
                      ") (test_percent," + str(validation_percent) +
@@ -268,15 +269,15 @@ class BaseModel(WithLogging):
                 verbose=1,
                 save_weights_only=True,
                 save_freq='epoch')
-            # early_stopping_callback = EarlyStopping(
-            #     monitor="val_loss",
-            #     min_delta=0.01,
-            #     patience=5,
-            #     verbose=0,
-            #     mode="auto",
-            #     baseline=None,
-            #     restore_best_weights=False,
-            # )
+            early_stopping_callback = ExoMlEarlyStopping(
+                monitor="val_loss",
+                min_delta=early_stopping_delta,
+                patience=early_stopping_patience,
+                verbose=0,
+                mode="auto",
+                baseline=None,
+                restore_best_weights=False,
+            )
             get_weights_callback = GetWeights(model_weights_logger)
             model_validation_steps = int(test_dataset_size // batch_size)
             class_weights = class_loss_weights if class_loss_weights is not None \
@@ -291,7 +292,7 @@ class BaseModel(WithLogging):
                            epochs=epochs, verbose=1, class_weight=class_weights,
                            validation_data=validation_batch_generator,
                            validation_steps=model_validation_steps,
-                           callbacks=[csv_logger, cp_callback, get_weights_callback,
+                           callbacks=[csv_logger, cp_callback, get_weights_callback, early_stopping_callback,
                                       MetricsPlotCallback(self, model_path, steps_per_epoch)] +
                                       callbacks,
                            use_multiprocessing=cores > 0, workers=1 if cores <= 0 else cores)
