@@ -1,4 +1,3 @@
-import logging
 import multiprocessing
 
 import numpy as np
@@ -8,10 +7,10 @@ from keras.layers import LeakyReLU
 from sklearn.utils import shuffle
 
 from ml.model.base_model import CategoricalPredictionSetStats
-from ml.model.binary_model import BinaryModel
+from ml.model.imbalanced_binary_model import ImbalancedBinaryModel
 from transpot.transpot_generator import TranspotModelGenerator
 
-class TRANSPOT(BinaryModel):
+class TRANSPOT(ImbalancedBinaryModel):
     def __init__(self, class_ids, input_size=(20610, 13)) -> None:
         super().__init__('TRANSPOT', input_size, class_ids)
 

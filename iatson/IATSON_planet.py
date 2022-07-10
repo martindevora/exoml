@@ -9,10 +9,10 @@ from sklearn.utils import shuffle
 
 from iatson.iatson_planet_generator import IatsonPlanetModelGenerator
 from ml.model.base_model import CategoricalPredictionSetStats
-from ml.model.binary_model import BinaryModel
+from ml.model.imbalanced_binary_model import ImbalancedBinaryModel
 
 
-class IATSON_planet(BinaryModel):
+class IATSON_planet(ImbalancedBinaryModel):
     def __init__(self, class_ids, class_names) -> None:
         super().__init__('IATSON_planet', [11, 9 * 15, 2500, 500, 500, 500, 500, 500, 500], class_ids)
         self.class_names = class_names
