@@ -9,10 +9,10 @@ from sklearn.utils import shuffle
 
 from iatson.iatson_generator import IatsonModelGenerator
 from ml.model.base_model import CategoricalPredictionSetStats
-from ml.model.categorical_model import CategoricalModel
+from ml.model.imbalanced_categorical_model import ImbalancedCategoricalModel
 
 
-class IATSON(CategoricalModel):
+class IATSON(ImbalancedCategoricalModel):
     def __init__(self, class_ids, class_names) -> None:
         super().__init__(class_names, 'IATSON', [11, 9 * 15, 2500, 500, 500, 500, 500, 500, 500], class_ids)
         self.class_names = class_names
