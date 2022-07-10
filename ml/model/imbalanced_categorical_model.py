@@ -6,7 +6,6 @@ from ml.model.categorical_model import CategoricalModel
 class ImbalancedCategoricalModel(CategoricalModel):
     def __init__(self, class_names, name, input_size, class_ids) -> None:
         super().__init__(class_names, name, input_size, class_ids)
-        self.class_names = class_names
 
     def instance_loss_accuracy(self):
         return categorical_focal_loss, CategoricalAccuracy()
