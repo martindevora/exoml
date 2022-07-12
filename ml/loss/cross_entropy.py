@@ -1,5 +1,5 @@
 from keras.activations import softmax
-from keras.losses import CategoricalCrossentropy, BinaryCrossentropy
+from keras.losses import CategoricalCrossentropy, BinaryCrossentropy, binary_crossentropy
 from keras.metrics import CategoricalAccuracy, BinaryAccuracy
 import tensorflow as tf
 from keras import backend as K
@@ -128,3 +128,60 @@ def categorical_focal_loss(y_true, y_pred, alpha=0.2, gamma=2.):
     # Compute mean loss in mini_batch
     return K.mean(K.sum(loss, axis=-1))
 
+
+def f1_loss(y_true, y_pred):
+    """
+    The macro F1-score has one big trouble. It's non-differentiable. Which means we cannot use it as a loss function.
+
+    But we can modify it to be differentiable. Instead of accepting 0/1 integer predictions, let's accept probabilities
+    instead. Thus if the ground truth is 1 and the model prediction is 0.4, we calculate it as 0.4 true positive and
+    0.6 false negative. If the ground truth is 0 and the model prediction is 0.4, we calculate it as 0.6 true negative
+    and 0.4 false positive.
+    :param y_true: the real outputs
+    :param y_pred: the predicted outputs
+    :return:
+    """
+    tp = K.sum(K.cast(y_true * y_pred, 'float'), axis=0)
+    tn = K.sum(K.cast((1 - y_true) * (1 - y_pred), 'float'), axis=0)
+    fp = K.sum(K.cast((1 - y_true) * y_pred, 'float'), axis=0)
+    fn = K.sum(K.cast(y_true * (1 - y_pred), 'float'), axis=0)
+    p = tp / (tp + fp + K.epsilon())
+    r = tp / (tp + fn + K.epsilon())
+    f1 = 2 * p * r / (p + r + K.epsilon())
+    f1 = tf.where(tf.math.is_nan(f1), tf.zeros_like(f1), f1)
+    return 1 - K.mean(f1)
+
+
+def dice_loss(targets, inputs, smooth=1e-6):
+    """
+    From https://www.kaggle.com/code/bigironsphere/loss-function-library-keras-pytorch/notebook
+    :param targets: the expected outputs
+    :param inputs: the given inputs
+    :param smooth:
+    :return: the dice loss
+    """
+    inputs = K.flatten(inputs)
+    targets = K.flatten(targets)
+    intersection = K.sum(K.dot(targets, inputs))
+    dice = (2 * intersection + smooth) / (K.sum(targets) + K.sum(inputs) + smooth)
+    return 1 - dice
+
+
+def dice_bce_loss(targets, inputs, smooth=1e-6):
+    """
+    This loss combines Dice loss with the standard binary cross-entropy (BCE) loss that is generally the default for
+    segmentation models. Combining the two methods allows for some diversity in the loss, while benefitting from the
+    stability of BCE.
+    From https://www.kaggle.com/code/bigironsphere/loss-function-library-keras-pytorch/notebook
+    :param targets: the expected outputs
+    :param inputs: the given inputs
+    :param smooth: the dice loss smooth parameter
+    :return:
+    """
+    inputs = K.flatten(inputs)
+    targets = K.flatten(targets)
+    bce = binary_crossentropy(targets, inputs)
+    intersection = K.sum(K.dot(targets, inputs))
+    dice_loss = 1 - (2 * intersection + smooth) / (K.sum(targets) + K.sum(inputs) + smooth)
+    dice_bce = bce + dice_loss
+    return dice_bce
