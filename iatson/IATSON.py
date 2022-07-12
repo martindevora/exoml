@@ -246,7 +246,7 @@ class IATSON(ImbalancedCategoricalModel):
         else:
             return max_prediction_indexes, max_prediction_values
 
-    def predict_threshold(self, predictions, threshold=[0.8, 0.8, 0.8, 0.5]):
+    def predict_threshold(self, predictions, threshold=[0.5, 0.5, 0.5, 0.5]):
         max_prediction_indexes = [np.argmax(prediction) for prediction in predictions]
         max_prediction_values = [predictions[index][max_prediction_index]
                                  if predictions[index][max_prediction_index] > threshold[predictions[index][max_prediction_index]]
@@ -255,8 +255,11 @@ class IATSON(ImbalancedCategoricalModel):
         max_prediction_indexes[max_prediction_values == -1] = -1
         return max_prediction_indexes, max_prediction_values
 
-    def predict_test_set(self, training_dir, model_dir, batch_size=20, zero_epsilon=1e-7):
+    def predict_test_set(self, training_dir, model_dir, batch_size=20, test_set_limit=None, zero_epsilon=1e-7):
         test_dataset = pd.read_csv(model_dir + '/test_dataset.csv')
+        test_dataset = shuffle(test_dataset)
+        if test_set_limit is not None:
+            test_dataset = test_dataset.iloc[0:test_set_limit]
         lcs_dir = training_dir + '/lcs/'
         testing_batch_generator = IatsonModelGenerator(test_dataset, lcs_dir, batch_size, self.input_size,
                                                        zero_epsilon)
