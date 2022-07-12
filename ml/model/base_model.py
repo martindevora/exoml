@@ -203,7 +203,8 @@ class BaseModel(WithLogging):
               validation_percent=0.1, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
               gradient_clip_norm=0.01, cores=0, metrics=[], callbacks=[], learning_rate_decay=0.98,
               learning_rate_schedule=None, balance_class_id=None, balance_class_sampling=None,
-              class_loss_weights=None, early_stopping_delta=0.01, early_stopping_patience=3):
+              class_loss_weights=None, early_stopping_delta=0.01, early_stopping_patience=3,
+              custom_loss=None):
         logging.info("Preparing training data with (training_dir," + str(training_dir) +
                      ") (train_percent," + str(train_percent) +
                      ") (test_percent," + str(validation_percent) +
@@ -238,7 +239,8 @@ class BaseModel(WithLogging):
                                              clipnorm=gradient_clip_norm)
         # We don't use SparseCategoricalCrossentropy because our targets are one-hot encoded
         loss, accuracy = self.instance_loss_accuracy()
-        self.compile(optimizer, loss, metrics=[accuracy] + self.instance_metrics() + metrics)
+        self.compile(optimizer, custom_loss if custom_loss is not None else loss,
+                     metrics=[accuracy] + self.instance_metrics() + metrics)
         model_weights_logger = ModelWeightsLogger()
         if not dry_run:
             logging.info("Initializing training and validation generators with (batch_size," + str(batch_size) +
@@ -267,7 +269,7 @@ class BaseModel(WithLogging):
             cp_callback = tf.keras.callbacks.ModelCheckpoint(
                 filepath=model_path,
                 verbose=1,
-                save_weights_only=True,
+                save_weights_only=False,
                 save_freq='epoch')
             early_stopping_callback = ExoMlEarlyStopping(
                 monitor="val_loss",
