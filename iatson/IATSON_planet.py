@@ -1,4 +1,5 @@
-import multiprocessing
+import logging
+import os
 
 import numpy as np
 import pandas as pd
@@ -234,52 +235,60 @@ class IATSON_planet(ImbalancedBinaryModel):
         prediction = self.model(input, training=False)
         return self.predict_threshold([prediction])
 
-    def predict_batch(self, inputs, expected_outputs=None, batch_size=20, cores=multiprocessing.cpu_count() - 1):
+    def predict_batch(self, inputs, expected_outputs=None, batch_size=20, cores=os.cpu_count() - 1):
         predictions = self.model.predict(inputs, use_multiprocessing=True, batch_size=batch_size, workers=cores)
         max_prediction_indexes, max_prediction_values = self.predict_threshold(predictions)
         if expected_outputs is not None:
-            bckeb_stats = self.test_metrics(expected_outputs, predictions, 0)
-            eb_stats = self.test_metrics(expected_outputs, predictions, 1)
-            planet_stats = self.test_metrics(expected_outputs, predictions, 2)
-            none_stats = self.test_metrics(expected_outputs, predictions, 3)
-            return max_prediction_indexes, max_prediction_values, [bckeb_stats, eb_stats, planet_stats, none_stats]
+            planet_stats = self.test_metrics(expected_outputs, max_prediction_indexes, max_prediction_values)
+            return max_prediction_indexes, max_prediction_values, [planet_stats]
         else:
             return max_prediction_indexes, max_prediction_values
 
-    def predict_threshold(self, predictions, threshold=[0.8, 0.8, 0.8, 0.5]):
-        max_prediction_indexes = [np.argmax(prediction) for prediction in predictions]
-        max_prediction_values = [predictions[index][max_prediction_index]
-                                 if predictions[index][max_prediction_index] > threshold[predictions[index][max_prediction_index]]
+    def predict_threshold(self, predictions, threshold=[0.5]):
+        max_prediction_indexes = np.array([np.argmax(prediction) for prediction in predictions])
+        max_prediction_values = np.array([predictions[index][max_prediction_index]
+                                 if predictions[index][max_prediction_index] > threshold[max_prediction_index]
                                  else -1
-                                 for index, max_prediction_index in enumerate(max_prediction_indexes)]
-        max_prediction_indexes[max_prediction_values == -1] = -1
+                                 for index, max_prediction_index in enumerate(max_prediction_indexes)])
+        max_prediction_indexes[np.argwhere(max_prediction_values < 0).flatten()] = -1
         return max_prediction_indexes, max_prediction_values
 
-    def predict_test_set(self, training_dir, model_dir, batch_size=20, zero_epsilon=1e-7):
+    def predict_test_set(self, training_dir, model_dir, batch_size=20, cores=os.cpu_count() - 1, test_set_limit=None,
+                         zero_epsilon=1e-7):
         test_dataset = pd.read_csv(model_dir + '/test_dataset.csv')
+        test_dataset = shuffle(test_dataset)
+        if test_set_limit is not None:
+            test_dataset = test_dataset.iloc[0:test_set_limit]
         lcs_dir = training_dir + '/lcs/'
         testing_batch_generator = IatsonPlanetModelGenerator(test_dataset, lcs_dir, batch_size, self.input_size,
-                                                       zero_epsilon)
+                                                             zero_epsilon)
         expected_outputs = None
         for i in np.arange(0, len(test_dataset) // batch_size + 1, 1):
             input, expected_output = testing_batch_generator.__getitem__(i)
             expected_outputs = np.concatenate((expected_outputs, expected_output)) if expected_outputs is not None else expected_output
-        return self.predict_batch(testing_batch_generator, expected_outputs, batch_size)
+        max_prediction_indexes, max_prediction_values, prediction_stats = \
+            self.predict_batch(testing_batch_generator, expected_outputs, batch_size, cores=cores)
+        prediction_stats = prediction_stats[0]
+        logging.info("Prediction stats for label %.0f: TP=%.0f, FP=%.0f, FN=%.0f, ACC=%.3f, PRE=%.3f, REC=%.3f", 0,
+                     prediction_stats.tp, prediction_stats.fp, prediction_stats.fn, prediction_stats.accuracy,
+                     prediction_stats.precision, prediction_stats.recall)
 
-    def test_metrics(self, expected_outputs, max_prediction_indexes, label_index):
-        set_count = len(expected_outputs)
-        max_output_indexes = [np.max(expected_output) for expected_output in expected_outputs]
-        matches_indexes = np.argwhere(max_output_indexes == max_prediction_indexes).flatten()
-        matches_count = len(matches_indexes)
-        accuracy = matches_count / set_count
-        expected_label_indexes = np.argwhere(max_output_indexes == label_index).flatten()
-        output_label_indexes = np.argwhere(max_output_indexes == label_index).flatten()
-        label_tp_indexes = np.intersect1d(expected_label_indexes, output_label_indexes)
-        label_fp_indexes = output_label_indexes[~np.isin(output_label_indexes, expected_label_indexes)]
-        label_fn_indexes = expected_label_indexes[~np.isin(expected_label_indexes, output_label_indexes)]
+
+    def test_metrics(self, expected_outputs, max_prediction_indexes, max_prediction_values):
+        expected_outputs = expected_outputs.flatten()
+        positive_preds = np.argwhere(max_prediction_indexes.flatten() != -1).flatten()
+        negative_preds = np.argwhere(max_prediction_indexes.flatten() == -1).flatten()
+        positive_outputs = np.argwhere(expected_outputs == 1).flatten()
+        negative_outputs = np.argwhere(expected_outputs == 0).flatten()
+        label_tp_indexes = np.intersect1d(positive_preds, positive_outputs)
+        label_tn_indexes = np.intersect1d(negative_preds, negative_preds)
+        label_fp_indexes = positive_preds[np.isin(positive_preds, negative_outputs)]
+        label_fn_indexes = negative_preds[np.isin(negative_preds, positive_outputs)]
         label_tp = len(label_tp_indexes)
+        label_tn = len(label_tn_indexes)
         label_fp = len(label_fp_indexes)
         label_fn = len(label_fn_indexes)
+        accuracy = (label_tp + label_tn) / len(expected_outputs)
         precision = label_tp / (label_tp + label_fp)
         recall = label_tp / (label_tp + label_fn)
         return CategoricalPredictionSetStats(label_tp, label_fp, label_fn, accuracy, precision, recall)
