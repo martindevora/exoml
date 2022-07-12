@@ -85,7 +85,6 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
         max_index = (idx + 1) * self.batch_size
         max_index = len(self.injected_objects_df) if max_index > len(self.injected_objects_df) else max_index
         target_indexes = np.arange(idx * self.batch_size, max_index, 1)
-        target_indexes = shuffle(target_indexes)
         injected_objects_df = self.injected_objects_df.iloc[target_indexes]
         star_array = np.empty((len(target_indexes), 11, 1))
         star_neighbours_array = np.empty((len(target_indexes), 9 * 15, 1))
