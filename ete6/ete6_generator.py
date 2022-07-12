@@ -124,7 +124,7 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         pixel_size = 20.25
         max_distance = search_radius * pixel_size
         # Limiting the set to 15 stars, removing the first one, which is the target star
-        star_df = star_df.iloc[1:16, :]
+        star_df = star_df.iloc[1:16, :].copy()
         star_df['Teff'] = star_df['Teff'].fillna(6000)
         star_df['radius'] = star_df['radius'].fillna(1)
         star_df['mass'] = star_df['mass'].fillna(1)
