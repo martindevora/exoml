@@ -4,23 +4,24 @@ from keras.losses import BinaryCrossentropy
 from keras.metrics import Precision, Recall, AUC, BinaryAccuracy, RecallAtPrecision
 from tensorflow_addons.metrics import F1Score
 
+from ml.loss.cross_entropy import binary_focal_loss
 from ml.model.base_model import BaseModel
 import pandas as pd
 import matplotlib.pyplot as plt
 
 
 class BinaryModel(BaseModel):
-    def __init__(self, name, input_size, class_ids) -> None:
-        super().__init__(name, input_size, class_ids)
+    def __init__(self, name, input_size, class_ids, dropout_rate) -> None:
+        super().__init__(name, input_size, class_ids, dropout_rate)
 
     def instance_loss_accuracy(self):
-        return BinaryCrossentropy(), BinaryAccuracy()
+        return binary_focal_loss, BinaryAccuracy()
 
     def instance_metrics(self):
         return [Precision(), Recall(), RecallAtPrecision(precision=0.99, name="r@p99"),
                 RecallAtPrecision(0.975, name="r@p975"),
                 RecallAtPrecision(0.95, name="r@p95"),
-                F1Score(num_classes=1), AUC(name="roc_auc"),
+                AUC(name="roc_auc"),
                 AUC(curve="PR", name="pr_auc")]
 
     def plot_metrics(self, model_dir, steps_per_epoch, with_validation=False):

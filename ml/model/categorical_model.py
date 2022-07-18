@@ -11,8 +11,8 @@ import numpy as np
 
 
 class CategoricalModel(BaseModel):
-    def __init__(self, class_names, name, input_size, class_ids) -> None:
-        super().__init__(name, input_size, class_ids)
+    def __init__(self, class_names, name, input_size, class_ids, dropout_rate=0.1) -> None:
+        super().__init__(name, input_size, class_ids, dropout_rate)
         self.class_names = class_names
 
     def instance_loss_accuracy(self):
