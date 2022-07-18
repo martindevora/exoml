@@ -3,17 +3,27 @@ import os
 #tf.config.run_functions_eagerly(True)
 # thread_config.setup_threads(1)
 from iatson.IATSON_planet import IATSON_planet
-
+from ml.loss.cross_entropy import f1_loss
+from ml.model.base_model import HyperParams
 
 training_dir = '/mnt/DATA-2/ete6'
-batch_size = 100
-epochs = 50
 model_dir = './'
-cores = 0
-lr = 0.01
-iatson = IATSON_planet({0: 'bckEB', 1: 'EB', 2: 'planet', 3: 'none'}, ['bckEB', 'EB', 'planet', 'none']).build()#.inform(model_dir)
-#iatson.load_model("./IATSON_model")
-iatson.train(training_dir, model_dir, batch_size, epochs, initial_learning_rate=lr, gradient_clip_norm=0.1,
-             dry_run=False, cores=cores, balance_class_sampling=[1, 1, 1, 0.08])
+hp = HyperParams(batch_size=100,
+            epochs=75,
+            initial_learning_rate=0.001,
+            gradient_clip_norm=0.1,
+            dry_run=False,
+            cores=0,
+            balance_class_sampling=[1, 1, 1, 0.08],
+            learning_rate_decay=0.98,
+            early_stopping_delta=0,
+            early_stopping_patience=0,
+            custom_loss=None,
+            run_eagerly=False)
+custom_loss = None #f1_loss
+iatson = IATSON_planet({0: 'bckEB', 1: 'EB', 2: 'planet', 3: 'none'}, ['bckEB', 'EB', 'planet', 'none'])\
+    .build(use_transformers=True).inform(model_dir)
+#iatson.load_model("./IATSON_planet_model_bck")
+iatson.train(training_dir, model_dir, hp)
 #iatson = IATSON().load_model(model_dir)
-#iatson.predict_test_set(training_dir, model_dir, batch_size)
+#iatson.predict_test_set(training_dir, "./IATSON_planet_model_bck", batch_size, os.cpu_count() - 1)
