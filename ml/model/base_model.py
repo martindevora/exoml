@@ -3,6 +3,7 @@ import os
 import numpy as np
 import tensorflow as tf
 import pandas as pd
+import ruamel.yaml
 from abc import abstractmethod
 
 from keras.utils.vis_utils import plot_model
@@ -25,7 +26,7 @@ class BaseModel(WithLogging):
 
     model = None
 
-    def __init__(self, name, input_size, class_ids) -> None:
+    def __init__(self, name, input_size, class_ids, dropout_rate=0.1) -> None:
         super().__init__()
         self.name = name
         self.input_size = input_size
@@ -33,6 +34,7 @@ class BaseModel(WithLogging):
             class_ids[class_id] = class_ids[class_id] if isinstance(class_ids[class_id], (list, np.ndarray)) \
                 else [class_ids[class_id]]
         self.class_ids = class_ids
+        self.dropout_rate = dropout_rate
 
     @abstractmethod
     def build(self, **kwargs):
@@ -101,7 +103,7 @@ class BaseModel(WithLogging):
                             for id, count in enumerate(classes_counts)]
         return self.balance_dataset_with_sampling(training_set, classes_sampling)
 
-    def compile(self, optimizer, loss, metrics=None):
+    def compile(self, optimizer, loss, metrics=None, run_eagerly=False, tuner=False):
         """
         Compiles and prepares the model for training
         :param optimizer: the optimizer to be used
@@ -115,6 +117,7 @@ class BaseModel(WithLogging):
         logging.info("Compiling model with optimizer " + str(optimizer) + ", loss " + str(loss) + " and metrics [" +
                      ",".join(metrics_str) + "]")
         self.model.compile(optimizer=optimizer, loss=loss, metrics=metrics)
+        self.model.run_eagerly = run_eagerly
         return self
 
     def inform(self, dir):
@@ -135,8 +138,9 @@ class BaseModel(WithLogging):
     def save(self, dir):
         dest_dir = dir + '/' + self._get_model_dir()
         logging.info("Saving model into %s", dest_dir)
-        self.model.save(dir + self._get_model_dir())
+        self.model.save(dest_dir)
         logging.info("Saved model")
+        return dest_dir
 
     def prepare_training_data(self, training_dir, output_dir, batch_size, train_percent=0.8, validation_percent=0.1,
                               training_set_limit=None, balance_class_id=None, balance_class_sampling=None):
@@ -198,60 +202,60 @@ class BaseModel(WithLogging):
                     file.write('\n'.join(test_filenames))
         return train_filenames, validation_filenames, test_filenames
 
-    def train(self, training_dir, output_dir, batch_size=20, epochs=20, initial_learning_rate=0.01,
-              dataset_iterations_per_epoch=1, train_percent=0.8,
-              validation_percent=0.1, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
-              gradient_clip_norm=0.01, cores=0, metrics=[], callbacks=[], learning_rate_decay=0.98,
-              learning_rate_schedule=None, balance_class_id=None, balance_class_sampling=None,
-              class_loss_weights=None, early_stopping_delta=0.01, early_stopping_patience=3,
-              custom_loss=None):
+    def train(self, training_dir, output_dir, hyperparams):
         logging.info("Preparing training data with (training_dir," + str(training_dir) +
-                     ") (train_percent," + str(train_percent) +
-                     ") (test_percent," + str(validation_percent) +
-                     ") (training_set_limit," + str(training_set_limit) +
+                     ") (train_percent," + str(hyperparams.train_percent) +
+                     ") (test_percent," + str(hyperparams.validation_percent) +
+                     ") (training_set_limit," + str(hyperparams.training_set_limit) +
                      ")")
         model_path = output_dir + self._get_model_dir()
         if not os.path.exists(model_path):
             os.mkdir(model_path)
         train_filenames, validation_filenames, test_filenames = \
-            self.prepare_training_data(training_dir, model_path, batch_size, train_percent, validation_percent,
-                                       training_set_limit, balance_class_id, balance_class_sampling)
+            self.prepare_training_data(training_dir, model_path, hyperparams.batch_size, hyperparams.train_percent,
+                                       hyperparams.validation_percent, hyperparams.training_set_limit,
+                                       hyperparams.balance_class_id, hyperparams.balance_class_sampling)
         # The optimizer is executed once for every batch, hence optimizer steps per epoch are
         train_dataset_size = len(train_filenames)
         test_dataset_size = len(validation_filenames)
-        steps_per_epoch = int(dataset_iterations_per_epoch * train_dataset_size // batch_size)
-        total_steps = steps_per_epoch * epochs
-        if learning_rate_schedule is None:
+        steps_per_epoch = int(hyperparams.dataset_iterations_per_epoch * train_dataset_size // hyperparams.batch_size)
+        total_steps = steps_per_epoch * hyperparams.epochs
+        if hyperparams.learning_rate_schedule is None:
             learning_rate_decay_steps = steps_per_epoch // 2
-            learning_rate_decay_steps = learning_rate_decay_steps if learning_rate_decay_steps > steps_per_epoch else steps_per_epoch
+            learning_rate_decay_steps = learning_rate_decay_steps if learning_rate_decay_steps > steps_per_epoch \
+                else steps_per_epoch
             logging.info("Initializing optimizer with learning_rate_decay_steps," + str(learning_rate_decay_steps) +
-                         ") (gradient_clip_norm," + str(gradient_clip_norm) +
+                         ") (gradient_clip_norm," + str(hyperparams.gradient_clip_norm) +
                          ")")
-            powers_for_half_learning_rate_decay = np.log(learning_rate_decay / 2) // np.log(learning_rate_decay)
-            learning_rate_schedule = ExponentialRescaleDecay(initial_learning_rate,
+            powers_for_half_learning_rate_decay = np.log(hyperparams.learning_rate_decay / 2) // \
+                                                  np.log(hyperparams.learning_rate_decay)
+            learning_rate_schedule = ExponentialRescaleDecay(hyperparams.initial_learning_rate,
                                                              decay_steps=learning_rate_decay_steps,
-                                                             decay_rate=learning_rate_decay,
-                                                             restore_steps=learning_rate_decay_steps * powers_for_half_learning_rate_decay,
+                                                             decay_rate=hyperparams.learning_rate_decay,
+                                                             restore_steps=learning_rate_decay_steps *
+                                                                           powers_for_half_learning_rate_decay,
                                                              restore_rate=1.5,
                                                              staircase=True)
-        logging.info("Initializing optimizer with (initial_learning_rate," + str(initial_learning_rate) + ")")
-        optimizer = tf.keras.optimizers.Adam(learning_rate_schedule, beta_1=0.9, beta_2=0.98, epsilon=1e-9,
-                                             clipnorm=gradient_clip_norm)
+        logging.info("Initializing optimizer with (initial_learning_rate," + str(hyperparams.initial_learning_rate) +
+                     ")")
+        optimizer = tf.keras.optimizers.Adam(hyperparams.learning_rate_schedule, beta_1=0.9, beta_2=0.98, epsilon=1e-9,
+                                             clipnorm=hyperparams.gradient_clip_norm)
         # We don't use SparseCategoricalCrossentropy because our targets are one-hot encoded
         loss, accuracy = self.instance_loss_accuracy()
-        self.compile(optimizer, custom_loss if custom_loss is not None else loss,
-                     metrics=[accuracy] + self.instance_metrics() + metrics)
+        self.compile(optimizer, hyperparams.custom_loss if hyperparams.custom_loss is not None else loss,
+                     metrics=[accuracy] + self.instance_metrics() + hyperparams.metrics,
+                     run_eagerly=hyperparams.run_eagerly)
         model_weights_logger = ModelWeightsLogger()
-        if not dry_run:
-            logging.info("Initializing training and validation generators with (batch_size," + str(batch_size) +
+        if not hyperparams.dry_run:
+            logging.info("Initializing training and validation generators with (batch_size," + str(hyperparams.batch_size) +
                          ") (self.input_size," + str(self.input_size) +
-                         ") (zero_epsilon," + str(zero_epsilon) +
+                         ") (zero_epsilon," + str(hyperparams.zero_epsilon) +
                          ")")
             lcs_dir = training_dir + '/lcs/'
-            training_batch_generator = self.instance_generator(train_filenames, lcs_dir, batch_size,
-                                                               self.input_size, zero_epsilon)
-            validation_batch_generator = self.instance_generator(validation_filenames, lcs_dir, batch_size,
-                                                                 self.input_size, zero_epsilon)
+            training_batch_generator = self.instance_generator(train_filenames, lcs_dir, hyperparams.batch_size,
+                                                               self.input_size, hyperparams.zero_epsilon)
+            validation_batch_generator = self.instance_generator(validation_filenames, lcs_dir, hyperparams.batch_size,
+                                                                 self.input_size, hyperparams.zero_epsilon)
             csv_log = model_path + '/training_log.csv'
             logging.info("Initializing csv logger with (csv_log," + str(csv_log) +
                          ") (steps_per_epoch," + str(steps_per_epoch) +
@@ -261,7 +265,7 @@ class BaseModel(WithLogging):
             logging.info("Initializing model checkpoint with (model_path," + str(model_path) +
                          ") (steps_per_epoch," + str(steps_per_epoch) +
                          ")")
-            for callback in callbacks:
+            for callback in hyperparams.callbacks:
                 if issubclass(callback.__class__, ModelDirDataAwareCallback):
                     callback.set_model_dir(model_path)
                 if issubclass(callback.__class__, ValidationDataAwareCallback):
@@ -271,36 +275,46 @@ class BaseModel(WithLogging):
                 verbose=1,
                 save_weights_only=False,
                 save_freq='epoch')
-            early_stopping_callback = ExoMlEarlyStopping(
-                monitor="val_loss",
-                min_delta=early_stopping_delta,
-                patience=early_stopping_patience,
-                verbose=0,
-                mode="auto",
-                baseline=None,
-                restore_best_weights=False,
-            )
+            if hyperparams.early_stopping_patience > 0 and hyperparams.early_stopping_delta > 0:
+                early_stopping_callback = ExoMlEarlyStopping(
+                    monitor="val_loss",
+                    min_delta=hyperparams.early_stopping_delta,
+                    patience=hyperparams.early_stopping_patience,
+                    verbose=0,
+                    mode="auto",
+                    baseline=None,
+                    restore_best_weights=False,
+                )
+                callbacks = hyperparams.callbacks + [early_stopping_callback]
             get_weights_callback = GetWeights(model_weights_logger)
-            model_validation_steps = int(test_dataset_size // batch_size)
-            class_weights = class_loss_weights if class_loss_weights is not None \
+            model_validation_steps = int(test_dataset_size // hyperparams.batch_size)
+            class_weights = hyperparams.class_loss_weights if hyperparams.class_loss_weights is not None \
                 else training_batch_generator.class_weights()
-            logging.info("Initializing training with (epochs," + str(epochs) +
+            logging.info("Initializing training with (epochs," + str(hyperparams.epochs) +
                          ") (steps_per_epoch," + str(steps_per_epoch) +
                          ") (model_validation_steps," + str(model_validation_steps) +
                          ")")
             self.save(output_dir)
+            self.__write_hyperparameters(hyperparams, model_path)
             fit_history = self.model.fit(x=training_batch_generator,
                            steps_per_epoch=steps_per_epoch,
-                           epochs=epochs, verbose=1, class_weight=class_weights,
+                           epochs=hyperparams.epochs, verbose=1, class_weight=class_weights,
                            validation_data=validation_batch_generator,
                            validation_steps=model_validation_steps,
-                           callbacks=[csv_logger, cp_callback, get_weights_callback, early_stopping_callback,
+                           callbacks=[csv_logger, cp_callback, get_weights_callback,
                                       MetricsPlotCallback(self, model_path, steps_per_epoch)] +
                                       callbacks,
-                           use_multiprocessing=cores > 0, workers=1 if cores <= 0 else cores)
+                           use_multiprocessing=hyperparams.cores > 0, workers=1 if hyperparams.cores <= 0
+                else hyperparams.cores)
             self.save(output_dir)
         else:
             logging.warning("dry_run was activated and 'training' will not be launched")
+
+    def __write_hyperparameters(self, hyperparameters, output_dir):
+        yaml = ruamel.yaml.YAML()
+        yaml.register_class(HyperParams)
+        with open(output_dir + '/hp.yaml', 'w', newline='') as f:
+            yaml.dump(hyperparameters, f)
 
     def load_model(self, dir):
         self.set_model(tf.keras.models.load_model(dir,
@@ -316,6 +330,62 @@ class BaseModel(WithLogging):
 
     def _get_model_dir(self):
         return self.name + '_model/'
+
+
+class HyperParams:
+    batch_size = 20
+    epochs = 20
+    initial_learning_rate = 0.01,
+    dataset_iterations_per_epoch = 1
+    train_percent = 0.8,
+    validation_percent = 0.1
+    training_set_limit = None
+    dry_run = True
+    zero_epsilon = 1e-7,
+    gradient_clip_norm = 0.01
+    cores = 0
+    metrics = []
+    callbacks = []
+    learning_rate_decay = 0.98
+    learning_rate_schedule = None
+    balance_class_id = None
+    balance_class_sampling = None
+    class_loss_weights = None
+    early_stopping_delta = 0
+    early_stopping_patience = 0,
+    custom_loss = None
+    run_eagerly = False
+
+    def __init__(self, batch_size=20, epochs=20, initial_learning_rate=0.01,
+              dataset_iterations_per_epoch=1, train_percent=0.8,
+              validation_percent=0.1, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
+              gradient_clip_norm=0.01, cores=0, metrics=[], callbacks=[], learning_rate_decay=0.98,
+              learning_rate_schedule=None, balance_class_id=None, balance_class_sampling=None,
+              class_loss_weights=None, early_stopping_delta=0, early_stopping_patience=0,
+              custom_loss=None, run_eagerly=False) -> None:
+        super().__init__()
+        self.batch_size = batch_size
+        self.epochs = epochs
+        self.initial_learning_rate = initial_learning_rate
+        self.dataset_iterations_per_epoch = dataset_iterations_per_epoch
+        self.train_percent = train_percent
+        self.validation_percent = validation_percent
+        self.training_set_limit = training_set_limit
+        self.dry_run = dry_run
+        self.zero_epsilon = zero_epsilon
+        self.gradient_clip_norm = gradient_clip_norm
+        self.cores = cores
+        self.metrics = metrics
+        self.callbacks = callbacks
+        self.learning_rate_decay = learning_rate_decay
+        self.learning_rate_schedule = learning_rate_schedule
+        self.balance_class_id = balance_class_id
+        self.balance_class_sampling = balance_class_sampling
+        self.class_loss_weights = class_loss_weights
+        self.early_stopping_delta = early_stopping_delta
+        self.early_stopping_patience = early_stopping_patience
+        self.custom_loss = custom_loss
+        self.run_eagerly = run_eagerly
 
 
 class CategoricalPredictionSetStats:
