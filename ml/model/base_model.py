@@ -1,5 +1,7 @@
 import logging
 import os
+from copy import deepcopy
+
 import numpy as np
 import tensorflow as tf
 import pandas as pd
@@ -229,7 +231,7 @@ class BaseModel(WithLogging):
                          ")")
             powers_for_half_learning_rate_decay = np.log(hyperparams.learning_rate_decay / 2) // \
                                                   np.log(hyperparams.learning_rate_decay)
-            learning_rate_schedule = ExponentialRescaleDecay(hyperparams.initial_learning_rate,
+            hyperparams.learning_rate_schedule = ExponentialRescaleDecay(hyperparams.initial_learning_rate,
                                                              decay_steps=learning_rate_decay_steps,
                                                              decay_rate=hyperparams.learning_rate_decay,
                                                              restore_steps=learning_rate_decay_steps *
@@ -311,10 +313,18 @@ class BaseModel(WithLogging):
             logging.warning("dry_run was activated and 'training' will not be launched")
 
     def __write_hyperparameters(self, hyperparameters, output_dir):
+        only_attributes_hyperparameters = deepcopy(hyperparameters)
         yaml = ruamel.yaml.YAML()
         yaml.register_class(HyperParams)
+        if len(only_attributes_hyperparameters.callbacks) > 0:
+            only_attributes_hyperparameters.callbacks = ""
+            for i, callback in enumerate(hyperparameters.callbacks):
+                only_attributes_hyperparameters.callbacks = only_attributes_hyperparameters.callbacks + \
+                                                            str(type(only_attributes_hyperparameters.callbacks[i]))
+        if only_attributes_hyperparameters.learning_rate_schedule is not None:
+            only_attributes_hyperparameters.learning_rate_schedule = str(type(hyperparameters.learning_rate_schedule))
         with open(output_dir + '/hp.yaml', 'w', newline='') as f:
-            yaml.dump(hyperparameters, f)
+            yaml.dump(only_attributes_hyperparameters, f)
 
     def load_model(self, dir):
         self.set_model(tf.keras.models.load_model(dir,
