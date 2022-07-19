@@ -40,7 +40,6 @@ class BinaryModel(BaseModel):
         axs[1][0].plot(training_log_df['batch_total'], training_log_df['recall'], color='blue', label='Train Recall.')
         axs[1][0].plot(training_log_df['batch_total'], training_log_df['r@p99'], color='green', label='Train r@p.')
         axs[1][1].plot(training_log_df['batch_total'], training_log_df['binary_accuracy'], color='black', label='Train Acc.')
-        axs[1][1].plot(training_log_df['batch_total'], training_log_df['f1_score'], color='red', label='Train F1')
         axs[1][1].plot(training_log_df['batch_total'], training_log_df['roc_auc'], color='blue', label='Train ROC AUC')
         axs[1][1].plot(training_log_df['batch_total'], training_log_df['pr_auc'], color='green',
                        label='Train PR AUC')
@@ -53,8 +52,6 @@ class BinaryModel(BaseModel):
                            color='green', label='Val. r@p', linestyle='--')
             axs[1][1].plot(validation_log_df['batch_total'], validation_log_df['val_binary_accuracy'],
                            color='black', label='Val. acc.', linestyle='--')
-            axs[1][1].plot(validation_log_df['batch_total'], validation_log_df['val_f1_score'],
-                           color='red', label='Val. F1', linestyle='--')
             axs[1][1].plot(validation_log_df['batch_total'], validation_log_df['val_roc_auc'],
                            color='blue', label='Val. ROC AUC', linestyle='--')
             axs[1][1].plot(validation_log_df['batch_total'], validation_log_df['val_pr_auc'],
