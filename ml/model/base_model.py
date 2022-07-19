@@ -285,7 +285,7 @@ class BaseModel(WithLogging):
                     baseline=None,
                     restore_best_weights=False,
                 )
-                callbacks = hyperparams.callbacks + [early_stopping_callback]
+                hyperparams.callbacks = hyperparams.callbacks + [early_stopping_callback]
             get_weights_callback = GetWeights(model_weights_logger)
             model_validation_steps = int(test_dataset_size // hyperparams.batch_size)
             class_weights = hyperparams.class_loss_weights if hyperparams.class_loss_weights is not None \
@@ -303,7 +303,7 @@ class BaseModel(WithLogging):
                            validation_steps=model_validation_steps,
                            callbacks=[csv_logger, cp_callback, get_weights_callback,
                                       MetricsPlotCallback(self, model_path, steps_per_epoch)] +
-                                      callbacks,
+                                      hyperparams.callbacks,
                            use_multiprocessing=hyperparams.cores > 0, workers=1 if hyperparams.cores <= 0
                 else hyperparams.cores)
             self.save(output_dir)
