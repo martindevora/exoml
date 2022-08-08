@@ -132,7 +132,10 @@ class BaseModel(WithLogging):
         dir = dir + self._get_model_dir()
         if not os.path.exists(dir):
             os.mkdir(dir)
-        plot_model(self.model, dir + '/network.png', show_shapes=True)
+        try:
+            plot_model(self.model, dir + '/network.png', show_shapes=True)
+        except Exception as e:
+            logging.exception("Can't plot model network.png")
         self.model.summary()
         ModelWeightsLogger().log_model_weights(self.model)
         return self
