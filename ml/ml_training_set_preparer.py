@@ -206,8 +206,6 @@ class MlTrainingSetPreparer:
         return lc_data
 
     def prepare_tic(self, prepare_tic_input):
-        import pydevd_pycharm
-        pydevd_pycharm.settrace('2.137.33.221', port=45678, stdoutToServer=True, stderrToServer=True)
         tic_id = str(prepare_tic_input.tic)
         target_dir = prepare_tic_input.dir + tic_id + "/"
         if not os.path.isdir(target_dir):
