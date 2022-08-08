@@ -21,7 +21,7 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
     random_number_generator = default_rng()
 
     def __init__(self, zero_epsilon=1e-6):
-        self.zero_epsilon = epsilon
+        self.zero_epsilon = zero_epsilon
 
     def bin_interp(self, array, new_size):
         result = np.zeros((array.shape[1], new_size))
