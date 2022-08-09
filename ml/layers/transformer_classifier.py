@@ -1,6 +1,8 @@
 import tensorflow as tf
 from keras.layers import MultiHeadAttention, LeakyReLU
 import tensorflow_addons as tfa
+from keras.regularizers import L2
+from tensorflow_addons.layers import GELU
 
 
 @tf.keras.utils.register_keras_serializable()
@@ -71,37 +73,29 @@ class TransformerEncoder(tf.keras.layers.Layer):
         self.num_heads = num_heads
         self.mlp_dim = mlp_dim
         self.dropout = dropout
+        self.regularizer_value = 0.1
 
     def build(self, input_shape):
-        self.att = MultiHeadAttention(
-            num_heads=self.num_heads,
+        self.att = MultiHeadAttention(num_heads=self.num_heads,
             key_dim=input_shape[-1],
             name="MultiHeadDotProductAttention_1"
         )
         self.mlpblock = tf.keras.Sequential(
             [
-                tf.keras.layers.Dense(
-                    self.mlp_dim,
-                    activation="linear",
-                    name=f"{self.name}/Dense_0",
-                ),
-                tf.keras.layers.Lambda(
-                    lambda x: tf.keras.activations.gelu(x, approximate=False)
-                ),
+                tf.keras.layers.Dense(self.mlp_dim, activation=GELU(), name=f"{self.name}/Dense_0"),
                 tf.keras.layers.Dropout(self.dropout),
-                tf.keras.layers.Dense(input_shape[-1], name=f"{self.name}/Dense_1"),
-                tf.keras.layers.Dropout(self.dropout),
+                tf.keras.layers.Dense(input_shape[-1], name=f"{self.name}/Dense_1", activation="linear")
             ],
             name="MlpBlock_3",
         )
         self.layernorm1 = tf.keras.layers.LayerNormalization(
-            epsilon=1e-6, name="LayerNorm_0"
+            epsilon=1e-6, name="LayerNorm_1"
         )
         self.layernorm2 = tf.keras.layers.LayerNormalization(
             epsilon=1e-6, name="LayerNorm_2"
         )
         self.layernorm3 = tf.keras.layers.LayerNormalization(
-            epsilon=1e-6, name="LayerNorm_2"
+            epsilon=1e-6, name="LayerNorm_3"
         )
         self.dropout_layer = tf.keras.layers.Dropout(self.dropout)
 
@@ -140,6 +134,7 @@ class Transformer(tf.keras.layers.Layer):
         self.dropout = dropout
         self.num_blocks = num_blocks
         self.transformer_encoders = []
+        self.regularizer_value = 0.1
 
     def build(self, input_shape):
         for n in range(self.num_blocks):
@@ -147,13 +142,13 @@ class Transformer(tf.keras.layers.Layer):
                 num_heads=self.num_heads,
                 mlp_dim=self.mlp_dim,
                 dropout=self.dropout,
-                name=f"Transformer/encoderblock_{n}",
+                name=f"Transformer/encoderblock_{n}"
             )]
 
     def call(self, inputs, training):
         result = inputs
         for n in range(self.num_blocks):
-            result, _ = self.transformer_encoders[n](result, training)
+            result, weights = self.transformer_encoders[n](result, training)
         return result
 
     def get_config(self):
@@ -185,6 +180,7 @@ class TransformerClassifier(tf.keras.layers.Layer):
         self.dropout = dropout
         self.num_blocks = num_blocks
         self.classes = classes
+        self.regularizer_value = 0.1
 
     def build(self, input_shape):
         # The linear projection could be a conv1d if the input was an image to be patched in pieces. As it is not,
@@ -203,9 +199,7 @@ class TransformerClassifier(tf.keras.layers.Layer):
                                        num_blocks=self.num_blocks)
         self.layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-6, name="Transformer/encoder_norm")
         #activation = "softmax" if self.classes > 1 else "sigmoid"
-        self.pre_head1 = tf.keras.layers.Dense(self.transformer_input_size, name="pre-head", activation="sigmoid")
-        self.dropout_layer = tf.keras.layers.Dropout(self.dropout)
-        self.head = tf.keras.layers.Dense(self.classes, name="head", activation=LeakyReLU(0.01))
+        self.head = tf.keras.layers.Dense(self.classes, name="head", activation=GELU())
 
 
     def call(self, inputs, training=True):
@@ -219,8 +213,6 @@ class TransformerClassifier(tf.keras.layers.Layer):
         #      lambda v: v[:, 0],
         #      name="ExtractToken")(result)
         result = self.layer_norm(result)
-        result = self.pre_head1(result)
-        result = self.dropout_layer(result, training=training)
         result = self.head(result)
         #result = self.dropout_layer(result, training=training)
         return result
