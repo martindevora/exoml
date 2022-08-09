@@ -8,7 +8,6 @@ import pandas as pd
 import ruamel.yaml
 from abc import abstractmethod
 
-from keras.utils.vis_utils import plot_model
 from sklearn.utils import shuffle
 
 from ml.callback.basemodel_aware_callback import MetricsPlotCallback
@@ -132,7 +131,6 @@ class BaseModel(WithLogging):
         dir = dir + self._get_model_dir()
         if not os.path.exists(dir):
             os.mkdir(dir)
-        plot_model(self.model, dir + '/network.png', show_shapes=True)
         self.model.summary()
         ModelWeightsLogger().log_model_weights(self.model)
         return self
@@ -241,7 +239,8 @@ class BaseModel(WithLogging):
         logging.info("Initializing optimizer with (initial_learning_rate," + str(hyperparams.initial_learning_rate) +
                      ")")
         optimizer = tf.keras.optimizers.Adam(hyperparams.learning_rate_schedule, beta_1=0.9, beta_2=0.98, epsilon=1e-9,
-                                             clipnorm=hyperparams.gradient_clip_norm)
+                                             clipnorm=hyperparams.gradient_clip_norm,
+                                             clipvalue=hyperparams.gradient_clip_value)
         # We don't use SparseCategoricalCrossentropy because our targets are one-hot encoded
         loss, accuracy = self.instance_loss_accuracy()
         self.compile(optimizer, hyperparams.custom_loss if hyperparams.custom_loss is not None else loss,
@@ -263,7 +262,6 @@ class BaseModel(WithLogging):
                          ") (steps_per_epoch," + str(steps_per_epoch) +
                          ")")
             csv_logger = BatchAwareCsvLogger(csv_log, steps_per_epoch)
-            model_path = output_dir + self._get_model_dir()
             logging.info("Initializing model checkpoint with (model_path," + str(model_path) +
                          ") (steps_per_epoch," + str(steps_per_epoch) +
                          ")")
@@ -323,6 +321,8 @@ class BaseModel(WithLogging):
                                                             str(type(only_attributes_hyperparameters.callbacks[i]))
         if only_attributes_hyperparameters.learning_rate_schedule is not None:
             only_attributes_hyperparameters.learning_rate_schedule = str(type(hyperparameters.learning_rate_schedule))
+        if only_attributes_hyperparameters.custom_loss is not None:
+            only_attributes_hyperparameters.custom_loss = str(type(hyperparameters.custom_loss))
         with open(output_dir + '/hp.yaml', 'w', newline='') as f:
             yaml.dump(only_attributes_hyperparameters, f)
 
@@ -369,7 +369,7 @@ class HyperParams:
     def __init__(self, batch_size=20, epochs=20, initial_learning_rate=0.01,
               dataset_iterations_per_epoch=1, train_percent=0.8,
               validation_percent=0.1, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
-              gradient_clip_norm=0.01, cores=0, metrics=[], callbacks=[], learning_rate_decay=0.98,
+              gradient_clip_norm=0.01, gradient_clip_value=0.5, cores=0, metrics=[], callbacks=[], learning_rate_decay=0.98,
               learning_rate_schedule=None, balance_class_id=None, balance_class_sampling=None,
               class_loss_weights=None, early_stopping_delta=0, early_stopping_patience=0,
               custom_loss=None, run_eagerly=False) -> None:
@@ -384,6 +384,7 @@ class HyperParams:
         self.dry_run = dry_run
         self.zero_epsilon = zero_epsilon
         self.gradient_clip_norm = gradient_clip_norm
+        self.gradient_clip_value = gradient_clip_value
         self.cores = cores
         self.metrics = metrics
         self.callbacks = callbacks
