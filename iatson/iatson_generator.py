@@ -13,12 +13,11 @@ class IatsonModelGenerator(Ete6ModelGenerator):
 
     def __init__(self, injected_objects_df, lcs_dir, batch_size, input_sizes, zero_epsilon=1e-7,
                  measurements_per_point=13):
-        super().__init__()
+        super().__init__(zero_epsilon)
         self.injected_objects_df = injected_objects_df
         self.lcs_dir = lcs_dir
         self.batch_size = batch_size
         self.input_sizes = input_sizes
-        self.zero_epsilon = zero_epsilon
         self.random_number_generator = default_rng()
         self.measurements_per_point = measurements_per_point
 
@@ -100,6 +99,7 @@ class IatsonModelGenerator(Ete6ModelGenerator):
         i = 0
         for df_index, target_row in injected_objects_df.iterrows():
             target_id = int(target_row['TIC ID'])
+            #target_id = 281734251
             # target_row = self.injected_objects_df[self.injected_objects_df['TIC ID'] == 356110099].iloc[0]
             leading_zeros_object_id = '{:09}'.format(target_id)
             lc_filename = str(leading_zeros_object_id) + '_lc.csv'
@@ -213,9 +213,9 @@ class IatsonModelGenerator(Ete6ModelGenerator):
         return [star_array, star_neighbours_array, global_flux_array, folded_flux_even_array, folded_flux_odd_array,
                 folded_flux_even_subhar_array, folded_flux_odd_subhar_array, folded_flux_even_har_array,
                 folded_flux_odd_har_array], batch_data_values
-
-# df = pd.read_csv("/mnt/DATA-2/ete6/injected_objects.csv", index_col=False)
+#
+# df = pd.read_csv("~/Downloads/injected_objects.csv", index_col=False)
 # df = shuffle(df)
 # df.reset_index(inplace=True, drop=True)
-# img = IatsonModelGenerator(df, "/mnt/DATA-2/ete6/lcs", 20, [11, 2500, 500, 500, 500, 500, 500, 500])
-# img.__getitem__(20)
+# img = IatsonModelGenerator(df, "~/Downloads/", 1, [11, 9 * 15, 2500, 500, 500, 500, 500, 500, 500])
+# img.__getitem__(1)

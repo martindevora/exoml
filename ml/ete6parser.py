@@ -35,12 +35,12 @@ def create_injection_dataframe(injections_dir, lcs_dir):
         leading_zeros_object_id = '{:09}'.format(object_id)
         star_file = lcs_dir + '/' + leading_zeros_object_id + '_star.csv'
         star_df = pd.read_csv(star_file)
-        star_radius = star_df['radius'].iloc[1]
+        star_radius = star_df['radius'].iloc[0]
         try:
             star_radius = 1 if np.isnan(star_radius) else star_radius
         except:
             print("ERROR WITH " + str(star_file))
-        star_mass = star_df['mass'].iloc[1]
+        star_mass = star_df['mass'].iloc[0]
         try:
             star_mass = 1 if np.isnan(star_mass) else star_mass
         except:
@@ -248,20 +248,21 @@ class CreateStarCsvInput:
         self.pixel_size = pixel_size * u.arcsec
 
 
-def smooth_and_detrend(time_array, flux_array, detrend_window, time_threshold=0.0001, window_len=11,
-                        window='blackman'):
-    if window not in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
-        raise ValueError("Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
+def detrend(time_array, flux_array, detrend_window, time_threshold=0.0001, smooth=True, smooth_window_len=11,
+            window='blackman'):
     flux_without_zeros = flux_array[time_array > time_threshold]
     time_without_zeros = time_array[time_array > time_threshold]
-    s = np.r_[np.ones(window_len // 2), flux_without_zeros, np.ones(window_len // 2)]
-    # print(len(s))
-    if window_len >= 3:
-        if window == 'flat':  # moving average
-            w = np.ones(window_len, 'd')
-        else:
-            w = eval('np.' + window + '(window_len)')
-        flux_without_zeros = np.convolve(w / w.sum(), s, mode='valid')
+    if smooth:
+        if window not in ['flat', 'hanning', 'hamming', 'bartlett', 'blackman']:
+            raise ValueError("Window is on of 'flat', 'hanning', 'hamming', 'bartlett', 'blackman'")
+        s = np.r_[np.ones(smooth_window_len // 2), flux_without_zeros, np.ones(smooth_window_len // 2)]
+        # print(len(s))
+        if smooth_window_len >= 3:
+            if window == 'flat':  # moving average
+                w = np.ones(smooth_window_len, 'd')
+            else:
+                w = eval('np.' + window + '(smooth_window_len)')
+            flux_without_zeros = np.convolve(w / w.sum(), s, mode='valid')
     flux_without_zeros = np.nan_to_num(wotan.flatten(time_without_zeros, flux_without_zeros, detrend_window,
                                                      method="biweight"))
     flux_array[time_array > time_threshold] = flux_without_zeros
@@ -343,8 +344,10 @@ def _create_target_csv(create_target_input):
     duration = injected_file_row['duration(h)'].iloc[0] / 24
     duration_to_period = duration / injected_file_row['period'].iloc[0]
     for j in np.arange(0, 5, 1):
-        flux_detrend_j = smooth_and_detrend(time_values, flux_values, duration_to_period * (4 + j))
+        flux_detrend_j = detrend(time_values, flux_values, duration_to_period * (4 + j))
         lc_df['flux_' + str(j)] = np.concatenate((padding_ones_left, flux_detrend_j, padding_ones_right))
+    bck_flux_detrend = detrend(time_values, flux_values, duration_to_period * 4, smooth=False)
+    lc_df['bck_flux'] = np.concatenate((padding_ones_left, bck_flux_detrend, padding_ones_right))
     flux_err_values = np.array(lc.flux_err.value) / median_flux
     lc_df['#time'] = np.concatenate((padding_zeros_left, np.array(lc.time.value), padding_zeros_right))
     lc_df['flux'] = np.concatenate((padding_ones_left, flux_values, padding_ones_right))
@@ -353,7 +356,6 @@ def _create_target_csv(create_target_input):
     lc_df['centroid_y'] = np.concatenate((padding_zeros_left, np.array(lc.centroid_row.value), padding_zeros_right))
     lc_df['motion_x'] = np.concatenate((padding_zeros_left, np.array(lc.mom_centr1.value), padding_zeros_right))
     lc_df['motion_y'] = np.concatenate((padding_zeros_left, np.array(lc.mom_centr2.value), padding_zeros_right))
-    lc_df['bck_flux'] = np.concatenate((padding_zeros_left, np.array(lc.sap_bkg.value), padding_zeros_right))
     lc_df['eb_model'] = np.concatenate((padding_ones_left, np.array(eb_model_flux), padding_ones_right))
     lc_df['bckeb_model'] = np.concatenate((padding_ones_left, np.array(backeb_model_flux), padding_ones_right))
     lc_df['planet_model'] = np.concatenate((padding_ones_left, np.array(planet_model_flux), padding_ones_right))

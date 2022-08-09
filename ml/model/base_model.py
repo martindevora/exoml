@@ -8,6 +8,7 @@ import pandas as pd
 import ruamel.yaml
 from abc import abstractmethod
 
+from keras.utils.vis_utils import plot_model
 from sklearn.utils import shuffle
 
 from ml.callback.basemodel_aware_callback import MetricsPlotCallback
@@ -131,6 +132,10 @@ class BaseModel(WithLogging):
         dir = dir + self._get_model_dir()
         if not os.path.exists(dir):
             os.mkdir(dir)
+        try:
+            plot_model(self.model, dir + '/network.png', show_shapes=True)
+        except Exception as e:
+            logging.exception("Can't plot model network.png")
         self.model.summary()
         ModelWeightsLogger().log_model_weights(self.model)
         return self

@@ -1,8 +1,10 @@
+import logging
 from abc import abstractmethod
 
 import matplotlib.pyplot as plt
 import foldedleastsquares
 import scipy
+import timesynth
 from numpy.random import default_rng
 from scipy import stats
 
@@ -16,13 +18,16 @@ from ml.functions.functions import sigmoid
 
 
 class Ete6ModelGenerator(tf.keras.utils.Sequence):
-    def __init__(self):
-        pass
+    random_number_generator = default_rng()
+
+    def __init__(self, zero_epsilon=1e-6):
+        self.zero_epsilon = zero_epsilon
 
     def bin_interp(self, array, new_size):
         result = np.zeros((array.shape[1], new_size))
         for index, nested_array in enumerate(np.transpose(array)):
             try:
+                nested_array = nested_array[nested_array > self.zero_epsilon]
                 arr_interp = scipy.interpolate.interp1d(np.arange(nested_array.size), nested_array)
                 result[index] = arr_interp(np.linspace(0, nested_array.size - 1, new_size))
             except Exception as e:
@@ -33,20 +38,23 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
     def bin_by_time(self, array, new_size):
         result = np.zeros((array.shape[1], new_size))
         transposed_array = np.transpose(array)
+        time_array = transposed_array[0]
         for index, nested_array in enumerate(transposed_array):
             if index > 0:
+                mask = nested_array > self.zero_epsilon
+                nested_array = nested_array[mask]
+                masked_time_array = time_array[mask]
                 try:
-                    bin_means, bin_edges, binnumber = stats.binned_statistic(transposed_array[0], nested_array,
+                    bin_means, bin_edges, binnumber = stats.binned_statistic(masked_time_array, nested_array,
                                                                              statistic='mean', bins=new_size)
-                    bin_stds, _, _ = stats.binned_statistic(transposed_array[0], nested_array, statistic='std', bins=new_size)
+                    bin_stds, _, _ = stats.binned_statistic(masked_time_array, nested_array, statistic='std', bins=new_size)
                     bin_width = (bin_edges[1] - bin_edges[0])
                     bin_centers = bin_edges[1:] - bin_width / 2
                     if np.max(result[0]) == 0:
                         result[0] = bin_centers
                     result[index] = bin_means
                 except Exception as e:
-                    a = 1
-                    # logging.exception("Error when interpolating, will create empty input array")
+                    logging.exception("Error when interpolating, will create empty input array")
         return np.transpose(np.nan_to_num(result))
 
     def _prepare_input_lc(self, input_df):
@@ -57,18 +65,35 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         jumps = np.where(np.abs(dif) > 0.25)[0]
         jumps = np.append(jumps, len(input_df))
         previous_jump_index = 0
+        epsilon = 1e-6
         for jumpIndex in jumps:
             token = input_df["centroid_x"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["centroid_x"][previous_jump_index:jumpIndex] = sigmoid(token - np.nanmedian(token))
+            input_df["centroid_x"][previous_jump_index:jumpIndex] = token / (np.nanmedian(token) + epsilon)
             token = input_df["centroid_y"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["centroid_y"][previous_jump_index:jumpIndex] = sigmoid(token - np.nanmedian(token))
+            input_df["centroid_y"][previous_jump_index:jumpIndex] = token / (np.nanmedian(token) + epsilon)
             token = input_df["motion_x"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["motion_x"][previous_jump_index:jumpIndex] = sigmoid(token - np.nanmedian(token))
+            input_df["motion_x"][previous_jump_index:jumpIndex] = token / (np.nanmedian(token) + epsilon)
             token = input_df["motion_y"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["motion_y"][previous_jump_index:jumpIndex] = sigmoid(token - np.nanmedian(token))
+            input_df["motion_y"][previous_jump_index:jumpIndex] = token / (np.nanmedian(token) + epsilon)
             token = input_df["bck_flux"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["bck_flux"][previous_jump_index:jumpIndex] = sigmoid(token - np.nanmedian(token))
+            input_df["bck_flux"][previous_jump_index:jumpIndex] = token / (np.nanmedian(token) + epsilon)
             previous_jump_index = jumpIndex
+        red_noise_freq = self.random_number_generator.uniform(0.01, 0.1)
+        flux_std = np.std(input_df['flux'])
+        red_noise_sd = self.random_number_generator.uniform(0, flux_std * 3)
+        red_noise = timesynth.noise.RedNoise(std=red_noise_sd, tau=red_noise_freq)
+        timeseries_rn = []
+        for value in time:
+            rn_value = red_noise.sample_next(value, None, None)
+            rn_value = rn_value[0] if isinstance(rn_value, (list, np.ndarray)) else rn_value
+            timeseries_rn = timeseries_rn + [rn_value]
+        timeseries_rn = np.array(timeseries_rn)
+        input_df['flux'] = input_df['flux'] + timeseries_rn
+        input_df['flux_0'] = input_df['flux_0'] + timeseries_rn
+        input_df['flux_1'] = input_df['flux_1'] + timeseries_rn
+        input_df['flux_2'] = input_df['flux_2'] + timeseries_rn
+        input_df['flux_3'] = input_df['flux_3'] + timeseries_rn
+        input_df['flux_4'] = input_df['flux_4'] + timeseries_rn
         input_df['flux'] = input_df['flux'] / 2
         input_df['flux'][input_df['flux'] > 1] = 1
         input_df['flux_0'] = input_df['flux_0'] / 2
@@ -81,6 +106,16 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         input_df['flux_3'][input_df['flux_3'] > 1] = 1
         input_df['flux_4'] = input_df['flux_4'] / 2
         input_df['flux_4'][input_df['flux_4'] > 1] = 1
+        input_df['centroid_x'] = input_df['centroid_x'] / 2
+        input_df['centroid_x'][input_df['centroid_x'] > 1] = 1
+        input_df['centroid_y'] = input_df['centroid_y'] / 2
+        input_df['centroid_y'][input_df['centroid_y'] > 1] = 1
+        input_df['motion_x'] = input_df['motion_x'] / 2
+        input_df['motion_x'][input_df['motion_x'] > 1] = 1
+        input_df['motion_y'] = input_df['motion_y'] / 2
+        input_df['motion_y'][input_df['motion_y'] > 1] = 1
+        input_df['bck_flux'] = input_df['bck_flux'] / 2
+        input_df['bck_flux'][input_df['bck_flux'] > 1] = 1
         input_df = input_df.fillna(self.zero_epsilon)
         input_df = input_df.replace(0.0, self.zero_epsilon)
         input_df = input_df.replace(0, self.zero_epsilon)
