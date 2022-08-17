@@ -52,16 +52,17 @@ handler.setLevel(logging.INFO)
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-home_dir = '/home/mdevora/'
-root_dir = home_dir + '/scratch/ml/q1_q17/'
-lcs_dir = root_dir + '/lcs/'
+home_dir = '/home/martin/'
+df_dir = '../q1_q17/'
+lcs_dir = home_dir + '/Downloads'
 cache_dir = home_dir
+cores = 1
 #uncompress_data('/mnt/DATA-2/ete6/backebs/BackEBs/')
 #uncompress_data('/mnt/DATA-2/ete6/ebs/EBs/')
 #uncompress_data('/mnt/DATA-2/ete6/planets/Planets/')
 #_create_star_csv(CreateStarCsvInput('/home/mdevora/scratch/ml/q1_q17/lcs/KIC 12106934_time_series_long.csv'))
-create_target_csvs(root_dir + '/classified_tces.csv', lcs_dir, cache_dir, 10)
-create_star_csvs(lcs_dir, 50, 4, KicStarCatalog(), '*time_series_long*.csv', "KIC_([0-9]+)_time_series_long", 10)
+create_target_csvs(df_dir + '/classified_tces.csv', lcs_dir, cache_dir, cores)
+create_star_csvs(lcs_dir, 50, 4, KicStarCatalog(), '*time_series_long*.csv', "KIC_([0-9]+)_time_series_long", cores)
 #create_injection_dataframe(root_dir, lcs_dir)
 #create_targets_df(root_dir)
 #_create_target_csv(CreateTargetInput(lcs_dir + '/tess2019128220341-0000000230382377-0016-s_lc.fits', root_dir, pd.read_csv(root_dir + '/injected_objects.csv')))
