@@ -142,13 +142,14 @@ def prepare_lc_data(lc_data, transit_duration, transit_period):
     lc_df = pd.DataFrame(columns=['#time', 'flux', 'flux_err', 'planet_model', 'eb_model', 'bckeb_model',
                                   'centroid_x', 'centroid_y', 'motion_x', 'motion_y', 'bck_flux'])
     flux_values = np.array(lc_data.flux)
-    median_flux = np.median(flux_values)
+    median_flux = np.nanmedian(flux_values)
     flux_values = flux_values / median_flux
     if len(np.argwhere(flux_values < 0).flatten()) > 0:
-        flux_values = np.array(lc_data.flux) + 2 * np.abs(np.nanmin(lc_data.flux))
-        median_flux = np.median(flux_values)
+        flux_values = np.array(lc_data.flux)
+        flux_values = flux_values + 2 * np.abs(np.nanmin(flux_values))
+        median_flux = np.nanmedian(flux_values)
         flux_values = flux_values / median_flux
-    time_values = lc_data.time
+    time_values = np.array(lc_data.time)
     duration_to_period = transit_duration / transit_period
     for j in np.arange(0, 5, 1):
         flux_detrend_j = detrend(time_values, flux_values, duration_to_period * (4 + j))
@@ -156,11 +157,11 @@ def prepare_lc_data(lc_data, transit_duration, transit_period):
     bck_flux_detrend = detrend(time_values, flux_values, duration_to_period * 4, smooth=False)
     lc_df['bck_flux'] = bck_flux_detrend
     flux_err_values = np.array(lc_data.flux_err) / median_flux
-    lc_df['#time'] = np.array(lc_data.time)
+    lc_df['#time'] = time_values
     lc_df['flux'] = flux_values
     lc_df['flux_err'] = flux_err_values
-    lc_df['centroid_x'] = np.array(lc_data.centroid_x)
-    lc_df['centroid_y'] = np.array(lc_data.centroid_y)
+    lc_df['centroid_x'] = np.array(lc_data.centroids_x)
+    lc_df['centroid_y'] = np.array(lc_data.centroids_y)
     lc_df['motion_x'] = np.array(lc_data.motion_x)
     lc_df['motion_y'] = np.array(lc_data.motion_y)
     lc_df = lc_df.fillna(0)
