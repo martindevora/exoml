@@ -5,6 +5,7 @@ import re
 from multiprocessing import Pool
 
 import astropy.units as u
+import foldedleastsquares
 import numpy as np
 import wotan
 import pandas as pd
@@ -135,13 +136,15 @@ def create_star_csv(create_star_input):
         star_df = star_df.sort_values(["dist_arcsec"], ascending=True)
     except Exception as e:
         logging.exception('Something failed when retrieving neighbours info for object id %s', str(object_id))
+        logging.exception('Something failed when retrieving neighbours info for object id %s', str(object_id))
     star_df.to_csv(create_star_input.output_dir + '/' + leading_zeros_object_id + '_star.csv')
     logging.info('Processed object id ' + str(object_id))
 
-def prepare_lc_data(lc_data, transit_duration, transit_period):
+def prepare_lc_data(object_id, lc_data, transit_duration, transit_period, epoch, long_cadence):
     lc_df = pd.DataFrame(columns=['#time', 'flux', 'flux_err', 'planet_model', 'eb_model', 'bckeb_model',
                                   'centroid_x', 'centroid_y', 'motion_x', 'motion_y', 'bck_flux'])
     flux_values = np.array(lc_data.flux)
+    # Normalizing PDCSAP flux, but not using the normalization for detrending
     median_flux = np.nanmedian(flux_values)
     flux_values = flux_values / median_flux
     if len(np.argwhere(flux_values < 0).flatten()) > 0:
@@ -151,12 +154,17 @@ def prepare_lc_data(lc_data, transit_duration, transit_period):
         flux_values = flux_values / median_flux
     time_values = np.array(lc_data.time)
     duration_to_period = transit_duration / transit_period
+    series_len = len(time_values)
     for j in np.arange(0, 5, 1):
-        flux_detrend_j = detrend(time_values, flux_values, duration_to_period * (4 + j))
+        logging.info("Detrending no %s for target %s with %s points with duration %s", j, object_id, series_len, transit_duration * (4 + j))
+        flux_detrend_j = detrend(time_values, np.array(lc_data.flux), transit_duration * (4 + j), smooth=not long_cadence)
         lc_df['flux_' + str(j)] = flux_detrend_j
-    bck_flux_detrend = detrend(time_values, flux_values, duration_to_period * 4, smooth=False)
+    logging.info("Detrending bck for target %s with %s points with duration %s", object_id, series_len, transit_duration * 4)
+    bck_flux_detrended = np.array(lc_data.background_flux)
+    bck_flux_detrend = detrend(time_values, bck_flux_detrended, transit_duration * 4, smooth=False)
+    logging.info("Finished detrending for target %s with %s points", object_id, series_len)
     lc_df['bck_flux'] = bck_flux_detrend
-    flux_err_values = np.array(lc_data.flux_err) / median_flux
+    flux_err_values = np.array(lc_data.flux_err) / flux_values
     lc_df['#time'] = time_values
     lc_df['flux'] = flux_values
     lc_df['flux_err'] = flux_err_values
@@ -165,6 +173,19 @@ def prepare_lc_data(lc_data, transit_duration, transit_period):
     lc_df['motion_x'] = np.array(lc_data.motion_x)
     lc_df['motion_y'] = np.array(lc_data.motion_y)
     lc_df = lc_df.fillna(0)
+    #
+    # lc_df['#time1'] = foldedleastsquares.fold(np.float32(time_values), transit_period, epoch + transit_period / 2)
+    # lc_df = lc_df.sort_values(by=['#time1'])
+    # lc_df_focus = lc_df
+    # lc_df_focus = lc_df_focus[
+    #     (lc_df_focus['#time1'] > 0.5 - duration_to_period * 3) & (lc_df_focus['#time1'] < 0.5 + duration_to_period * 3)]
+    # import matplotlib.pyplot as plt
+    # fig, axs = plt.subplots(1, 1, figsize=(8, 4), constrained_layout=True)
+    # axs.scatter(lc_df_focus['#time1'], lc_df_focus['flux_2'])
+    # axs.set_ylim(0.490, 0.505)
+    # plt.show()
+    # plt.clf()
+    # plt.close()
     return lc_df
 
 class CreateTargetInput:
@@ -192,9 +213,10 @@ def create_target_csv(create_target_input):
                 mission_lightcurve_builder.build(MissionObjectInfo(mission_id, 'all'),
                                                  create_target_input.target_dir,
                                                  create_target_input.cache_dir)
-            lc_df = prepare_lc_data(lcbuild_short.lc_data,
-                                    create_target_input.injected_files_df['tce_duration'] / 24,
-                                    create_target_input.injected_files_df['tce_period'])
+            lc_df = prepare_lc_data(mission_id, lcbuild_short.lc_data,
+                                    create_target_input.injected_files_df['duration(h)'] / 24,
+                                    create_target_input.injected_files_df['period'],
+                                    create_target_input.injected_files_df['epoch'], False)
             lc_df.to_csv(file_name)
     except Exception as e:
         logging.exception("Failed short cadence for %s", mission_id)
@@ -206,9 +228,10 @@ def create_target_csv(create_target_input):
                 mission_ffi_lightcurve_builder.build(MissionFfiIdObjectInfo(mission_id, 'all'),
                                                      create_target_input.target_dir,
                                                      create_target_input.cache_dir)
-            lc_df = prepare_lc_data(lcbuild_long.lc_data,
-                                    create_target_input.injected_files_df['tce_duration'] / 24,
-                                    create_target_input.injected_files_df['tce_period'])
+            lc_df = prepare_lc_data(mission_id, lcbuild_long.lc_data,
+                                    create_target_input.injected_files_df['duration(h)'] / 24,
+                                    create_target_input.injected_files_df['period'],
+                                    create_target_input.injected_files_df['epoch'], True)
             lc_df.to_csv(file_name)
     except Exception as e:
         logging.exception("Failed long cadence for %s", mission_id)
