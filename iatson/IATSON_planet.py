@@ -20,11 +20,16 @@ from ml.model.imbalanced_binary_model import ImbalancedBinaryModel
 
 
 class IATSON_planet(ImbalancedBinaryModel):
-    def __init__(self, class_ids, class_names, dropout_rate=0.1) -> None:
-        super().__init__('IATSON_planet', [11, 9 * 15, 2500, 500, 500, 500, 500, 500, 500], class_ids, dropout_rate)
+    def __init__(self, class_ids, class_names, type_to_label, dropout_rate=0.1) -> None:
+        super().__init__('IATSON_planet',
+                         [11, 9 * 15, 2500, 100, 100, 100, 100, 100, 100],
+                         class_ids,
+                         type_to_label,
+                         dropout_rate)
 
     def _get_flux_transformer_branch(self, name, transformer_blocks=6, transformer_heads=6):
-        flux_input = keras.Input(shape=(2500, 13), name=name)
+        # TODO use binning error as channel
+        flux_input = keras.Input(shape=(self.input_size[2], 13), name=name)
         transformer_input_size = 300
         transformer_output_size = 300
         kernel_size = 25
@@ -37,8 +42,9 @@ class IATSON_planet(ImbalancedBinaryModel):
     def _get_flux_conv_branch(self, name):
         # (time, flux, [detrended_flux1 ... detrended_flux5], flux_model, centroidx, centroidy, motionx, motiony, bck)
         # flux model by transit params and stellar params
+        # TODO use binning error as channel
         leaky_relu_alpha = 0.01
-        flux_input = keras.Input(shape=(2500, 13), name=name)
+        flux_input = keras.Input(shape=(self.input_size[2], 13), name=name)
         flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_input)
         flux_branch = keras.layers.SpatialDropout1D(rate=0.1)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=128, kernel_size=9, padding="same",
@@ -73,7 +79,8 @@ class IATSON_planet(ImbalancedBinaryModel):
 
     def _get_focus_flux_conv_branch(self, name):
         leaky_relu_alpha = 0.01
-        focus_flux_input = keras.Input(shape=(500, 13), name=name)
+        # TODO use binning error as channel
+        focus_flux_input = keras.Input(shape=(self.input_size[3], 13), name=name)
         focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_input)
         # (time, flux, detrended_flux1... detrended_flux5, flux_model, centroidx, centroidy, motionx, motiony, bck)
         # flux model by transit params and stellar params
@@ -95,7 +102,8 @@ class IATSON_planet(ImbalancedBinaryModel):
         return focus_flux_input, focus_flux_branch
 
     def _get_focus_flux_transformer_branch(self, name, transformer_blocks=6, transformer_heads=6):
-        focus_flux_input = keras.Input(shape=(500, 13), name=name)
+        # TODO use binning error as channel
+        focus_flux_input = keras.Input(shape=(self.input_size[3], 13), name=name)
         transformer_input_size = 100
         transformer_output_size = 100
         kernel_size = 5
@@ -322,8 +330,8 @@ class IATSON_planet(ImbalancedBinaryModel):
         injected_objects_df.reset_index(inplace=True, drop=True)
         return injected_objects_df
 
-    def instance_generator(self, dataset, dir, batch_size, input_sizes, zero_epsilon):
-        return IatsonPlanetModelGenerator(dataset, dir, batch_size, input_sizes, zero_epsilon)
+    def instance_generator(self, dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon):
+        return IatsonPlanetModelGenerator(dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon)
 
     def predict(self, input):
         prediction = self.model(input, training=False)
