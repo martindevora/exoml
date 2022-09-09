@@ -203,8 +203,8 @@ class CreateTargetInput:
 def create_target_csv(create_target_input):
     mission_lightcurve_builder = MissionLightcurveBuilder()
     mission_ffi_lightcurve_builder = MissionFfiLightcurveBuilder()
-    mission_id = create_target_input.mission + ' ' + str(int(create_target_input.id))
-    file_id = create_target_input.mission + '_' + str(int(create_target_input.id))
+    mission_id = create_target_input.id
+    file_id = mission_id.replace(' ', '_')
     try:
         logging.info("Trying to get short cadence info for %s", mission_id)
         file_name = create_target_input.target_dir + file_id + "_lc_short.csv"
