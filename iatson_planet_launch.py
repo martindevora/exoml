@@ -21,8 +21,9 @@ hp = HyperParams(batch_size=100,
             early_stopping_patience=0,
             custom_loss=None,
             run_eagerly=False)
-custom_loss = None #f1_loss
-iatson = IATSON_planet({0: 'bckEB', 1: 'EB', 2: 'planet', 3: 'none'}, ['bckEB', 'EB', 'planet', 'none'])\
+iatson = IATSON_planet({0: 'bckEB', 1: 'EB', 2: 'planet', 3: 'none'},
+                       ['bckEB', 'EB', 'planet', 'none'],
+                       {'bckEB': [0], 'EB': [0], 'planet': [1], 'none': [0]})\
     .build(use_transformers=False, transformer_blocks=3, transformer_heads=3)
 #iatson.load_model("./IATSON_planet_model_bck")
 iatson.train(training_dir, model_dir, hp)
