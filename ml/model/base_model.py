@@ -28,7 +28,7 @@ class BaseModel(WithLogging):
 
     model = None
 
-    def __init__(self, name, input_size, class_ids, dropout_rate=0.1) -> None:
+    def __init__(self, name, input_size, class_ids, type_to_label, dropout_rate=0.1) -> None:
         super().__init__()
         self.name = name
         self.input_size = input_size
@@ -36,6 +36,7 @@ class BaseModel(WithLogging):
             class_ids[class_id] = class_ids[class_id] if isinstance(class_ids[class_id], (list, np.ndarray)) \
                 else [class_ids[class_id]]
         self.class_ids = class_ids
+        self.type_to_label = type_to_label
         self.dropout_rate = dropout_rate
 
     @abstractmethod
@@ -57,7 +58,7 @@ class BaseModel(WithLogging):
         pass
 
     @abstractmethod
-    def instance_generator(self, dataset, dir, batch_size, input_sizes, zero_epsilon):
+    def instance_generator(self, dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon):
         pass
 
     @abstractmethod
@@ -259,9 +260,9 @@ class BaseModel(WithLogging):
                          ")")
             lcs_dir = training_dir + '/lcs/'
             training_batch_generator = self.instance_generator(train_filenames, lcs_dir, hyperparams.batch_size,
-                                                               self.input_size, hyperparams.zero_epsilon)
+                                                               self.input_size, self.type_to_label, hyperparams.zero_epsilon)
             validation_batch_generator = self.instance_generator(validation_filenames, lcs_dir, hyperparams.batch_size,
-                                                                 self.input_size, hyperparams.zero_epsilon)
+                                                                 self.input_size, self.type_to_label, hyperparams.zero_epsilon)
             csv_log = model_path + '/training_log.csv'
             logging.info("Initializing csv logger with (csv_log," + str(csv_log) +
                          ") (steps_per_epoch," + str(steps_per_epoch) +
