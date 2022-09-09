@@ -104,6 +104,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
         folded_flux_even_har_array = np.empty((len(target_indexes), self.input_sizes[3], self.measurements_per_point))
         folded_flux_odd_har_array = np.empty((len(target_indexes), self.input_sizes[3], self.measurements_per_point))
         batch_data_values = np.empty((len(target_indexes), 1))
+        #TODO use binning errors
         i = 0
         for df_index, target_row in injected_objects_df.iterrows():
             #target_row = self.injected_objects_df[self.injected_objects_df['object_id'] == 1026957].iloc[0]
