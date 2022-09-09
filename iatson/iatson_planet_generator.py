@@ -1,3 +1,5 @@
+import os
+
 import matplotlib.pyplot as plt
 import foldedleastsquares
 from numpy.random import default_rng
@@ -9,9 +11,7 @@ import pandas as pd
 
 
 class IatsonPlanetModelGenerator(Ete6ModelGenerator):
-    TYPE_TO_LABEL = {'bckEB': [0], 'EB': [0], 'planet': [1], 'none': [0]}
-
-    def __init__(self, injected_objects_df, lcs_dir, batch_size, input_sizes, zero_epsilon=1e-7,
+    def __init__(self, injected_objects_df, lcs_dir, batch_size, input_sizes, type_to_label, zero_epsilon=1e-7,
                  measurements_per_point=13):
         super().__init__(zero_epsilon)
         self.injected_objects_df = injected_objects_df
@@ -20,6 +20,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
         self.input_sizes = input_sizes
         self.random_number_generator = default_rng()
         self.measurements_per_point = measurements_per_point
+        self.type_to_label = type_to_label
 
     def __len__(self):
         return (np.ceil(len(self.injected_objects_df) / float(self.batch_size))).astype(int)
@@ -80,42 +81,60 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
         plt.clf()
         plt.close()
 
+    def plot_single_data(self, lc_df, target_row):
+        fig, axs = plt.subplots(1, 1, figsize=(8, 4), constrained_layout=True)
+        axs.scatter(lc_df['#time'], lc_df['flux_2'])
+        axs.set_ylim(0.5 - target_row['tce_depth'] / 0.5e6, 0.505)
+        plt.show()
+        plt.clf()
+        plt.close()
+
     def __getitem__(self, idx):
         max_index = (idx + 1) * self.batch_size
         max_index = len(self.injected_objects_df) if max_index > len(self.injected_objects_df) else max_index
         target_indexes = np.arange(idx * self.batch_size, max_index, 1)
         injected_objects_df = self.injected_objects_df.iloc[target_indexes]
-        star_array = np.empty((len(target_indexes), 11, 1))
-        star_neighbours_array = np.empty((len(target_indexes), 9 * 15, 1))
-        global_flux_array = np.empty((len(target_indexes), 2500, self.measurements_per_point))
-        folded_flux_even_array = np.empty((len(target_indexes), 500, self.measurements_per_point))
-        folded_flux_odd_array = np.empty((len(target_indexes), 500, self.measurements_per_point))
-        folded_flux_even_subhar_array = np.empty((len(target_indexes), 500, self.measurements_per_point))
-        folded_flux_odd_subhar_array = np.empty((len(target_indexes), 500, self.measurements_per_point))
-        folded_flux_even_har_array = np.empty((len(target_indexes), 500, self.measurements_per_point))
-        folded_flux_odd_har_array = np.empty((len(target_indexes), 500, self.measurements_per_point))
+        star_array = np.empty((len(target_indexes), self.input_sizes[0], 1))
+        star_neighbours_array = np.empty((len(target_indexes), self.input_sizes[1], 1))
+        global_flux_array = np.empty((len(target_indexes), self.input_sizes[2], self.measurements_per_point))
+        folded_flux_even_array = np.empty((len(target_indexes), self.input_sizes[3], self.measurements_per_point))
+        folded_flux_odd_array = np.empty((len(target_indexes), self.input_sizes[3], self.measurements_per_point))
+        folded_flux_even_subhar_array = np.empty((len(target_indexes), self.input_sizes[3], self.measurements_per_point))
+        folded_flux_odd_subhar_array = np.empty((len(target_indexes), self.input_sizes[3], self.measurements_per_point))
+        folded_flux_even_har_array = np.empty((len(target_indexes), self.input_sizes[3], self.measurements_per_point))
+        folded_flux_odd_har_array = np.empty((len(target_indexes), self.input_sizes[3], self.measurements_per_point))
         batch_data_values = np.empty((len(target_indexes), 1))
         i = 0
         for df_index, target_row in injected_objects_df.iterrows():
-            target_id = int(target_row['TIC ID'])
-            # target_row = self.injected_objects_df[self.injected_objects_df['TIC ID'] == 356110099].iloc[0]
+            #target_row = self.injected_objects_df[self.injected_objects_df['object_id'] == 1026957].iloc[0]
+            #TODO refactor to use mission for object_id
+            target_id = int(target_row['object_id'])
             leading_zeros_object_id = '{:09}'.format(target_id)
-            lc_filename = str(leading_zeros_object_id) + '_lc.csv'
-            star_filename = str(leading_zeros_object_id) + '_star.csv'
-            star_neighbours_df = pd.read_csv(self.lcs_dir + '/' + star_filename,
+            #TODO refactor to use mission for _lc files
+            lc_filename = self.lcs_dir + '/' + str(leading_zeros_object_id) + '_lc.csv'
+            lc_short_filename = self.lcs_dir + '/' + 'KIC_' + str(target_id) + '_lc_short.csv'
+            lc_long_filename = self.lcs_dir + '/' + 'KIC_' + str(target_id) + '_lc_long.csv'
+            read_filename = lc_long_filename
+            if os.path.exists(lc_filename):
+                read_filename = lc_filename
+            elif os.path.exists(lc_short_filename):
+                read_filename = lc_short_filename
+            #TODO refactor to use mission for star files
+            star_filename = self.lcs_dir + '/' + str(leading_zeros_object_id) + '_star.csv'
+            star_neighbours_df = pd.read_csv(star_filename,
                                              usecols=['Teff', 'lum', 'v', 'j', 'k', 'h', 'radius', 'mass',
                                                       'dist_arcsec'], index_col=False)
             star_neighbours_df = self._prepare_input_neighbour_stars(star_neighbours_df)
-            star_df = pd.read_csv(self.lcs_dir + '/' + star_filename, index_col=False)
+            star_df = pd.read_csv(star_filename, index_col=False)
             star_df = self._prepare_input_star(star_df)
-            lc_df = pd.read_csv(self.lcs_dir + '/' + lc_filename, usecols=['#time', 'flux', 'flux_0', 'flux_1',
+            lc_df = pd.read_csv(read_filename, usecols=['#time', 'flux', 'flux_0', 'flux_1',
                                                                            'flux_2', 'flux_3', 'flux_4',
                                                                            'flux_err', 'centroid_x',
                                                                            'centroid_y', 'motion_x', 'motion_y',
                                                                            'bck_flux'], low_memory=True)
             lc_df = self._prepare_input_lc(lc_df)
             type = target_row['type']
-            batch_data_values[i] = self.TYPE_TO_LABEL[type]
+            batch_data_values[i] = self.type_to_label[type]
             not_null_times_args = np.argwhere(lc_df['#time'].to_numpy() > 0).flatten()
             lc_df = lc_df.iloc[not_null_times_args]
             period = target_row['period']
@@ -153,7 +172,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                                       (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
             folded_flux_odd_array[i] = self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[4])
             # self._plot_df(lc_df_focus, type, "odd")
-            # self._plot_input(folded_flux_odd_array[i], type, "odd")
+            #self._plot_input(folded_flux_odd_array[i], type, "odd")
             # Focus flux sub-harmonic even
             lc_df_focus = lc_df.copy()
             lc_df_focus['#time'] = foldedleastsquares.fold(time, period / 2, epoch)
