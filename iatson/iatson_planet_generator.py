@@ -111,7 +111,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
             #TODO refactor to use mission for object_id
             object_id = target_row['object_id'].split(' ')
             mission_id = object_id[0]
-            target_id = int(target_row['object_id'][1])
+            target_id = int(object_id[1])
             #TODO refactor to use mission for _lc files
             lc_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_lc.csv'
             lc_short_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_lc_short.csv'
