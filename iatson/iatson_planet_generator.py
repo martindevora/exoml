@@ -109,19 +109,20 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
         for df_index, target_row in injected_objects_df.iterrows():
             #target_row = self.injected_objects_df[self.injected_objects_df['object_id'] == 1026957].iloc[0]
             #TODO refactor to use mission for object_id
-            target_id = int(target_row['object_id'])
-            leading_zeros_object_id = '{:09}'.format(target_id)
+            object_id = target_row['object_id'].split(' ')
+            mission_id = object_id[0]
+            target_id = int(target_row['object_id'][1])
             #TODO refactor to use mission for _lc files
-            lc_filename = self.lcs_dir + '/' + str(leading_zeros_object_id) + '_lc.csv'
-            lc_short_filename = self.lcs_dir + '/' + 'KIC_' + str(target_id) + '_lc_short.csv'
-            lc_long_filename = self.lcs_dir + '/' + 'KIC_' + str(target_id) + '_lc_long.csv'
+            lc_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_lc.csv'
+            lc_short_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_lc_short.csv'
+            lc_long_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_lc_long.csv'
             read_filename = lc_long_filename
             if os.path.exists(lc_filename):
                 read_filename = lc_filename
             elif os.path.exists(lc_short_filename):
                 read_filename = lc_short_filename
             #TODO refactor to use mission for star files
-            star_filename = self.lcs_dir + '/' + str(leading_zeros_object_id) + '_star.csv'
+            star_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_star.csv'
             star_neighbours_df = pd.read_csv(star_filename,
                                              usecols=['Teff', 'lum', 'v', 'j', 'k', 'h', 'radius', 'mass',
                                                       'dist_arcsec'], index_col=False)
