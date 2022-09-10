@@ -10,14 +10,14 @@ from lcbuilder.star.TicStarCatalog import TicStarCatalog
 from lightkurve import TessLightCurve
 from numpy.random import default_rng
 from ml.physics.transit_functions import t14
-from preparation.parser_utils import CreateTargetInput
+from preparation.parser_utils import CreateTargetInput, create_star_csvs, detrend
 
 
 def create_injection_dataframe(injections_dir, lcs_dir):
     backeb_df = pd.read_csv(injections_dir + '/ete6_backeb_data.txt', comment="#")
     eb_df = pd.read_csv(injections_dir + '/ete6_eb_data.txt', comment="#")
     planet_df = pd.read_csv(injections_dir + '/ete6_planet_data.txt', comment="#")
-    df = pd.DataFrame(columns=['TIC ID', 'type', 'period', 'epoch', 'Rsec/Rpri', 'b',
+    df = pd.DataFrame(columns=['object_id', 'type', 'period', 'epoch', 'Rsec/Rpri', 'b',
                                 'a/Rstar', 'duration(h)', 'depth_primary', 'depth_secondary',
                                'insolation', 'Rstar_primary', 'Rstar_secondary', 'contact_amplitude', 'Mstar'])
     i = 0
@@ -47,7 +47,7 @@ def create_injection_dataframe(injections_dir, lcs_dir):
         epoch = random_number_generator.uniform(min_lc_time, min_lc_time + period)
         duration = t14(star_radius, star_mass, period)
         duration = duration * 24
-        df = df.append({'TIC ID': object_id, 'type': 'none', 'period': period,
+        df = df.append({'object_id': 'TIC ' + object_id, 'type': 'none', 'period': period,
                    'epoch': epoch,
                    'Rsec/Rpri': 0,
                    'b': 0,
@@ -72,7 +72,7 @@ def create_injection_dataframe(injections_dir, lcs_dir):
             else:
                 duration = t14(star_radius, star_mass, period)
             duration = duration * 24
-            df = df.append({'TIC ID': target_row['TIC ID'], 'type': 'bckEB', 'period': period,
+            df = df.append({'object_id': 'TIC ' + target_row['TIC ID'], 'type': 'bckEB', 'period': period,
                        'epoch': epoch,
                        'Rsec/Rpri': target_row['Secondary Rstar'] / target_row['Primary Rstar'],
                        'b': target_row['Impact Parameter'],
@@ -97,7 +97,7 @@ def create_injection_dataframe(injections_dir, lcs_dir):
             else:
                 duration = t14(star_radius, star_mass, period)
             duration = duration * 24
-            df = df.append({'TIC ID': target_row['TIC ID'], 'type': 'EB', 'period': period,
+            df = df.append({'object_id': 'TIC ' + target_row['TIC ID'], 'type': 'EB', 'period': period,
                        'epoch': epoch,
                        'Rsec/Rpri': target_row['Secondary Rstar'] / target_row['Primary Rstar'],
                        'b': target_row['Impact Parameter'],
@@ -124,7 +124,7 @@ def create_injection_dataframe(injections_dir, lcs_dir):
                 else:
                     duration = t14(star_radius, star_mass, period)
                 duration = duration * 24
-            df = df.append({'TIC ID': target_row['TIC ID'], 'type': 'planet', 'period': period,
+            df = df.append({'object_id': 'TIC ' + target_row['TIC ID'], 'type': 'planet', 'period': period,
                        'epoch': epoch,
                        'Rsec/Rpri': target_row['Rp/Rstar'],
                        'b': target_row['Impact Parameter'],
@@ -141,7 +141,7 @@ def create_injection_dataframe(injections_dir, lcs_dir):
             #df = df.sort_values(["TIC ID", "type"], ascending=True)
             df.to_csv(injections_dir + '/injected_objects.csv')
         i = i + 1
-    df = df.sort_values(["TIC ID", "type"], ascending=True)
+    df = df.sort_values(["object_id", "type"], ascending=True)
     df.to_csv(injections_dir + '/injected_objects.csv')
 
 
@@ -150,10 +150,10 @@ def create_target_csvs(lcs_dir, models_dir, cores=multiprocessing.cpu_count() - 
     inputs = []
     for file in list(pathlib.Path(lcs_dir).glob('*.fits')):
         lc_file = str(file)
-        inputs = inputs + [CreateTargetInput(lc_file, models_dir, injected_files_df, max_lc_length)]
+        inputs = inputs + [CreateTargetInput('TIC', None, str(lc_file), lcs_dir, models_dir, injected_files_df,
+                                             None, max_lc_length)]
     with Pool(processes=cores) as pool:
         pool.map(_create_target_csv, inputs)
-
 
 
 def _create_target_csv(create_target_input):
@@ -167,6 +167,7 @@ def _create_target_csv(create_target_input):
         return
     object_id = lc.meta['OBJECT']
     object_id = int(object_id.split(' ')[1])
+    mission_id = 'TIC'
     injected_file_row = create_target_input.injected_files_df[create_target_input.injected_files_df['TIC ID'] == object_id]
     leading_zeros_object_id = '{:09}'.format(object_id)
     lc_length = len(lc)
@@ -230,7 +231,8 @@ def _create_target_csv(create_target_input):
     lc_df['bckeb_model'] = np.concatenate((padding_ones_left, np.array(backeb_model_flux), padding_ones_right))
     lc_df['planet_model'] = np.concatenate((padding_ones_left, np.array(planet_model_flux), padding_ones_right))
     lc_df = lc_df.fillna(0)
-    lc_df.to_csv(lcs_dir + '/' + leading_zeros_object_id + '_lc.csv')
+    lc_df.to_csv(lcs_dir + '/' + mission_id + '_' + str(object_id) + '_lc.csv')
+
 
 def resample_model(model, lc_time):
     total_missing_points = len(model) - len(lc_time)
@@ -255,6 +257,7 @@ def resample_model(model, lc_time):
     model = np.delete(model, corrected_time_gap_indexes.astype(int))
     return model
 
+
 def uncompress_data(data_dir):
     for file in os.listdir(data_dir):
         original_file_name = data_dir + '/' + file
@@ -267,11 +270,11 @@ def uncompress_data(data_dir):
 
 root_dir = '/mnt/DATA-2/ete6/'
 lcs_dir = root_dir + 'lcs/'
+cores = 10
 #uncompress_data('/mnt/DATA-2/ete6/backebs/BackEBs/')
 #uncompress_data('/mnt/DATA-2/ete6/ebs/EBs/')
 #uncompress_data('/mnt/DATA-2/ete6/planets/Planets/')
-#create_star_csvs(lcs_dir)
-create_star_csvs(lcs_dir, 10, 20.25, TicStarCatalog(), '*_lc.csv', "([0-9]+)_lc.csv", 10)
+create_star_csvs(lcs_dir, 10, 20.25, TicStarCatalog(), '*_lc.csv', "([0-9]+)_lc.csv", cores)
 #create_injection_dataframe(root_dir, lcs_dir)
 create_target_csvs(lcs_dir, root_dir)
 #_create_target_csv(CreateTargetInput(lcs_dir + '/tess2019128220341-0000000230382377-0016-s_lc.fits', root_dir, pd.read_csv(root_dir + '/injected_objects.csv')))
