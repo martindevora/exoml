@@ -72,6 +72,6 @@ cores = 1
 #_create_star_csv(CreateStarCsvInput('/home/mdevora/scratch/ml/q1_q17/lcs/KIC 12106934_time_series_long.csv'))
 #create_targets_df(df_dir)
 create_target_csvs(df_dir + '/classified_tces.csv', lcs_dir, cache_dir, cores)
-#create_star_csvs(lcs_dir, 50, 4, KicStarCatalog(), '*time_series_long*.csv', "KIC_([0-9]+)_time_series_long", cores)
+create_star_csvs(lcs_dir, 50, 4, KicStarCatalog(), '*lc_long*.csv', "(KIC)_([0-9]+)_lc_long", cores)
 
 #_create_target_csv(CreateTargetInput(lcs_dir + '/tess2019128220341-0000000230382377-0016-s_lc.fits', root_dir, pd.read_csv(root_dir + '/injected_objects.csv')))

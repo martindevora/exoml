@@ -52,7 +52,7 @@ def create_star_csvs(lcs_dir, search_radius, pixel_size, star_catalog, fileslist
                      cores=os.cpu_count() - 1):
     create_star_inputs = []
     for lc_file in list(pathlib.Path(lcs_dir).glob(fileslist_regex)):
-        create_star_inputs = create_star_inputs + [CreateStarCsvInput(lc_file, pixel_size, search_radius,
+        create_star_inputs = create_star_inputs + [CreateStarCsvInput(str(lc_file), pixel_size, search_radius,
                                                                       object_id_regex, star_catalog, lcs_dir)]
     with Pool(processes=cores) as pool:
         pool.map(create_star_csv, create_star_inputs)
@@ -60,12 +60,12 @@ def create_star_csvs(lcs_dir, search_radius, pixel_size, star_catalog, fileslist
 def create_star_csv(create_star_input):
     tries = 0
     object_id = None
-    leading_zeros_object_id = ''
+    mission_id = None
     while tries < 3:
         try:
             lc_filename_match = re.search(create_star_input.lcs_regex, create_star_input.lc_file)
-            object_id = int(lc_filename_match[1])
-            leading_zeros_object_id = '{:09}'.format(object_id)
+            object_id = int(lc_filename_match[2])
+            mission_id = lc_filename_match[1]
             star_info = create_star_input.star_catalog.catalog_info(object_id)
             star_df = pd.DataFrame(
                 columns=['id', 'ra', 'dec', 'ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h',
@@ -81,6 +81,7 @@ def create_star_csv(create_star_input):
             break
         except Exception as e:
             logging.exception("Failed object %s try", object_id)
+            tries = tries + 1
     if tries >= 3:
         print("Failed downloading object id " + str(object_id))
     assert tries < 3
@@ -136,8 +137,7 @@ def create_star_csv(create_star_input):
         star_df = star_df.sort_values(["dist_arcsec"], ascending=True)
     except Exception as e:
         logging.exception('Something failed when retrieving neighbours info for object id %s', str(object_id))
-        logging.exception('Something failed when retrieving neighbours info for object id %s', str(object_id))
-    star_df.to_csv(create_star_input.output_dir + '/' + leading_zeros_object_id + '_star.csv')
+    star_df.to_csv(create_star_input.output_dir + '/' + mission_id + '_' + str(object_id) + '_star.csv')
     logging.info('Processed object id ' + str(object_id))
 
 def prepare_lc_data(object_id, lc_data, transit_duration, transit_period, epoch, long_cadence):
