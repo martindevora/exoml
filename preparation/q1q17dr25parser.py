@@ -3,6 +3,7 @@ import multiprocessing
 import sys
 from multiprocessing import Pool
 import pandas as pd
+import numpy as np
 from lcbuilder.star.KicStarCatalog import KicStarCatalog
 
 from preparation.parser_utils import CreateTargetInput, create_target_csv, create_star_csvs
@@ -12,11 +13,11 @@ def create_targets_df(tces_dir):
     # Merge TCEs DF and cumulative DF ignoring everything not from Kepler or K2
     # Mark TCEs as planet only if they have photometric and rv measurements
     tces_df = pd.read_csv(tces_dir + '/q1_q17_dr25_tce_2022.06.22_13.49.14.csv', comment='#')
-    tces_df['tce_period_round'] = tces_df['tce_period'].round(3)
+    tces_df['tce_period_round'] = tces_df['tce_period'].round(1)
     cum_df = pd.read_csv(tces_dir + '/cumulative_2022.05.31_02.29.20.csv', comment='#')
     cum_df['pl_name'] = cum_df['kepler_name']
     cum_df['tce_period'] = cum_df['koi_period']
-    cum_df['tce_period_round'] = cum_df['tce_period'].round(3)
+    cum_df['tce_period_round'] = cum_df['tce_period'].round(1)
     tces_df = pd.merge(tces_df, cum_df, on=['kepid', 'tce_period_round'], how='outer')
     disc_df = pd.read_csv(tces_dir + '/PSCompPars_2022.06.25_14.17.21.csv', comment='#')
     disc_df = disc_df[disc_df['disc_facility'] == 'Kepler']
@@ -32,9 +33,33 @@ def create_targets_df(tces_dir):
     disc_df.loc[disc_df['period'].isna(), 'period'] = disc_df[disc_df['period'].isna()]['tce_period_y']
     disc_df['epoch'] = disc_df['tce_time0bk']
     disc_df['duration(h)'] = disc_df['tce_duration']
-    disc_df.to_csv(tces_dir + '/classified_tces.csv')
-    disc_df = disc_df[disc_df['type'].isin(['fp', 'planet', 'planet_transit'])]
-    disc_df.to_csv(tces_dir + '/injected_objects.csv')
+    disc_df = disc_df.sort_values(by=["object_id", "period"], ascending=True)
+    last_target = ''
+    last_period = 0
+    last_index = -1
+    left_match_index = []
+    right_match_index = []
+    unpaired_index = disc_df.index.values
+    for index, target_row in disc_df.iterrows():
+        if last_target == target_row['object_id'] and np.abs(target_row['period'] - last_period) < 0.05 * last_period:
+            right_match_index = right_match_index + [index]
+            left_match_index = left_match_index + [last_index]
+            if last_index in unpaired_index:
+                unpaired_index = unpaired_index[unpaired_index != last_index]
+            if index in unpaired_index:
+                unpaired_index = unpaired_index[unpaired_index != index]
+        last_target = target_row['object_id']
+        last_period = target_row['period']
+        last_index = index
+    #disc_df = disc_df.loc[left_match_index].combine_first(disc_df.loc[right_match_index])
+    result_df = disc_df.loc[unpaired_index]
+    for i, index in enumerate(left_match_index):
+        result = disc_df.loc[index].combine_first(disc_df.loc[right_match_index[i]])
+        result_df = pd.concat([result_df, result.to_frame().T], ignore_index=True)
+    result_df.to_csv(tces_dir + '/classified_tces.csv')
+    #disc_df[disc_df['object_id'] == 'KIC 7377200'].iloc[0]['epoch']
+    result_df = disc_df[disc_df['type'].isin(['fp', 'planet', 'planet_transit'])]
+    result_df.to_csv(tces_dir + '/injected_objects.csv')
 
 
 def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_count() - 1):
@@ -62,7 +87,7 @@ handler.setFormatter(formatter)
 logger.addHandler(handler)
 
 home_dir = '/home/mdevora/'
-df_dir = '/home/mdevora/scratch/ml/q1_q17/'
+df_dir = '/mnt/DATA-2/q1_q17/'
 lcs_dir = df_dir + '/lcs/'
 cache_dir = home_dir
 cores = 1
@@ -70,8 +95,8 @@ cores = 1
 #uncompress_data('/mnt/DATA-2/ete6/ebs/EBs/')
 #uncompress_data('/mnt/DATA-2/ete6/planets/Planets/')
 #_create_star_csv(CreateStarCsvInput('/home/mdevora/scratch/ml/q1_q17/lcs/KIC 12106934_time_series_long.csv'))
-#create_targets_df(df_dir)
-create_target_csvs(df_dir + '/classified_tces.csv', lcs_dir, cache_dir, cores)
-create_star_csvs(lcs_dir, 50, 4, KicStarCatalog(), '*lc_long*.csv', "(KIC)_([0-9]+)_lc_long", cores)
+create_targets_df(df_dir)
+#create_target_csvs(df_dir + '/classified_tces.csv', lcs_dir, cache_dir, cores)
+#create_star_csvs(lcs_dir, 50, 4, KicStarCatalog(), '*lc_long*.csv', "(KIC)_([0-9]+)_lc_long", cores)
 
 #_create_target_csv(CreateTargetInput(lcs_dir + '/tess2019128220341-0000000230382377-0016-s_lc.fits', root_dir, pd.read_csv(root_dir + '/injected_objects.csv')))
