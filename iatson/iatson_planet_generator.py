@@ -13,7 +13,7 @@ import pandas as pd
 
 class IatsonPlanetModelGenerator(Ete6ModelGenerator):
     def __init__(self, injected_objects_df, lcs_dir, batch_size, input_sizes, type_to_label, zero_epsilon=1e-7,
-                 measurements_per_point=12, plot_inputs=False):
+                 measurements_per_point=12, plot_inputs=False, fixed_target_id=None):
         super().__init__(zero_epsilon)
         self.injected_objects_df = injected_objects_df
         self.lcs_dir = lcs_dir
@@ -23,6 +23,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
         self.measurements_per_point = measurements_per_point
         self.type_to_label = type_to_label
         self.plot_inputs = plot_inputs
+        self.fixed_target_id = fixed_target_id
 
     def __len__(self):
         return (np.ceil(len(self.injected_objects_df) / float(self.batch_size))).astype(int)
@@ -45,81 +46,106 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
 
     def _plot_input(self, input_array, input_err_array, type, scenario):
         if self.plot_inputs:
+            transposed_err_array = np.transpose(input_err_array)
+            transposed_array = np.transpose(input_array)
             fig, axs = plt.subplots(6, 2, figsize=(24, 12), constrained_layout=True)
-            current_array = np.transpose(input_array)[0]
-            current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            time_array = current_array
-            axs[0][0].scatter(np.arange(0, len(current_array[current_array_mask])), current_array[current_array_mask])
-            axs[0][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
-            axs[0][0].set_title("Time")
-            current_array = np.transpose(input_array)[1]
+            current_array = transposed_array[0]
             current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
             current_array = current_array[current_array_mask]
+            time_array = current_array
+            axs[0][0].scatter(np.arange(0, len(current_array)), current_array)
+            axs[0][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
+            axs[0][0].set_title("Time")
+            current_array = transposed_array[1]
+            current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
+            current_array = current_array[current_array_mask]
+            axs[0][1].errorbar(time_array[current_array_mask], current_array,
+                               yerr=transposed_err_array[1][current_array_mask], color="orange", alpha=0.5)
             axs[0][1].scatter(time_array[current_array_mask], current_array)
             axs[0][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
             axs[0][1].set_title("Flux")
-            current_array = np.transpose(input_array)[7]
+            current_array = transposed_array[7]
             current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
             current_array = current_array[current_array_mask]
+            axs[1][0].errorbar(time_array[current_array_mask], current_array,
+                               yerr=transposed_err_array[7][current_array_mask], color="orange", alpha=0.5)
             axs[1][0].scatter(time_array[current_array_mask], current_array)
             axs[1][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array),
                                np.mean(current_array) + 6 * np.std(current_array))
             axs[1][0].set_title("Flux 1")
-            current_array = np.transpose(input_array)[8]
+            current_array = transposed_array[8]
             current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
             current_array = current_array[current_array_mask]
+            axs[1][1].errorbar(time_array[current_array_mask], current_array,
+                               yerr=transposed_err_array[8][current_array_mask], color="orange", alpha=0.5)
             axs[1][1].scatter(time_array[current_array_mask], current_array)
             axs[1][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array),
                                np.mean(current_array) + 6 * np.std(current_array))
             axs[1][1].set_title("Flux 2")
-            current_array = np.transpose(input_array)[9]
+            current_array = transposed_array[9]
             current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
             current_array = current_array[current_array_mask]
+            axs[2][0].errorbar(time_array[current_array_mask], current_array,
+                               yerr=transposed_err_array[9][current_array_mask], color="orange", alpha=0.5)
             axs[2][0].scatter(time_array[current_array_mask], current_array)
             axs[2][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array),
                                np.mean(current_array) + 6 * np.std(current_array))
             axs[2][0].set_title("Flux 3")
-            current_array = np.transpose(input_array)[10]
+            current_array = transposed_array[10]
             current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
             current_array = current_array[current_array_mask]
+            axs[2][1].errorbar(time_array[current_array_mask], current_array,
+                               yerr=transposed_err_array[10][current_array_mask], color="orange", alpha=0.5)
             axs[2][1].scatter(time_array[current_array_mask], current_array)
             axs[2][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array),
                                np.mean(current_array) + 6 * np.std(current_array))
             axs[2][1].set_title("Flux 4")
-            current_array = np.transpose(input_array)[11]
+            current_array = transposed_array[11]
             current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
             current_array = current_array[current_array_mask]
+            axs[3][0].errorbar(time_array[current_array_mask], current_array,
+                               yerr=transposed_err_array[11][current_array_mask], color="orange", alpha=0.5)
             axs[3][0].scatter(time_array[current_array_mask], current_array)
             axs[3][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array),
                                np.mean(current_array) + 6 * np.std(current_array))
             axs[3][0].set_title("Flux 5")
-            current_array = np.transpose(input_array)[6]
+            current_array = transposed_array[6]
             current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
             current_array = current_array[current_array_mask]
+            axs[3][1].errorbar(time_array[current_array_mask], current_array,
+                               yerr=transposed_err_array[6][current_array_mask], color="orange", alpha=0.5)
             axs[3][1].scatter(time_array[current_array_mask], current_array)
             axs[3][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
             axs[3][1].set_title("Bck Flux")
-            current_array = np.transpose(input_array)[2]
+            current_array = transposed_array[2]
             current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
             current_array = current_array[current_array_mask]
+            axs[4][0].errorbar(time_array[current_array_mask], current_array,
+                               yerr=transposed_err_array[2][current_array_mask], color="orange", alpha=0.5)
             axs[4][0].scatter(time_array[current_array_mask], current_array)
             axs[4][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
             axs[4][0].set_title("Centroid X")
-            current_array = np.transpose(input_array)[3]
+            current_array = transposed_array[3]
             current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
             current_array = current_array[current_array_mask]
+            axs[4][1].errorbar(time_array[current_array_mask], current_array,
+                               yerr=transposed_err_array[3][current_array_mask], color="orange", alpha=0.5)
             axs[4][1].scatter(time_array[current_array_mask], current_array)
             axs[4][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
             axs[4][1].set_title("Centroid Y")
-            current_array = np.transpose(input_array)[4]
+            current_array = transposed_array[4]
             current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
             current_array = current_array[current_array_mask]
+            axs[5][0].errorbar(time_array[current_array_mask], current_array,
+                               yerr=transposed_err_array[4][current_array_mask], color="orange", alpha=0.5)
             axs[5][0].scatter(time_array[current_array_mask], current_array)
             axs[5][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
             axs[5][0].set_title("Motion Y")
-            current_array = np.transpose(input_array)[5]
+            current_array = transposed_array[5]
             current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
             current_array = current_array[current_array_mask]
+            axs[5][1].errorbar(time_array[current_array_mask], current_array,
+                               yerr=transposed_err_array[5][current_array_mask], color="orange", alpha=0.5)
             axs[5][1].scatter(time_array[current_array_mask], current_array)
             axs[5][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
             axs[5][1].set_title("Motion Y")
@@ -160,7 +186,8 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
         batch_data_values = np.empty((len(target_indexes), 1))
         i = 0
         for df_index, target_row in injected_objects_df.iterrows():
-            # target_row = self.injected_objects_df[self.injected_objects_df['object_id'] == 'KIC 3245969'].iloc[0]
+            if self.fixed_target_id is not None:
+                target_row = self.injected_objects_df[self.injected_objects_df['object_id'] == self.fixed_target_id].iloc[0]
             #TODO refactor to use mission for object_id
             object_id = target_row['object_id'].split(' ')
             mission_id = object_id[0]
@@ -315,5 +342,6 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
 # df = shuffle(df)
 # df.reset_index(inplace=True, drop=True)
 # img = IatsonPlanetModelGenerator(df, "/mnt/DATA-2/q1_q17/lcs", 20, [11, 135, 2500, 500, 500, 500, 500, 500, 500],
-#                                  {'fp': [0], 'planet': [1], 'planet_transit': [1]}, plot_inputs=True)
+#                                  {'fp': [0], 'planet': [1], 'planet_transit': [1]}, plot_inputs=True,
+#                                  fixed_target_id='KIC 3245969')
 # img.__getitem__(20)
