@@ -35,8 +35,9 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
                 # logging.exception("Error when interpolating, will create empty input array")
         return np.transpose(result)
 
-    def bin_by_time(self, array, new_size):
+    def bin_by_time(self, array, new_size, target):
         result = np.zeros((array.shape[1], new_size))
+        result_err = np.zeros((array.shape[1], new_size))
         transposed_array = np.transpose(array)
         time_array = transposed_array[0]
         for index, nested_array in enumerate(transposed_array):
@@ -52,10 +53,13 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
                     bin_centers = bin_edges[1:] - bin_width / 2
                     if np.max(result[0]) == 0:
                         result[0] = bin_centers
+                        result_err[0] = np.full((new_size), 0.5)
+                    # Store binning values for flux
                     result[index] = bin_means
+                    result_err[index] = bin_stds
                 except Exception as e:
-                    logging.exception("Error when interpolating, will create empty input array")
-        return np.transpose(np.nan_to_num(result))
+                    logging.exception("Error when interpolating for target " + str(target) + ", will create empty input array")
+        return np.transpose(np.nan_to_num(result)), np.transpose(np.nan_to_num(result_err))
 
     def _prepare_input_lc(self, input_df):
         time = input_df["#time"].to_numpy()
@@ -67,27 +71,29 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         previous_jump_index = 0
         epsilon = 1e-6
         for jumpIndex in jumps:
-            token = input_df["centroid_x"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["centroid_x"][previous_jump_index:jumpIndex] = token / (np.nanmedian(token) + epsilon)
-            token = input_df["centroid_y"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["centroid_y"][previous_jump_index:jumpIndex] = token / (np.nanmedian(token) + epsilon)
-            token = input_df["motion_x"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["motion_x"][previous_jump_index:jumpIndex] = token / (np.nanmedian(token) + epsilon)
-            token = input_df["motion_y"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["motion_y"][previous_jump_index:jumpIndex] = token / (np.nanmedian(token) + epsilon)
-            token = input_df["bck_flux"][previous_jump_index:jumpIndex].to_numpy()
-            input_df["bck_flux"][previous_jump_index:jumpIndex] = token / (np.nanmedian(token) + epsilon)
-            previous_jump_index = jumpIndex
+            token = input_df["centroid_x"][previous_jump_index:jumpIndex + 1].to_numpy()
+            input_df["centroid_x"][previous_jump_index:jumpIndex + 1] = token / (np.nanmedian(token) + epsilon)
+            token = input_df["centroid_y"][previous_jump_index:jumpIndex + 1].to_numpy()
+            input_df["centroid_y"][previous_jump_index:jumpIndex + 1] = token / (np.nanmedian(token) + epsilon)
+            token = input_df["motion_x"][previous_jump_index:jumpIndex + 1].to_numpy()
+            input_df["motion_x"][previous_jump_index:jumpIndex + 1] = token + 0.5
+            token = input_df["motion_y"][previous_jump_index:jumpIndex + 1].to_numpy()
+            input_df["motion_y"][previous_jump_index:jumpIndex + 1] = token + 0.5
+            token = input_df["bck_flux"][previous_jump_index:jumpIndex + 1].to_numpy()
+            input_df["bck_flux"][previous_jump_index:jumpIndex + 1] = token / (np.nanmedian(token) + epsilon)
+            previous_jump_index = jumpIndex + 1
         red_noise_freq = self.random_number_generator.uniform(0.01, 0.1)
         flux_std = np.std(input_df['flux'])
         red_noise_sd = self.random_number_generator.uniform(0, flux_std * 3)
         red_noise = timesynth.noise.RedNoise(std=red_noise_sd, tau=red_noise_freq)
-        timeseries_rn = []
-        for value in time:
-            rn_value = red_noise.sample_next(value, None, None)
-            rn_value = rn_value[0] if isinstance(rn_value, (list, np.ndarray)) else rn_value
-            timeseries_rn = timeseries_rn + [rn_value]
-        timeseries_rn = np.array(timeseries_rn)
+        timeseries_rn = np.zeros(len(time))
+        # TODO red noise algorithm is too slow for long time series
+        # timeseries_rn = []
+        # for value in time:
+        #     rn_value = red_noise.sample_next(value, None, None)
+        #     rn_value = rn_value[0] if isinstance(rn_value, (list, np.ndarray)) else rn_value
+        #     timeseries_rn = timeseries_rn + [rn_value]
+        # timeseries_rn = np.array(timeseries_rn)
         input_df['flux'] = input_df['flux'] + timeseries_rn
         input_df['flux_0'] = input_df['flux_0'] + timeseries_rn
         input_df['flux_1'] = input_df['flux_1'] + timeseries_rn
@@ -110,9 +116,7 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         input_df['centroid_x'][input_df['centroid_x'] > 1] = 1
         input_df['centroid_y'] = input_df['centroid_y'] / 2
         input_df['centroid_y'][input_df['centroid_y'] > 1] = 1
-        input_df['motion_x'] = input_df['motion_x'] / 2
         input_df['motion_x'][input_df['motion_x'] > 1] = 1
-        input_df['motion_y'] = input_df['motion_y'] / 2
         input_df['motion_y'][input_df['motion_y'] > 1] = 1
         input_df['bck_flux'] = input_df['bck_flux'] / 2
         input_df['bck_flux'][input_df['bck_flux'] > 1] = 1
