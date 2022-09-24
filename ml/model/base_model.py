@@ -378,7 +378,7 @@ class HyperParams:
               gradient_clip_norm=0.01, gradient_clip_value=0.5, cores=0, metrics=[], callbacks=[], learning_rate_decay=0.98,
               learning_rate_schedule=None, balance_class_id=None, balance_class_sampling=None,
               class_loss_weights=None, early_stopping_delta=0, early_stopping_patience=0,
-              custom_loss=None, run_eagerly=False) -> None:
+              custom_loss=None, run_eagerly=False, dropout_rate=0.1) -> None:
         super().__init__()
         self.batch_size = batch_size
         self.epochs = epochs
@@ -403,6 +403,7 @@ class HyperParams:
         self.early_stopping_patience = early_stopping_patience
         self.custom_loss = custom_loss
         self.run_eagerly = run_eagerly
+        self.dropout_rate = dropout_rate
 
 
 class CategoricalPredictionSetStats:
