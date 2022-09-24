@@ -49,6 +49,8 @@ class IATSON_planet(ImbalancedBinaryModel):
         leaky_relu_alpha = 0.01
         flux_input = keras.Input(shape=(self.input_size[2], self.channels), name=name)
         flux_err_input = keras.Input(shape=(self.input_size[2], self.channels), name=name + "_err")
+        flux_input = keras.layers.GaussianNoise(flux_input, stddev=0.01)
+        flux_err_input = keras.layers.GaussianNoise(flux_err_input, stddev=0.1)
         flux_input_final = keras.layers.concatenate([flux_input, flux_err_input], axis=2)
         flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_input_final)
         flux_branch = keras.layers.SpatialDropout1D(rate=0.1)(flux_branch)
@@ -88,6 +90,8 @@ class IATSON_planet(ImbalancedBinaryModel):
         focus_flux_input = keras.Input(shape=(self.input_size[3], self.channels), name=name)
         focus_flux_err_input = keras.Input(shape=(self.input_size[3], self.channels), name=name + "_err")
         focus_flux_input_final = keras.layers.concatenate([focus_flux_input, focus_flux_err_input], axis=2)
+        focus_flux_input = keras.layers.GaussianNoise(focus_flux_input, stddev=0.01)
+        focus_flux_err_input = keras.layers.GaussianNoise(focus_flux_err_input, stddev=0.1)
         focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_input_final)
         # (time, flux, detrended_flux1... detrended_flux5, flux_model, centroidx, centroidy, motionx, motiony, bck)
         # flux model by transit params and stellar params
