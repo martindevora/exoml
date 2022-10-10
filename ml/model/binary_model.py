@@ -11,8 +11,8 @@ import matplotlib.pyplot as plt
 
 
 class BinaryModel(BaseModel):
-    def __init__(self, name, input_size, class_ids, type_to_label, dropout_rate) -> None:
-        super().__init__(name, input_size, class_ids, type_to_label, dropout_rate)
+    def __init__(self, name, input_size, class_ids, type_to_label, hyperparams) -> None:
+        super().__init__(name, input_size, class_ids, type_to_label, hyperparams)
 
     def instance_loss_accuracy(self):
         return binary_focal_loss, BinaryAccuracy()

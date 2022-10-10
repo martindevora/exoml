@@ -13,8 +13,8 @@ from ml.model.imbalanced_categorical_model import ImbalancedCategoricalModel
 
 
 class IATSON(ImbalancedCategoricalModel):
-    def __init__(self, class_ids, class_names) -> None:
-        super().__init__(class_names, 'IATSON', [11, 9 * 15, 2500, 500, 500, 500, 500, 500, 500], class_ids)
+    def __init__(self, class_ids, class_names, dropout_rate=0.1) -> None:
+        super().__init__(class_names, 'IATSON', [11, 9 * 15, 2500, 500, 500, 500, 500, 500, 500], class_ids, dropout_rate)
         self.class_names = class_names
 
     def _get_flux_conv_branch(self, name):
@@ -23,32 +23,42 @@ class IATSON(ImbalancedCategoricalModel):
         leaky_relu_alpha = 0.01
         flux_input = keras.Input(shape=(2500, 13), name=name)
         flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_input)
-        flux_branch = keras.layers.SpatialDropout1D(rate=0.1)(flux_branch)
-        flux_branch = keras.layers.Conv1D(filters=128, kernel_size=9, padding="same",
+        flux_branch = keras.layers.SpatialDropout1D(rate=self.dropout_rate)(flux_branch)
+        flux_branch = keras.layers.Conv1D(filters=512, kernel_size=5, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
-        flux_branch = keras.layers.MaxPooling1D(pool_size=10, strides=6)(flux_branch)
+        flux_branch = keras.layers.MaxPooling1D(pool_size=5, strides=3)(flux_branch)
         flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
-        flux_branch = keras.layers.Dropout(rate=0.1)(flux_branch)
-        flux_branch = keras.layers.Conv1D(filters=64, kernel_size=7, padding="same",
+        flux_branch = keras.layers.SpatialDropout1D(rate=self.dropout_rate)(flux_branch)
+        flux_branch = keras.layers.Conv1D(filters=256, kernel_size=5, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
-        flux_branch = keras.layers.MaxPooling1D(pool_size=4, strides=3)(flux_branch)
+        flux_branch = keras.layers.MaxPooling1D(pool_size=5, strides=2)(flux_branch)
         flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
-        flux_branch = keras.layers.Dropout(rate=0.1)(flux_branch)
-        flux_branch = keras.layers.Conv1D(filters=32, kernel_size=5, padding="same",
+        flux_branch = keras.layers.SpatialDropout1D(rate=self.dropout_rate)(flux_branch)
+        flux_branch = keras.layers.Conv1D(filters=128, kernel_size=5, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
-        flux_branch = keras.layers.MaxPooling1D(pool_size=3, strides=3)(flux_branch)
+        flux_branch = keras.layers.MaxPooling1D(pool_size=5, strides=2)(flux_branch)
         flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
-        flux_branch = keras.layers.Dropout(rate=0.1)(flux_branch)
+        flux_branch = keras.layers.SpatialDropout1D(rate=self.dropout_rate)(flux_branch)
+        flux_branch = keras.layers.Conv1D(filters=64, kernel_size=4, padding="same",
+                                          activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
+        flux_branch = keras.layers.MaxPooling1D(pool_size=4, strides=2)(flux_branch)
+        flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
+        flux_branch = keras.layers.SpatialDropout1D(rate=self.dropout_rate)(flux_branch)
+        flux_branch = keras.layers.Conv1D(filters=32, kernel_size=3, padding="same",
+                                          activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
+        flux_branch = keras.layers.MaxPooling1D(pool_size=3, strides=2)(flux_branch)
+        flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
+        flux_branch = keras.layers.SpatialDropout1D(rate=self.dropout_rate)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=16, kernel_size=3, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
-        flux_branch = keras.layers.MaxPooling1D(pool_size=2, strides=2)(flux_branch)
+        flux_branch = keras.layers.MaxPooling1D(pool_size=3, strides=2)(flux_branch)
         return flux_input, flux_branch
 
     def _get_flux_model_branch(self):
         leaky_relu_alpha = 0.01
         flux_input, flux_branch = self._get_flux_conv_branch("global_flux_branch")
         flux_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
-        flux_branch = keras.layers.Dropout(rate=0.1)(flux_branch)
+        flux_branch = keras.layers.Dropout(rate=self.dropout_rate)(flux_branch)
         flux_branch = keras.layers.Dense(16, activation='linear')(flux_branch)
         flux_branch = keras.layers.LayerNormalization()(flux_branch)
         flux_branch = keras.Model(inputs=[flux_input], outputs=flux_branch)
@@ -60,20 +70,44 @@ class IATSON(ImbalancedCategoricalModel):
         focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_input)
         # (time, flux, detrended_flux1... detrended_flux5, flux_model, centroidx, centroidy, motionx, motiony, bck)
         # flux model by transit params and stellar params
-        focus_flux_branch = keras.layers.SpatialDropout1D(rate=0.1)(focus_flux_branch)
-        focus_flux_branch = keras.layers.Conv1D(filters=64, kernel_size=5, padding="same",
+        focus_flux_branch = keras.layers.SpatialDropout1D(rate=self.dropout_rate)(focus_flux_branch)
+        focus_flux_branch = keras.layers.Conv1D(filters=256, kernel_size=10, padding="same",
                                                 activation=LeakyReLU(leaky_relu_alpha), use_bias=True)(
             focus_flux_branch)
-        focus_flux_branch = keras.layers.MaxPooling1D(pool_size=5, strides=3)(focus_flux_branch)
+        focus_flux_branch = keras.layers.MaxPooling1D(pool_size=10, strides=2)(focus_flux_branch)
         focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_branch)
-        focus_flux_branch = keras.layers.Dropout(rate=0.1)(focus_flux_branch)
+        focus_flux_branch = keras.layers.SpatialDropout1D(rate=self.dropout_rate)(focus_flux_branch)
+        focus_flux_branch = keras.layers.Conv1D(filters=128, kernel_size=6, padding="same",
+                                                activation=LeakyReLU(leaky_relu_alpha), use_bias=True)(
+            focus_flux_branch)
+        focus_flux_branch = keras.layers.MaxPooling1D(pool_size=6, strides=2)(focus_flux_branch)
+        focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_branch)
+        focus_flux_branch = keras.layers.SpatialDropout1D(rate=self.dropout_rate)(focus_flux_branch)
+        focus_flux_branch = keras.layers.Conv1D(filters=64, kernel_size=3, padding="same",
+                                                activation=LeakyReLU(leaky_relu_alpha), use_bias=True)(
+            focus_flux_branch)
+        focus_flux_branch = keras.layers.MaxPooling1D(pool_size=3, strides=2)(focus_flux_branch)
+        focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_branch)
+        focus_flux_branch = keras.layers.SpatialDropout1D(rate=self.dropout_rate)(focus_flux_branch)
         focus_flux_branch = keras.layers.Conv1D(filters=32, kernel_size=3, padding="same",
                                                 activation=LeakyReLU(leaky_relu_alpha), use_bias=True)(
             focus_flux_branch)
+        focus_flux_branch = keras.layers.MaxPooling1D(pool_size=3, strides=2)(focus_flux_branch)
         focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_branch)
-        focus_flux_branch = keras.layers.MaxPooling1D(pool_size=3, strides=3)(focus_flux_branch)
+        focus_flux_branch = keras.layers.SpatialDropout1D(rate=self.dropout_rate)(focus_flux_branch)
+        focus_flux_branch = keras.layers.Conv1D(filters=16, kernel_size=2, padding="same",
+                                                activation=LeakyReLU(leaky_relu_alpha), use_bias=True)(
+            focus_flux_branch)
+        focus_flux_branch = keras.layers.MaxPooling1D(pool_size=2, strides=2)(focus_flux_branch)
+        focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_branch)
+        focus_flux_branch = keras.layers.SpatialDropout1D(rate=self.dropout_rate)(focus_flux_branch)
+        focus_flux_branch = keras.layers.Conv1D(filters=9, kernel_size=2, padding="same",
+                                                activation=LeakyReLU(leaky_relu_alpha), use_bias=True)(
+            focus_flux_branch)
+        focus_flux_branch = keras.layers.MaxPooling1D(pool_size=2, strides=2)(focus_flux_branch)
+        focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_branch)
         focus_flux_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha))(focus_flux_branch)
-        focus_flux_branch = keras.layers.Dropout(rate=0.1)(focus_flux_branch)
+        focus_flux_branch = keras.layers.Dropout(rate=self.dropout_rate)(focus_flux_branch)
         focus_flux_branch = keras.layers.LayerNormalization()(focus_flux_branch)
         return focus_flux_input, focus_flux_branch
 
@@ -92,16 +126,16 @@ class IATSON(ImbalancedCategoricalModel):
         even_flux_branch = keras.layers.Add()(
             [even_flux_branch, harmonic_even_flux_branch, subharmonic_even_flux_branch])
         odd_flux_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha))(odd_flux_branch)
-        odd_flux_branch = keras.layers.Dropout(rate=0.1)(odd_flux_branch)
+        odd_flux_branch = keras.layers.Dropout(rate=self.dropout_rate)(odd_flux_branch)
         even_flux_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha))(even_flux_branch)
-        even_flux_branch = keras.layers.Dropout(rate=0.1)(even_flux_branch)
+        even_flux_branch = keras.layers.Dropout(rate=self.dropout_rate)(even_flux_branch)
         odd_flux_branch = keras.layers.Dense(32, activation='linear')(odd_flux_branch)
         even_flux_branch = keras.layers.Dense(32, activation='linear')(even_flux_branch)
         odd_flux_branch = keras.layers.LayerNormalization()(odd_flux_branch)
         even_flux_branch = keras.layers.LayerNormalization()(even_flux_branch)
         focus_flux_branch = keras.layers.Add()([odd_flux_branch, even_flux_branch])
         focus_flux_branch = keras.layers.Dense(24, activation=LeakyReLU(leaky_relu_alpha))(focus_flux_branch)
-        focus_flux_branch = keras.layers.Dropout(rate=0.1)(focus_flux_branch)
+        focus_flux_branch = keras.layers.Dropout(rate=self.dropout_rate)(focus_flux_branch)
         focus_flux_branch = keras.layers.Dense(16, activation='linear')(focus_flux_branch)
         input = [even_flux_input, odd_flux_input, subharmonic_even_flux_input, subharmonic_odd_flux_input,
                  harmonic_even_flux_input, harmonic_odd_flux_input]
@@ -193,17 +227,17 @@ class IATSON(ImbalancedCategoricalModel):
         stellar_model_input = keras.Input(shape=(11, 1), name="stellar_model")
         stellar_model_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha), name="stellar-first")(
             stellar_model_input)
-        stellar_model_branch = keras.layers.Dropout(rate=0.1, name="stellar-first-dropout-0.1")(stellar_model_branch)
+        stellar_model_branch = keras.layers.Dropout(rate=self.dropout_rate, name="stellar-first-dropout-0.1")(stellar_model_branch)
         stellar_model_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha), name="stellar-refinement")(
             stellar_model_branch)
         #(TEFF, lum, 4 magnitudes, distance, radius, mass) * 15 stars
         stellar_neighbours_input = keras.Input(shape=(9 * 15, 1), name="stellar_neighbours_model")
         stellar_neighbours_branch = keras.layers.Dense(100, activation=LeakyReLU(leaky_relu_alpha), name="stellar-neighbours-1")(
             stellar_neighbours_input)
-        stellar_neighbours_branch = keras.layers.Dropout(rate=0.1, name="stellar-neighbours-1-dropout-0.1")(stellar_neighbours_branch)
+        stellar_neighbours_branch = keras.layers.Dropout(rate=self.dropout_rate, name="stellar-neighbours-1-dropout-0.1")(stellar_neighbours_branch)
         stellar_neighbours_branch = keras.layers.Dense(50, activation=LeakyReLU(leaky_relu_alpha), name="stellar-neighbours-2")(
             stellar_neighbours_branch)
-        stellar_neighbours_branch = keras.layers.Dropout(rate=0.1, name="stellar-neighbours-2-dropout-0.1")(stellar_neighbours_branch)
+        stellar_neighbours_branch = keras.layers.Dropout(rate=self.dropout_rate, name="stellar-neighbours-2-dropout-0.1")(stellar_neighbours_branch)
         stellar_neighbours_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha), name="stellar-neighbours_3")(
             stellar_neighbours_branch)
         flux_model_branch = self._get_flux_model_branch()
@@ -212,9 +246,9 @@ class IATSON(ImbalancedCategoricalModel):
             [stellar_model_branch, stellar_neighbours_branch, flux_model_branch.output, focus_flux_model_branch.output])
         final_branch = keras.layers.GlobalAveragePooling1D()(final_branch)
         final_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha), name="final-dense1")(final_branch)
-        final_branch = keras.layers.Dropout(rate=0.1)(final_branch)
+        final_branch = keras.layers.Dropout(rate=self.dropout_rate)(final_branch)
         final_branch = keras.layers.Dense(32, activation=LeakyReLU(leaky_relu_alpha), name="final-dense2")(final_branch)
-        final_branch = keras.layers.Dropout(rate=0.1)(final_branch)
+        final_branch = keras.layers.Dropout(rate=self.dropout_rate)(final_branch)
         final_branch = keras.layers.Dense(4, activation="softmax", name="final-dense-softmax")(final_branch)
         inputs = [stellar_model_input, stellar_neighbours_input] + flux_model_branch.inputs + focus_flux_model_branch.inputs
         self.set_model(keras.Model(inputs=inputs, outputs=final_branch, name="IATSON"))

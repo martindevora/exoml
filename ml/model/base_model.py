@@ -28,7 +28,7 @@ class BaseModel(WithLogging):
 
     model = None
 
-    def __init__(self, name, input_size, class_ids, type_to_label, dropout_rate=0.1) -> None:
+    def __init__(self, name, input_size, class_ids, type_to_label, hyperparams) -> None:
         super().__init__()
         self.name = name
         self.input_size = input_size
@@ -37,7 +37,7 @@ class BaseModel(WithLogging):
                 else [class_ids[class_id]]
         self.class_ids = class_ids
         self.type_to_label = type_to_label
-        self.dropout_rate = dropout_rate
+        self.hyperparams = hyperparams
 
     @abstractmethod
     def build(self, **kwargs):
@@ -378,7 +378,7 @@ class HyperParams:
               gradient_clip_norm=0.01, gradient_clip_value=0.5, cores=0, metrics=[], callbacks=[], learning_rate_decay=0.98,
               learning_rate_schedule=None, balance_class_id=None, balance_class_sampling=None,
               class_loss_weights=None, early_stopping_delta=0, early_stopping_patience=0,
-              custom_loss=None, run_eagerly=False, dropout_rate=0.1) -> None:
+              custom_loss=None, run_eagerly=False, dropout_rate=0.1, white_noise_std=None) -> None:
         super().__init__()
         self.batch_size = batch_size
         self.epochs = epochs
@@ -404,6 +404,7 @@ class HyperParams:
         self.custom_loss = custom_loss
         self.run_eagerly = run_eagerly
         self.dropout_rate = dropout_rate
+        self.white_noise_std = white_noise_std
 
 
 class CategoricalPredictionSetStats:
