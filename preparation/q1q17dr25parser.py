@@ -6,14 +6,16 @@ import pandas as pd
 import numpy as np
 from lcbuilder.star.KicStarCatalog import KicStarCatalog
 
-from preparation.parser_utils import CreateTargetInput, create_target_csv, create_star_csvs
+from preparation.parser_utils import CreateStarCsvInput, CreateTargetInput, create_target_csv, create_star_csvs, create_star_csv
 
 
 def create_targets_df(tces_dir):
     # Merge TCEs DF and cumulative DF ignoring everything not from Kepler or K2
     # Mark TCEs as planet only if they have photometric and rv measurements
-    # test_df = pd.read_csv(tces_dir + '/injected_objects.csv', comment='#')
+    # test_df = pd.read_csv(tces_dir + '/classified_tces.csv', comment='#')
     # test_df = test_df.sort_values(by=["object_id", "period"], ascending=True)
+    # test_df = test_df[test_df['type'].isin(['fp', 'planet', 'planet_transit', 'tce'])]
+    # test_df.to_csv(tces_dir + '/injected_objects_tces.csv')
     tces_df = pd.read_csv(tces_dir + '/q1_q17_dr25_tce_2022.09.13_14.23.37.csv', comment='#')
     tces_df['tce_period_round'] = tces_df['tce_period'].round(1)
     cum_df = pd.read_csv(tces_dir + '/cumulative_2022.09.13_14.24.29.csv', comment='#')
@@ -67,6 +69,11 @@ def create_targets_df(tces_dir):
     result_df.drop(result_df[result_df['duration(h)'].isnull()].index, inplace=True)
     result_df.to_csv(tces_dir + '/classified_tces.csv')
     #disc_df[disc_df['object_id'] == 'KIC 7377200'].iloc[0]['epoch']
+    result_df = disc_df[disc_df['type'].isin(['fp', 'planet', 'planet_transit', 'tce'])]
+    result_df = result_df[result_df['object_id'] != 'KIC 100001645'] #This KIC doesn't seem to exist
+    #TODO this next statement is to prevent confirmed planets not matching any tce nor koi
+    #result_df = result_df[~result_df['object_id'].str.contains('<NA')]
+    result_df.to_csv(tces_dir + '/injected_objects_tces.csv')
     result_df = disc_df[disc_df['type'].isin(['fp', 'planet', 'planet_transit'])]
     result_df.to_csv(tces_dir + '/injected_objects.csv')
 
@@ -94,17 +101,17 @@ handler.setLevel(logging.INFO)
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-home_dir = '/home/mdevora/'
-df_dir = '/home/mdevora/scratch/ml/q1_q17/'
+home_dir = '/home/martin/'
+df_dir = '/mnt/DATA-2/q1_q17/'
 lcs_dir = df_dir + '/lcs/'
 cache_dir = home_dir
 cores = 3
 #uncompress_data('/mnt/DATA-2/ete6/backebs/BackEBs/')
 #uncompress_data('/mnt/DATA-2/ete6/ebs/EBs/')
 #uncompress_data('/mnt/DATA-2/ete6/planets/Planets/')
-#_create_star_csv(CreateStarCsvInput('/home/mdevora/scratch/ml/q1_q17/lcs/KIC 12106934_time_series_long.csv'))
+#create_star_csv(CreateStarCsvInput('/home/mdevora/scratch/ml/q1_q17/lcs/KIC_100001645_lc_long.csv', 20.25, 6.5, "(KIC)_([0-9]+)_lc_long", KicStarCatalog(), lcs_dir))
 #create_targets_df(df_dir)
-create_target_csvs(df_dir + '/injected_objects.csv', lcs_dir, cache_dir, cores)
+#create_target_csvs(df_dir + '/classified_tces.csv', lcs_dir, cache_dir, cores)
 #create_star_csvs(lcs_dir, 50, 4, KicStarCatalog(), '*lc_long*.csv', "(KIC)_([0-9]+)_lc_long", cores)
 
 #_create_target_csv(CreateTargetInput(lcs_dir + '/tess2019128220341-0000000230382377-0016-s_lc.fits', root_dir, pd.read_csv(root_dir + '/injected_objects.csv')))
