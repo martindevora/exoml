@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 
 import matplotlib.pyplot as plt
 import foldedleastsquares
@@ -13,7 +14,8 @@ import pandas as pd
 
 class IatsonPlanetModelGenerator(Ete6ModelGenerator):
     def __init__(self, injected_objects_df, lcs_dir, batch_size, input_sizes, type_to_label, zero_epsilon=1e-7,
-                 measurements_per_point=12, plot_inputs=False, fixed_target_id=None):
+                 measurements_per_point=12, plot_inputs=False, fixed_target_id=None, store_arrays=False,
+                 from_arrays=True):
         super().__init__(zero_epsilon)
         self.injected_objects_df = injected_objects_df
         self.lcs_dir = lcs_dir
@@ -24,6 +26,8 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
         self.type_to_label = type_to_label
         self.plot_inputs = plot_inputs
         self.fixed_target_id = fixed_target_id
+        self.store_arrays = store_arrays
+        self.from_arrays = from_arrays
 
     def __len__(self):
         return (np.ceil(len(self.injected_objects_df) / float(self.batch_size))).astype(int)
@@ -192,145 +196,186 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
             object_id = target_row['object_id'].split(' ')
             mission_id = object_id[0]
             target_id = int(object_id[1])
-            #TODO refactor to use mission for _lc files
-            lc_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_lc.csv'
-            lc_short_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_lc_short.csv'
-            lc_long_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_lc_long.csv'
-            lc_df = None
-            if os.path.exists(lc_filename):
-                read_df = pd.read_csv(lc_filename, usecols=['#time', 'flux', 'flux_0', 'flux_1',
-                                                              'flux_2', 'flux_3', 'flux_4',
-                                                              'centroid_x', 'centroid_y', 'motion_x', 'motion_y',
-                                                              'bck_flux'], low_memory=True)
-                lc_df = read_df if lc_df is None else lc_df.append(read_df, ignore_index=True)
-            if os.path.exists(lc_long_filename):
-                read_df = pd.read_csv(lc_long_filename, usecols=['#time', 'flux', 'flux_0', 'flux_1',
-                                                            'flux_2', 'flux_3', 'flux_4',
-                                                            'centroid_x', 'centroid_y', 'motion_x', 'motion_y',
-                                                            'bck_flux'], low_memory=True)
-                lc_df = read_df if lc_df is None else lc_df.append(read_df, ignore_index=True)
-            if os.path.exists(lc_short_filename):
-                read_df = pd.read_csv(lc_short_filename, usecols=['#time', 'flux', 'flux_0', 'flux_1',
-                                                            'flux_2', 'flux_3', 'flux_4',
-                                                            'centroid_x', 'centroid_y', 'motion_x', 'motion_y',
-                                                            'bck_flux'], low_memory=True)
-                lc_df = read_df if lc_df is None else lc_df.append(read_df, ignore_index=True)
-            if lc_df is None:
-                logging.warning("No curve for target " + str(target_row['object_id']))
-            assert lc_df is not None
-            lc_df = lc_df.sort_values(by=['#time'])
-            #TODO refactor to use mission for star files
-            star_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_star.csv'
-            star_neighbours_df = pd.read_csv(star_filename,
-                                             usecols=['Teff', 'lum', 'v', 'j', 'k', 'h', 'radius', 'mass',
-                                                      'dist_arcsec'], index_col=False)
-            star_neighbours_df = self._prepare_input_neighbour_stars(star_neighbours_df)
-            star_df = pd.read_csv(star_filename, index_col=False)
-            star_df = self._prepare_input_star(star_df)
-            lc_df = self._prepare_input_lc(lc_df)
+            period = target_row['period']
             type = target_row['type']
             batch_data_values[i] = self.type_to_label[type]
-            not_null_times_args = np.argwhere(lc_df['#time'].to_numpy() > 0).flatten()
-            lc_df = lc_df.iloc[not_null_times_args]
-            period = target_row['period']
-            epoch = target_row['epoch']
-            duration = target_row['duration(h)'] / 24
-            duration_to_period = duration / period
-            #['ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k'])
-            neighbours_array = star_neighbours_df.to_numpy().flatten()
-            star_neighbours_array[i] = np.transpose([neighbours_array if len(neighbours_array) == 9 * 15 \
-                else neighbours_array + np.zeros(9 * 15 - len(neighbours_array))])
-            star_array[i] = np.transpose([star_df.to_numpy()])
-            time = lc_df['#time'].to_numpy()
-            # Global flux
-            # Shifting data 1/4 so that main transit and possible occultation don't get cut by the borders
-            lc_df_sorted_fold = lc_df.copy()
-            lc_df_sorted_fold['#time'] = foldedleastsquares.fold(time, period, epoch + period / 4)
-            lc_df_sorted_fold = lc_df_sorted_fold.sort_values(by=['#time'])
-            global_flux_array[i], global_flux_array_err[i] = \
-                self.bin_by_time(lc_df_sorted_fold.to_numpy(), self.input_sizes[2], target_row['object_id'])
-            self._plot_input(global_flux_array[i], global_flux_array_err[i], type, "global")
-            # Focus flux even
-            lc_df_focus = lc_df.copy()
-            lc_df_focus['#time'] = foldedleastsquares.fold(time, period, epoch)
-            lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-            lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 2) &
-                                      (lc_df_focus['#time'] < 0.5 + duration_to_period * 2)]
-            folded_flux_even_array[i], folded_flux_even_array_err[i] = \
-                self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[3], target_row['object_id'])
-            self._plot_input(folded_flux_even_array[i], folded_flux_even_array_err[i], type, "even")
-            # Focus flux odd
-            lc_df_focus = lc_df.copy()
-            lc_df_focus['#time'] = foldedleastsquares.fold(time, period, epoch + period / 2)
-            lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-            lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                      (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-            folded_flux_odd_array[i], folded_flux_odd_array_err[i] = \
-                self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[4], target_row['object_id'])
-            self._plot_input(folded_flux_odd_array[i], folded_flux_odd_array_err[i], type, "odd")
-            # Focus flux sub-harmonic even
-            lc_df_focus = lc_df.copy()
-            lc_df_focus['#time'] = foldedleastsquares.fold(time, period / 2, epoch)
-            lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-            lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                      (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-            folded_flux_even_subhar_array[i], folded_flux_even_subhar_array_err[i] = \
-                self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[5], target_row['object_id'])
-            self._plot_input(folded_flux_even_subhar_array[i], folded_flux_even_subhar_array_err[i], type, "even_subhar")
-            # Focus flux sub-harmonic odd
-            lc_df_focus = lc_df.copy()
-            lc_df_focus['#time'] = foldedleastsquares.fold(time, period / 2, epoch + period / 4)
-            lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-            lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                      (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-            folded_flux_odd_subhar_array[i], folded_flux_odd_subhar_array_err[i] = \
-                self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[6], target_row['object_id'])
-            self._plot_input(folded_flux_odd_subhar_array[i], folded_flux_odd_subhar_array_err[i], type, "odd_subhar")
-            # Focus flux harmonic even
-            lc_df_focus = lc_df.copy()
-            lc_df_focus['#time'] = foldedleastsquares.fold(time, period * 2, epoch)
-            lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-            lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                      (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-            folded_flux_even_har_array[i], folded_flux_even_har_array_err[i] = \
-                self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[7], target_row['object_id'])
-            self._plot_input(folded_flux_even_har_array[i], folded_flux_even_har_array[i], type, "even_har")
-            # Focus flux harmonic odd
-            lc_df_focus = lc_df.copy()
-            lc_df_focus['#time'] = foldedleastsquares.fold(time, period * 2, epoch + period * 3 / 2)
-            lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-            lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                      (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-            folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i] = \
-                self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[8], target_row['object_id'])
-            self._plot_input(folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i], type, "odd_har")
-            if np.max(global_flux_array[i]) >= 2:
-                logging.error("Wrong flux value for target " + str(target_row['object_id']))
-            assert np.max(global_flux_array[i]) < 2
-            assert not np.isnan(star_array[i]).any() and not np.isinf(star_array[i]).any()
-            assert not np.isnan(global_flux_array[i]).any() and not np.isinf(global_flux_array[i]).any()
-            assert not np.isnan(folded_flux_even_array[i]).any() and not np.isinf(folded_flux_even_array[i]).any()
-            assert not np.isnan(folded_flux_odd_array[i]).any() and not np.isinf(folded_flux_odd_array[i]).any()
-            assert not np.isnan(folded_flux_even_subhar_array[i]).any() and not np.isinf(folded_flux_even_subhar_array[i]).any()
-            assert not np.isnan(folded_flux_odd_subhar_array[i]).any() and not np.isinf(folded_flux_odd_subhar_array[i]).any()
-            assert not np.isnan(folded_flux_even_har_array[i]).any() and not np.isinf(folded_flux_even_har_array[i]).any()
-            assert not np.isnan(folded_flux_odd_har_array[i]).any() and not np.isinf(folded_flux_odd_har_array[i]).any()
-            # logging.info("GENERATOR Star Inputs max " + str(np.max(star_array[i])) + " and min " +
-            #              str(np.min(star_array[i])))
-            # logging.info("GENERATOR Global Flux Inputs max " + str(np.max(global_flux_array[i])) + " and min " +
-            #              str(np.min(global_flux_array[i])))
-            # logging.info("GENERATOR Folded Even Inputs max " + str(np.max(folded_flux_even_array[i])) + " and min " +
-            #              str(np.min(folded_flux_even_array[i])))
-            # logging.info("GENERATOR Folded Odd Inputs max " + str(np.max(folded_flux_odd_array[i])) + " and min " +
-            #              str(np.min(folded_flux_odd_array[i])))
-            # logging.info("GENERATOR Folded Even Subhar Inputs max " + str(np.max(folded_flux_even_subhar_array[i])) +
-            #              " and min " + str(np.min(folded_flux_even_subhar_array[i])))
-            # logging.info("GENERATOR Folded Odd Subhar Inputs max " + str(np.max(folded_flux_odd_subhar_array[i])) +
-            #              " and min " + str(np.min(folded_flux_odd_subhar_array[i])))
-            # logging.info("GENERATOR Folded Even Har Inputs max " + str(np.max(folded_flux_even_har_array[i])) +
-            #              " and min " + str(np.min(folded_flux_even_har_array[i])))
-            # logging.info("GENERATOR Folded Odd Har Inputs max " + str(np.max(folded_flux_odd_har_array[i])) +
-            #              " and min " + str(np.min(folded_flux_odd_har_array[i])))
+            file_prefix = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_' + str(np.round(period, 2))
+            if self.from_arrays:
+                file_prefix = self.lcs_dir + '/' + mission_id + '_' + str(target_id)
+                star_array[i] = np.loadtxt(file_prefix + '_input_star.csv', delimiter=',')
+                star_neighbours_array[i] = np.loadtxt(file_prefix + '_input_nb.csv', delimiter=',')
+                global_flux_array[i] = np.loadtxt(file_prefix + '_input_global.csv', delimiter=',')
+                global_flux_array_err[i] = np.loadtxt(file_prefix + '_input_global_err.csv', delimiter=',')
+                folded_flux_even_array[i] = np.loadtxt(file_prefix + '_input_even.csv', delimiter=',')
+                folded_flux_even_array_err[i] = np.loadtxt(file_prefix + '_input_even_err.csv', delimiter=',')
+                folded_flux_odd_array[i] = np.loadtxt(file_prefix + '_input_odd.csv', delimiter=',')
+                folded_flux_odd_array_err[i] = np.loadtxt(file_prefix + '_input_odd_err.csv', delimiter=',')
+                folded_flux_even_subhar_array[i] = np.loadtxt(file_prefix + '_input_even_sh.csv', delimiter=',')
+                folded_flux_even_subhar_array_err[i] = np.loadtxt(file_prefix + '_input_even_sh_err.csv', delimiter=',')
+                folded_flux_odd_subhar_array[i] = np.loadtxt(file_prefix + '_input_odd_sh.csv', delimiter=',')
+                folded_flux_odd_subhar_array_err[i] = np.loadtxt(file_prefix + '_input_odd_sh_err.csv', delimiter=',')
+                folded_flux_even_har_array[i] = np.loadtxt(file_prefix + '_input_even_h.csv', delimiter=',')
+                folded_flux_even_har_array_err[i] = np.loadtxt(file_prefix + '_input_even_h_err.csv', delimiter=',')
+                folded_flux_odd_har_array[i] = np.loadtxt(file_prefix + '_input_odd_h.csv', delimiter=',')
+                folded_flux_odd_har_array_err[i] = np.loadtxt(file_prefix + '_input_odd_h_err.csv', delimiter=',')
+            else:
+                #TODO refactor to use mission for _lc files
+                lc_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_lc.csv'
+                lc_short_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_lc_short.csv'
+                lc_long_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_lc_long.csv'
+                lc_df = None
+                if os.path.exists(lc_filename):
+                    read_df = pd.read_csv(lc_filename, usecols=['#time', 'flux', 'flux_0', 'flux_1',
+                                                                  'flux_2', 'flux_3', 'flux_4',
+                                                                  'centroid_x', 'centroid_y', 'motion_x', 'motion_y',
+                                                                  'bck_flux'], low_memory=True)
+                    lc_df = read_df if lc_df is None else lc_df.append(read_df, ignore_index=True)
+                if os.path.exists(lc_long_filename):
+                    read_df = pd.read_csv(lc_long_filename, usecols=['#time', 'flux', 'flux_0', 'flux_1',
+                                                                'flux_2', 'flux_3', 'flux_4',
+                                                                'centroid_x', 'centroid_y', 'motion_x', 'motion_y',
+                                                                'bck_flux'], low_memory=True)
+                    lc_df = read_df if lc_df is None else lc_df.append(read_df, ignore_index=True)
+                if os.path.exists(lc_short_filename):
+                    read_df = pd.read_csv(lc_short_filename, usecols=['#time', 'flux', 'flux_0', 'flux_1',
+                                                                'flux_2', 'flux_3', 'flux_4',
+                                                                'centroid_x', 'centroid_y', 'motion_x', 'motion_y',
+                                                                'bck_flux'], low_memory=True)
+                    lc_df = read_df if lc_df is None else lc_df.append(read_df, ignore_index=True)
+                if lc_df is None:
+                    logging.warning("No curve for target " + str(target_row['object_id']))
+                assert lc_df is not None
+                lc_df = lc_df.sort_values(by=['#time'])
+                #TODO refactor to use mission for star files
+                star_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_star.csv'
+                star_neighbours_df = pd.read_csv(star_filename,
+                                                 usecols=['Teff', 'lum', 'v', 'j', 'k', 'h', 'radius', 'mass',
+                                                          'dist_arcsec'], index_col=False)
+                star_neighbours_df = self._prepare_input_neighbour_stars(star_neighbours_df)
+                star_df = pd.read_csv(star_filename, index_col=False)
+                star_df = self._prepare_input_star(star_df)
+                lc_df = self._prepare_input_lc(lc_df)
+                not_null_times_args = np.argwhere(lc_df['#time'].to_numpy() > 0).flatten()
+                lc_df = lc_df.iloc[not_null_times_args]
+                epoch = target_row['epoch']
+                duration = target_row['duration(h)'] / 24
+                duration_to_period = duration / period
+                #['ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k'])
+                neighbours_array = star_neighbours_df.to_numpy().flatten()
+                star_neighbours_array[i] = np.transpose([neighbours_array if len(neighbours_array) == 9 * 15 \
+                    else neighbours_array + np.zeros(9 * 15 - len(neighbours_array))])
+                star_array[i] = np.transpose([star_df.to_numpy()])
+                time = lc_df['#time'].to_numpy()
+                # Global flux
+                # Shifting data 1/4 so that main transit and possible occultation don't get cut by the borders
+                lc_df_sorted_fold = lc_df.copy()
+                lc_df_sorted_fold['#time'] = foldedleastsquares.fold(time, period, epoch + period / 4)
+                lc_df_sorted_fold = lc_df_sorted_fold.sort_values(by=['#time'])
+                global_flux_array[i], global_flux_array_err[i] = \
+                    self.bin_by_time(lc_df_sorted_fold.to_numpy(), self.input_sizes[2], target_row['object_id'])
+                self._plot_input(global_flux_array[i], global_flux_array_err[i], type, "global")
+                # Focus flux even
+                lc_df_focus = lc_df.copy()
+                lc_df_focus['#time'] = foldedleastsquares.fold(time, period, epoch)
+                lc_df_focus = lc_df_focus.sort_values(by=['#time'])
+                lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 2) &
+                                          (lc_df_focus['#time'] < 0.5 + duration_to_period * 2)]
+                folded_flux_even_array[i], folded_flux_even_array_err[i] = \
+                    self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[3], target_row['object_id'])
+                self._plot_input(folded_flux_even_array[i], folded_flux_even_array_err[i], type, "even")
+                # Focus flux odd
+                lc_df_focus = lc_df.copy()
+                lc_df_focus['#time'] = foldedleastsquares.fold(time, period, epoch + period / 2)
+                lc_df_focus = lc_df_focus.sort_values(by=['#time'])
+                lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
+                                          (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
+                folded_flux_odd_array[i], folded_flux_odd_array_err[i] = \
+                    self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[4], target_row['object_id'])
+                self._plot_input(folded_flux_odd_array[i], folded_flux_odd_array_err[i], type, "odd")
+                # Focus flux sub-harmonic even
+                lc_df_focus = lc_df.copy()
+                lc_df_focus['#time'] = foldedleastsquares.fold(time, period / 2, epoch)
+                lc_df_focus = lc_df_focus.sort_values(by=['#time'])
+                lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
+                                          (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
+                folded_flux_even_subhar_array[i], folded_flux_even_subhar_array_err[i] = \
+                    self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[5], target_row['object_id'])
+                self._plot_input(folded_flux_even_subhar_array[i], folded_flux_even_subhar_array_err[i], type, "even_subhar")
+                # Focus flux sub-harmonic odd
+                lc_df_focus = lc_df.copy()
+                lc_df_focus['#time'] = foldedleastsquares.fold(time, period / 2, epoch + period / 4)
+                lc_df_focus = lc_df_focus.sort_values(by=['#time'])
+                lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
+                                          (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
+                folded_flux_odd_subhar_array[i], folded_flux_odd_subhar_array_err[i] = \
+                    self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[6], target_row['object_id'])
+                self._plot_input(folded_flux_odd_subhar_array[i], folded_flux_odd_subhar_array_err[i], type, "odd_subhar")
+                # Focus flux harmonic even
+                lc_df_focus = lc_df.copy()
+                lc_df_focus['#time'] = foldedleastsquares.fold(time, period * 2, epoch)
+                lc_df_focus = lc_df_focus.sort_values(by=['#time'])
+                lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
+                                          (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
+                folded_flux_even_har_array[i], folded_flux_even_har_array_err[i] = \
+                    self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[7], target_row['object_id'])
+                self._plot_input(folded_flux_even_har_array[i], folded_flux_even_har_array[i], type, "even_har")
+                # Focus flux harmonic odd
+                lc_df_focus = lc_df.copy()
+                lc_df_focus['#time'] = foldedleastsquares.fold(time, period * 2, epoch + period * 3 / 2)
+                lc_df_focus = lc_df_focus.sort_values(by=['#time'])
+                lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
+                                          (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
+                folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i] = \
+                    self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[8], target_row['object_id'])
+                self._plot_input(folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i], type, "odd_har")
+                if np.max(global_flux_array[i]) >= 2:
+                    logging.error("Wrong flux value for target " + str(target_row['object_id']))
+                assert np.max(global_flux_array[i]) < 2
+                assert not np.isnan(star_array[i]).any() and not np.isinf(star_array[i]).any()
+                assert not np.isnan(global_flux_array[i]).any() and not np.isinf(global_flux_array[i]).any()
+                assert not np.isnan(folded_flux_even_array[i]).any() and not np.isinf(folded_flux_even_array[i]).any()
+                assert not np.isnan(folded_flux_odd_array[i]).any() and not np.isinf(folded_flux_odd_array[i]).any()
+                assert not np.isnan(folded_flux_even_subhar_array[i]).any() and not np.isinf(folded_flux_even_subhar_array[i]).any()
+                assert not np.isnan(folded_flux_odd_subhar_array[i]).any() and not np.isinf(folded_flux_odd_subhar_array[i]).any()
+                assert not np.isnan(folded_flux_even_har_array[i]).any() and not np.isinf(folded_flux_even_har_array[i]).any()
+                assert not np.isnan(folded_flux_odd_har_array[i]).any() and not np.isinf(folded_flux_odd_har_array[i]).any()
+                # logging.info("GENERATOR Star Inputs max " + str(np.max(star_array[i])) + " and min " +
+                #              str(np.min(star_array[i])))
+                # logging.info("GENERATOR Global Flux Inputs max " + str(np.max(global_flux_array[i])) + " and min " +
+                #              str(np.min(global_flux_array[i])))
+                # logging.info("GENERATOR Folded Even Inputs max " + str(np.max(folded_flux_even_array[i])) + " and min " +
+                #              str(np.min(folded_flux_even_array[i])))
+                # logging.info("GENERATOR Folded Odd Inputs max " + str(np.max(folded_flux_odd_array[i])) + " and min " +
+                #              str(np.min(folded_flux_odd_array[i])))
+                # logging.info("GENERATOR Folded Even Subhar Inputs max " + str(np.max(folded_flux_even_subhar_array[i])) +
+                #              " and min " + str(np.min(folded_flux_even_subhar_array[i])))
+                # logging.info("GENERATOR Folded Odd Subhar Inputs max " + str(np.max(folded_flux_odd_subhar_array[i])) +
+                #              " and min " + str(np.min(folded_flux_odd_subhar_array[i])))
+                # logging.info("GENERATOR Folded Even Har Inputs max " + str(np.max(folded_flux_even_har_array[i])) +
+                #              " and min " + str(np.min(folded_flux_even_har_array[i])))
+                # logging.info("GENERATOR Folded Odd Har Inputs max " + str(np.max(folded_flux_odd_har_array[i])) +
+                #              " and min " + str(np.min(folded_flux_odd_har_array[i])))
+            if self.store_arrays:
+                logging.info("Storing arrays into prefix " + file_prefix)
+                np.savetxt(file_prefix + '_input_star.csv', star_array[i], delimiter=',', fmt='%f')
+                np.savetxt(file_prefix + '_input_nb.csv', star_neighbours_array[i], delimiter=',', fmt='%f')
+                np.savetxt(file_prefix + '_input_global.csv', global_flux_array[i], delimiter=',', fmt='%f')
+                np.savetxt(file_prefix + '_input_global_err.csv', global_flux_array_err[i], delimiter=',', fmt='%f')
+                np.savetxt(file_prefix + '_input_even.csv', folded_flux_even_array[i], delimiter=',', fmt='%f')
+                np.savetxt(file_prefix + '_input_even_err.csv', folded_flux_even_array_err[i], delimiter=',', fmt='%f')
+                np.savetxt(file_prefix + '_input_odd.csv', folded_flux_odd_array[i], delimiter=',', fmt='%f')
+                np.savetxt(file_prefix + '_input_odd_err.csv', folded_flux_odd_array_err[i], delimiter=',', fmt='%f')
+                np.savetxt(file_prefix + '_input_even_sh.csv', folded_flux_even_subhar_array[i], delimiter=',', fmt='%f')
+                np.savetxt(file_prefix + '_input_even_sh_err.csv', folded_flux_even_subhar_array_err[i], delimiter=',',
+                           fmt='%f')
+                np.savetxt(file_prefix + '_input_odd_sh.csv', folded_flux_odd_subhar_array[i], delimiter=',', fmt='%f')
+                np.savetxt(file_prefix + '_input_odd_sh_err.csv', folded_flux_odd_subhar_array_err[i], delimiter=',',
+                           fmt='%f')
+                np.savetxt(file_prefix + '_input_even_h.csv', folded_flux_even_har_array[i], delimiter=',', fmt='%f')
+                np.savetxt(file_prefix + '_input_even_h_err.csv', folded_flux_even_har_array_err[i], delimiter=',',
+                           fmt='%f')
+                np.savetxt(file_prefix + '_input_odd_h.csv', folded_flux_odd_har_array[i], delimiter=',', fmt='%f')
+                np.savetxt(file_prefix + '_input_odd_h_err.csv', folded_flux_odd_har_array_err[i], delimiter=',', fmt='%f')
             i = i + 1
         return [star_array, star_neighbours_array, global_flux_array, global_flux_array_err, folded_flux_even_array,
                 folded_flux_even_array_err, folded_flux_odd_array, folded_flux_odd_array_err,
@@ -338,10 +383,29 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 folded_flux_odd_subhar_array_err, folded_flux_even_har_array, folded_flux_even_har_array_err,
                 folded_flux_odd_har_array, folded_flux_odd_har_array_err], batch_data_values
 
-# df = pd.read_csv("/mnt/DATA-2/q1_q17/injected_objects.csv", index_col=False)
-# df = shuffle(df)
+# formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+# logger = logging.getLogger()
+# # while len(logger.handlers) > 0:
+# #     logger.handlers.pop()
+# logger.setLevel(logging.INFO)
+# handler = logging.StreamHandler(sys.stdout)
+# handler.setLevel(logging.INFO)
+# handler.setFormatter(formatter)
+# logger.addHandler(handler)
+#
+# dir = "/home/mdevora/scratch/ml/q1_q17/lcs"
+# for filename in os.listdir(dir):
+#     if 'input' in filename:
+#         logging.info("Removing %s", filename)
+#         os.remove(dir + '/' + filename)
+#
+# df = pd.read_csv("/home/mdevora/scratch/ml/q1_q17/injected_objects.csv", index_col=False)
+# #df = shuffle(df)
 # df.reset_index(inplace=True, drop=True)
-# img = IatsonPlanetModelGenerator(df, "/mnt/DATA-2/q1_q17/lcs", 20, [11, 135, 2500, 500, 500, 500, 500, 500, 500],
-#                                  {'fp': [0], 'planet': [1], 'planet_transit': [1]}, plot_inputs=True,
-#                                  fixed_target_id='KIC 3245969')
-# img.__getitem__(20)
+# img = IatsonPlanetModelGenerator(df, "/home/mdevora/scratch/ml/q1_q17/lcs", 1, [11, 135, 2500, 500, 500, 500, 500, 500, 500],
+#                                  {'fp': [0], 'planet': [1], 'planet_transit': [1], 'tce': [0]}, from_arrays=False,
+#                                  store_arrays=True)
+# df_len = len(df)
+# for i in range(0, df_len):
+#     logging.info("Doing " + str(i) + " item of " + str(df_len))
+#     img.__getitem__(i)
