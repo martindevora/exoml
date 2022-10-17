@@ -11,9 +11,7 @@ import wotan
 import pandas as pd
 from astropy.coordinates import SkyCoord
 from astroquery.mast import Catalogs
-from lcbuilder.objectinfo.MissionFfiIdObjectInfo import MissionFfiIdObjectInfo
 from lcbuilder.objectinfo.MissionObjectInfo import MissionObjectInfo
-from lcbuilder.objectinfo.preparer.MissionFfiLightcurveBuilder import MissionFfiLightcurveBuilder
 from lcbuilder.objectinfo.preparer.MissionLightcurveBuilder import MissionLightcurveBuilder
 
 
@@ -202,7 +200,6 @@ class CreateTargetInput:
 
 def create_target_csv(create_target_input):
     mission_lightcurve_builder = MissionLightcurveBuilder()
-    mission_ffi_lightcurve_builder = MissionFfiLightcurveBuilder()
     mission_id = create_target_input.id
     file_id = mission_id.replace(' ', '_')
     try:
@@ -225,7 +222,7 @@ def create_target_csv(create_target_input):
         file_name = create_target_input.target_dir + file_id + "_lc_long.csv"
         if not os.path.exists(file_name):
             lcbuild_long = \
-                mission_ffi_lightcurve_builder.build(MissionFfiIdObjectInfo(mission_id, 'all'),
+                mission_lightcurve_builder.build(MissionObjectInfo('all', mission_id, cadence=1800, author="TESS-SPOC"),
                                                      create_target_input.target_dir,
                                                      create_target_input.cache_dir)
             lc_df = prepare_lc_data(mission_id, lcbuild_long.lc_data,
