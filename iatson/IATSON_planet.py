@@ -22,7 +22,7 @@ from ml.model.imbalanced_binary_model import ImbalancedBinaryModel
 class IATSON_planet(ImbalancedBinaryModel):
     def __init__(self, class_ids, class_names, type_to_label, hyperparams, channels=12, name='IATSON_planet') -> None:
         super().__init__(name,
-                         [11, 9 * 15, 2500, 100, 100, 100, 100, 100, 100],
+                         [11, 9 * 15, 2500, 500, 500, 500, 500, 500, 500],
                          class_ids,
                          type_to_label,
                          hyperparams)
@@ -32,7 +32,12 @@ class IATSON_planet(ImbalancedBinaryModel):
         # TODO use binning error as channel
         flux_input = keras.Input(shape=(self.input_size[2], self.channels), name=name)
         flux_err_input = keras.Input(shape=(self.input_size[2], self.channels), name=name + "_err")
-        flux_input_final = keras.layers.concatenate([flux_input, flux_err_input], axis=2)
+        flux_input_mod = keras.layers.Dropout(self.hyperparams.dropout_rate)(flux_input)
+        flux_err_input_mod = keras.layers.Dropout(self.hyperparams.dropout_rate)(flux_err_input)
+        if self.hyperparams.white_noise_std is not None:
+            flux_input_mod = keras.layers.GaussianNoise(stddev=self.hyperparams.white_noise_std)(flux_input_mod)
+            flux_err_input_mod = keras.layers.GaussianNoise(stddev=self.hyperparams.white_noise_std)(flux_err_input_mod)
+        flux_input_final = keras.layers.concatenate([flux_input_mod, flux_err_input_mod], axis=2)
         transformer_input_size = 300
         transformer_output_size = 300
         kernel_size = 25
@@ -50,12 +55,12 @@ class IATSON_planet(ImbalancedBinaryModel):
         leaky_relu_alpha = 0.01
         flux_input = keras.Input(shape=(self.input_size[2], self.channels), name=name)
         flux_err_input = keras.Input(shape=(self.input_size[2], self.channels), name=name + "_err")
-        flux_input = keras.layers.Dropout(self.hyperparams.dropout_rate)(flux_input)
-        flux_err_input = keras.layers.Dropout(self.hyperparams.dropout_rate)(flux_err_input)
+        flux_input_mod = keras.layers.Dropout(self.hyperparams.dropout_rate)(flux_input)
+        flux_err_input_mod = keras.layers.Dropout(self.hyperparams.dropout_rate)(flux_err_input)
         if self.hyperparams.white_noise_std is not None:
-            flux_input = keras.layers.GaussianNoise(stddev=self.hyperparams.white_noise_std)(flux_input)
-            flux_err_input = keras.layers.GaussianNoise(stddev=self.hyperparams.white_noise_std)(flux_err_input)
-        flux_input_final = keras.layers.concatenate([flux_input, flux_err_input], axis=2)
+            flux_input_mod = keras.layers.GaussianNoise(stddev=self.hyperparams.white_noise_std, name="gn_flux")(flux_input_mod)
+            flux_err_input_mod = keras.layers.GaussianNoise(stddev=self.hyperparams.white_noise_std, name="gn_flux_err")(flux_err_input_mod)
+        flux_input_final = keras.layers.concatenate([flux_input_mod, flux_err_input_mod], axis=2)
         flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_input_final)
         flux_branch = keras.layers.SpatialDropout1D(rate=self.hyperparams.dropout_rate)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=128, kernel_size=9, padding="same",
@@ -93,12 +98,12 @@ class IATSON_planet(ImbalancedBinaryModel):
         # TODO use binning error as channel
         focus_flux_input = keras.Input(shape=(self.input_size[3], self.channels), name=name)
         focus_flux_err_input = keras.Input(shape=(self.input_size[3], self.channels), name=name + "_err")
-        focus_flux_input = keras.layers.Dropout(self.hyperparams.dropout_rate)(focus_flux_input)
-        focus_flux_err_input = keras.layers.Dropout(self.hyperparams.dropout_rate)(focus_flux_err_input)
+        focus_flux_input_mod = keras.layers.Dropout(self.hyperparams.dropout_rate)(focus_flux_input)
+        focus_flux_err_input_mod = keras.layers.Dropout(self.hyperparams.dropout_rate)(focus_flux_err_input)
         if self.hyperparams.white_noise_std is not None:
-            focus_flux_input = keras.layers.GaussianNoise(stddev=self.hyperparams.white_noise_std)(focus_flux_input)
-            focus_flux_err_input = keras.layers.GaussianNoise(stddev=self.hyperparams.white_noise_std)(focus_flux_err_input)
-        focus_flux_input_final = keras.layers.concatenate([focus_flux_input, focus_flux_err_input], axis=2)
+            focus_flux_input_mod = keras.layers.GaussianNoise(stddev=self.hyperparams.white_noise_std)(focus_flux_input_mod)
+            focus_flux_err_input_mod = keras.layers.GaussianNoise(stddev=self.hyperparams.white_noise_std)(focus_flux_err_input_mod)
+        focus_flux_input_final = keras.layers.concatenate([focus_flux_input_mod, focus_flux_err_input_mod], axis=2)
         focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_input_final)
         # (time, flux, detrended_flux1... detrended_flux5, flux_model, centroidx, centroidy, motionx, motiony, bck)
         # flux model by transit params and stellar params
@@ -123,7 +128,12 @@ class IATSON_planet(ImbalancedBinaryModel):
         # TODO use binning error as channel
         focus_flux_input = keras.Input(shape=(self.input_size[3], self.channels), name=name)
         focus_flux_err_input = keras.Input(shape=(self.input_size[3], self.channels), name=name + "_err")
-        focus_flux_input_final = keras.layers.concatenate([focus_flux_input, focus_flux_err_input], axis=2)
+        focus_flux_input_mod = keras.layers.Dropout(self.hyperparams.dropout_rate)(focus_flux_input)
+        focus_flux_err_input_mod = keras.layers.Dropout(self.hyperparams.dropout_rate)(focus_flux_err_input)
+        if self.hyperparams.white_noise_std is not None:
+            focus_flux_input_mod = keras.layers.GaussianNoise(stddev=self.hyperparams.white_noise_std)(focus_flux_input_mod)
+            focus_flux_err_input_mod = keras.layers.GaussianNoise(stddev=self.hyperparams.white_noise_std)(focus_flux_err_input_mod)
+        focus_flux_input_final = keras.layers.concatenate([focus_flux_input_mod, focus_flux_err_input_mod], axis=2)
         transformer_input_size = 100
         transformer_output_size = 100
         kernel_size = 5
