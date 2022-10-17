@@ -10,7 +10,7 @@ training_dir = '/mnt/DATA-2/q1_q17'
 model_dir = './'
 hp = HyperParams(batch_size=100,
             epochs=75,
-            initial_learning_rate=0.001,
+            initial_learning_rate=0.01,
             gradient_clip_norm=0.1,
             gradient_clip_value=0.5,
             dry_run=False,
@@ -20,11 +20,13 @@ hp = HyperParams(batch_size=100,
             early_stopping_delta=0,
             early_stopping_patience=0,
             custom_loss=None,
-            run_eagerly=False)
-iatson = IATSON_planet({0: 'planet_transit', 1: 'planet', 2: 'fp'},
-                       ['planet_transit', 'planet', 'tp'],
-                       {'fp': [0], 'planet': [1], 'planet_transit': [1]})\
-    .build(use_transformers=False, transformer_blocks=3, transformer_heads=3)
+            run_eagerly=False,
+            dropout_rate=0.2,
+            white_noise_std=0.01)
+iatson = IATSON_planet({0: 'planet_transit', 1: 'planet', 2: 'fp', 3: 'tce'},
+                       ['planet_transit', 'planet', 'tp', 'tce'],
+                       {'fp': [0], 'planet': [1], 'planet_transit': [1], 'tce': [0]}, hp)\
+    .build(use_transformers=False, transformer_blocks=3, transformer_heads=3).inform(model_dir)
 #iatson.load_model("./IATSON_planet_model_bck")
 iatson.train(training_dir, model_dir, hp)
 #iatson = IATSON().load_model(model_dir)
