@@ -162,7 +162,7 @@ def dice_loss(targets, inputs, smooth=1e-6):
     """
     inputs = K.flatten(inputs)
     targets = K.flatten(targets)
-    intersection = K.sum(K.dot(targets, inputs))
+    intersection = K.sum((inputs * targets))
     dice = (2 * intersection + smooth) / (K.sum(targets) + K.sum(inputs) + smooth)
     return 1 - dice
 
@@ -181,7 +181,7 @@ def dice_bce_loss(targets, inputs, smooth=1e-6):
     inputs = K.flatten(inputs)
     targets = K.flatten(targets)
     bce = binary_crossentropy(targets, inputs)
-    intersection = K.sum(K.dot(targets, inputs))
+    intersection = K.sum((inputs * targets))
     dice_loss = 1 - (2 * intersection + smooth) / (K.sum(targets) + K.sum(inputs) + smooth)
     dice_bce = bce + dice_loss
     return dice_bce
