@@ -2,17 +2,24 @@ import logging
 import os
 import pathlib
 import re
+from itertools import chain
 from multiprocessing import Pool
 
 import astropy.units as u
 import foldedleastsquares
+import lightkurve
 import numpy as np
 import wotan
 import pandas as pd
 from astropy.coordinates import SkyCoord
+from astropy.wcs import WCS
 from astroquery.mast import Catalogs
+from lcbuilder.helper import LcbuilderHelper
+from lcbuilder.lcbuilder_class import LcBuilder
 from lcbuilder.objectinfo.MissionObjectInfo import MissionObjectInfo
 from lcbuilder.objectinfo.preparer.MissionLightcurveBuilder import MissionLightcurveBuilder
+from lcbuilder.star.HabitabilityCalculator import HabitabilityCalculator
+from watson.watson import Watson
 
 
 def detrend(time_array, flux_array, detrend_window, time_threshold=0.0001, smooth=True, smooth_window_len=11,
@@ -138,7 +145,13 @@ def create_star_csv(create_star_input):
     star_df.to_csv(create_star_input.output_dir + '/' + mission_id + '_' + str(object_id) + '_star.csv')
     logging.info('Processed object id ' + str(object_id))
 
-def prepare_lc_data(object_id, lc_data, transit_duration, transit_period, epoch, long_cadence):
+def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_period, epoch, ra, dec, star_info, long_cadence):
+    cadence = 'long' if long_cadence else 'short'
+    lc_data = lc_data.drop(['quality'], axis=1)
+    lcbuilder = LcBuilder()
+    mission, mission_prefix, id = lcbuilder.parse_object_info(object_id)
+    author = lcbuilder.get_default_author(object_id, cadence)
+    tpfs = lightkurve.search_targetpixelfile(object_id, exptime=cadence, author=author).download_all()
     lc_df = pd.DataFrame(columns=['#time', 'flux', 'flux_err', 'planet_model', 'eb_model', 'bckeb_model',
                                   'centroid_x', 'centroid_y', 'motion_x', 'motion_y', 'bck_flux'])
     flux_values = np.array(lc_data.flux)
@@ -153,7 +166,7 @@ def prepare_lc_data(object_id, lc_data, transit_duration, transit_period, epoch,
     time_values = np.array(lc_data.time)
     duration_to_period = transit_duration / transit_period
     series_len = len(time_values)
-    for j in np.arange(0, 5, 1):
+    for j in np.arange(0, 1, 1):
         logging.info("Detrending no %s for target %s with %s points with duration %s", j, object_id, series_len, transit_duration * (4 + j))
         flux_detrend_j = detrend(time_values, np.array(lc_data.flux), transit_duration * (4 + j), smooth=not long_cadence)
         lc_df['flux_' + str(j)] = flux_detrend_j
@@ -171,6 +184,118 @@ def prepare_lc_data(object_id, lc_data, transit_duration, transit_period, epoch,
     lc_df['motion_x'] = np.array(lc_data.motion_x)
     lc_df['motion_y'] = np.array(lc_data.motion_y)
     lc_df = lc_df.fillna(0)
+    lc_df.to_csv(file_prefix + '_lc_' + str(cadence) + '.csv')
+    logging.info("Computing T0s for %s", object_id)
+    t0s_list = LcbuilderHelper.compute_t0s(lc_data['time'].to_numpy(), transit_period, epoch, transit_duration)
+    source_offsets_diffimg = []
+    source_offsets_bls = []
+    centroids_offsets_ra_list = []
+    centroids_offsets_dec_list = []
+    centroids_offsets_time_list = []
+    og_time_list = []
+    og_core_flux_list = []
+    og_halo_flux_list = []
+    logging.info("Computing TPF data for %s", object_id)
+    for tpf in tpfs:
+        sector_name, sector = LcbuilderHelper.mission_lightkurve_sector_extraction(mission, tpf)
+        aperture = tpf.pipeline_mask
+        cadence_s = np.round(np.nanmedian(tpf.time.value[1:] - tpf.time.value[:-1]) * 3600 * 24)
+        cadences_per_transit = LcbuilderHelper.estimate_transit_cadences(cadence_s, transit_duration * 2)
+        t0s_in_tpf_indexes = np.argwhere((t0s_list > tpf.time.value[0] - transit_duration) &
+                                         (t0s_list < tpf.time.value[-1] + transit_duration)).flatten()
+        if len(t0s_in_tpf_indexes) == 0:
+            continue
+        tpf_t0s_list = t0s_list[t0s_in_tpf_indexes]
+        good_quality_t0s = []
+        for t0 in tpf_t0s_list:
+            t0_in_tpf_indexes = \
+                np.argwhere((tpf.time.value > t0 - transit_duration) & (tpf.time.value < t0 + transit_duration)).flatten()
+            cadences_ratio = len(t0_in_tpf_indexes) / cadences_per_transit
+            if cadences_ratio >= 0.75:
+                good_quality_t0s.append(t0)
+            else:
+                tpf = tpf[(tpf.time.value < t0 - transit_duration) | (tpf.time.value > t0 + transit_duration)]
+        if len(good_quality_t0s) == 0:
+            continue
+        hdu = tpf.hdu[2].header
+        wcs = WCS(hdu)
+        centroids_drift = \
+            Watson.compute_centroids_for_tpf(ra, dec, lc_data, tpf, wcs, transit_period, epoch, duration_to_period)
+        optical_ghost_data = Watson.compute_optical_ghost_data(tpf, aperture, transit_period, epoch, duration_to_period)
+        pixel_values_i = np.array(range(tpf[0].shape[1]))
+        pixel_values_j = np.array(range(tpf[0].shape[2]))
+        snr_map, ax = Watson.plot_pixels(tpf, title=mission_prefix + ' ' + str(id) + ' ' + sector_name + ' ' + str(sector) + ' TPF BLS Analysis',
+                                         period=transit_period, epoch=epoch, duration=transit_duration, aperture_mask=aperture, dry=True)
+        source_offset_px = Watson.light_centroid(snr_map, pixel_values_i, pixel_values_j)
+        source_offset_bls = wcs.pixel_to_world(source_offset_px[1], source_offset_px[0])
+        tpf_sub = Watson.compute_tpf_diff_image(tpf, transit_period, epoch, transit_duration)
+        source_offset_diffimg_px = Watson.light_centroid(tpf_sub, pixel_values_i, pixel_values_j)
+        source_offset_diffimg = wcs.pixel_to_world(source_offset_diffimg_px[1], source_offset_diffimg_px[0])
+        centroids_offsets_time_list.append(centroids_drift[0])
+        centroids_offsets_ra_list.append(centroids_drift[1])
+        centroids_offsets_dec_list.append(centroids_drift[2])
+        og_time_list.append(optical_ghost_data[0])
+        og_core_flux_list.append(optical_ghost_data[1])
+        og_halo_flux_list.append(optical_ghost_data[2])
+        source_offsets_bls.append((source_offset_bls.ra.value, source_offset_bls.dec.value))
+        source_offsets_diffimg.append((source_offset_diffimg.ra.value, source_offset_diffimg.dec.value))
+    og_df = pd.DataFrame(columns=['time', 'core_flux', 'halo_flux', 'og_flux'])
+    og_df['time'] = list(chain.from_iterable(og_time_list))
+    og_df['core_flux'] = list(chain.from_iterable(og_core_flux_list))
+    og_df['halo_flux'] = list(chain.from_iterable(og_halo_flux_list))
+    og_df['og_flux'] = og_df['halo_flux'] - og_df['core_flux']
+    og_df.fillna(0)
+    og_df.to_csv(file_prefix + '_og_' + str(cadence) + '.csv')
+    centroid_coords_df = pd.DataFrame(columns=['time', 'centroids_ra', 'centroids_dec'])
+    centroid_coords_df['centroids_ra'] = list(chain.from_iterable(centroids_offsets_ra_list))
+    centroid_coords_df['centroids_dec'] = list(chain.from_iterable(centroids_offsets_dec_list))
+    centroid_coords_df['time'] = list(chain.from_iterable(centroids_offsets_time_list))
+    centroid_coords_df.fillna(0)
+    centroid_coords_df.to_csv(file_prefix + '_cent_' + str(cadence) + '.csv')
+    source_offset_diffimg_ra = np.nanmedian(np.array(source_offsets_diffimg)[:, 0])
+    source_offset_diffimg_dec = np.nanmedian(np.array(source_offsets_diffimg)[:, 1])
+    source_offset_diffimg_ra_err = np.nanstd(np.array(source_offsets_diffimg)[:, 0])
+    source_offset_diffimg_dec_err = np.nanstd(np.array(source_offsets_diffimg)[:, 1])
+    source_offset_bls_ra = np.nanmedian(np.array(source_offsets_bls)[:, 0])
+    source_offset_bls_dec = np.nanmedian(np.array(source_offsets_bls)[:, 1])
+    source_offset_bls_ra_err = np.nanstd(np.array(source_offsets_bls)[:, 0])
+    source_offset_bls_dec_err = np.nanstd(np.array(source_offsets_bls)[:, 1])
+    offset_ra = np.mean([source_offset_bls_ra, source_offset_diffimg_ra])
+    offset_dec = np.mean([source_offset_bls_dec, source_offset_diffimg_dec])
+    offset_ra_err = np.sqrt(source_offset_bls_ra_err ** 2 + source_offset_diffimg_ra_err ** 2)
+    offset_dec_err = np.sqrt(source_offset_bls_dec_err ** 2 + source_offset_diffimg_dec_err ** 2)
+    offsets_df = pd.DataFrame(columns=['name', 'ra', 'dec', 'ra_err', 'dec_err'])
+    offsets_df = offsets_df.append({'name': 'diff_img', 'ra': source_offset_diffimg_ra, 'dec': source_offset_diffimg_dec,
+                       'ra_err': source_offset_diffimg_ra_err, 'dec_err': source_offset_diffimg_dec_err}, ignore_index=True)
+    offsets_df = offsets_df.append({'name': 'px_bls', 'ra': source_offset_bls_ra, 'dec': source_offset_bls_dec,
+                       'ra_err': source_offset_bls_ra_err, 'dec_err': source_offset_bls_dec_err}, ignore_index=True)
+    offsets_df = offsets_df.append({'name': 'mean', 'ra': offset_ra, 'dec': offset_dec,
+                       'ra_err': offset_ra_err, 'dec_err': offset_dec_err}, ignore_index=True)
+    offsets_df.to_csv(file_prefix + '_offset_' + str(cadence) + '.csv')
+    logging.info("Computing metrics for %s", object_id)
+    lc_df['time_folded'] = foldedleastsquares.fold(lc_df['#time'].to_numpy(), transit_period, epoch + transit_period / 2)
+    lc_df['time_folded_sec'] = foldedleastsquares.fold(lc_df['#time'].to_numpy(), transit_period, epoch)
+    lc_df_secit = lc_df[(lc_df['time_folded_sec'] > 0.5 - duration_to_period / 2) & (lc_df['time_folded_sec'] < 0.5 + duration_to_period / 2)]
+    sec_depth = 1 - lc_df_secit['flux_0'].median()
+    sec_depth_err = lc_df_secit['flux_0'].std()
+    lc_df_it = lc_df[(lc_df['time_folded'] > 0.5 - duration_to_period / 2) & (lc_df['time_folded'] < 0.5 + duration_to_period / 2)]
+    depth = 1 - lc_df_it['flux_0'].median()
+    rp = np.sqrt(depth * (star_info.radius ** 2))
+    rp_rs = rp / star_info.radius
+    depth_err = lc_df_it['flux_0'].std()
+    semimajor_axis = \
+        HabitabilityCalculator().calculate_semi_major_axis(transit_period, star_info.mass) * 215.032 #sun radii in au
+    geom_albedo = sec_depth * (semimajor_axis / rp)
+    albedo = 0.5
+    planet_eq_temp = star_info.teff * ((star_info.radius / (2 * semimajor_axis)) ** (1 / 2)) * ((1 - albedo) ** (1 / 4))
+    planet_eff_temp = star_info.teff * (sec_depth ** (1 / 4)) * (rp_rs ** (1 / 2))
+    statistics_df = pd.DataFrame(columns=['name', 'value'])
+    statistics_df = statistics_df.append({'name': 'depth', 'value': depth}, ignore_index=True)
+    statistics_df = statistics_df.append({'name': 'sec_depth', 'value': sec_depth}, ignore_index=True)
+    statistics_df = statistics_df.append({'name': 'geom_albedo', 'value': geom_albedo}, ignore_index=True)
+    statistics_df = statistics_df.append({'name': 'eq_temp', 'value': planet_eq_temp}, ignore_index=True)
+    statistics_df = statistics_df.append({'name': 'eff_temp', 'value': planet_eff_temp}, ignore_index=True)
+    statistics_df.to_csv(file_prefix + '_metrics_' + str(cadence) + '.csv')
     #
     # lc_df['#time1'] = foldedleastsquares.fold(np.float32(time_values), transit_period, epoch + transit_period / 2)
     # lc_df = lc_df.sort_values(by=['#time1'])
@@ -187,7 +312,7 @@ def prepare_lc_data(object_id, lc_data, transit_duration, transit_period, epoch,
     return lc_df
 
 class CreateTargetInput:
-    def __init__(self, mission, id, lc_file, target_dir, models_dir, injected_files_df, cache_dir, max_lc_length=20610) -> None:
+    def __init__(self, mission, id, lc_file, target_dir, models_dir, injected_files_df, cache_dir, max_lc_length=20610, force=False) -> None:
         super().__init__()
         self.mission = mission
         self.id = id
@@ -197,38 +322,40 @@ class CreateTargetInput:
         self.injected_files_df = injected_files_df
         self.max_lc_length = max_lc_length
         self.cache_dir = cache_dir
+        self.force = force
 
 def create_target_csv(create_target_input):
     mission_lightcurve_builder = MissionLightcurveBuilder()
     mission_id = create_target_input.id
     file_id = mission_id.replace(' ', '_')
+    file_prefix = create_target_input.target_dir + file_id
     try:
         logging.info("Trying to get short cadence info for %s", mission_id)
-        file_name = create_target_input.target_dir + file_id + "_lc_short.csv"
-        if not os.path.exists(file_name):
+        file_name = file_prefix + '_lc_short.csv'
+        if create_target_input.force or not os.path.exists(file_name):
             lcbuild_short = \
-                mission_lightcurve_builder.build(MissionObjectInfo(mission_id, 'all'),
+                mission_lightcurve_builder.build(MissionObjectInfo('all', mission_id, cadence='short'),
                                                  create_target_input.target_dir,
                                                  create_target_input.cache_dir)
-            lc_df = prepare_lc_data(mission_id, lcbuild_short.lc_data,
-                                    create_target_input.injected_files_df['duration(h)'] / 24,
-                                    create_target_input.injected_files_df['period'],
-                                    create_target_input.injected_files_df['epoch'], False)
-            lc_df.to_csv(file_name)
+            prepare_lc_data(file_prefix, mission_id, lcbuild_short.lc_data,
+                            create_target_input.injected_files_df['duration(h)'] / 24,
+                            create_target_input.injected_files_df['period'],
+                            create_target_input.injected_files_df['epoch'],
+                            lcbuild_short.star_info.ra, lcbuild_short.star_info.dec, lcbuild_short.star_info, False)
     except Exception as e:
         logging.exception("Failed short cadence for %s", mission_id)
     try:
         logging.info("Trying to get long cadence info for %s", mission_id)
-        file_name = create_target_input.target_dir + file_id + "_lc_long.csv"
-        if not os.path.exists(file_name):
+        file_name = file_prefix + '_lc_long.csv'
+        if create_target_input.force or not os.path.exists(file_name):
             lcbuild_long = \
-                mission_lightcurve_builder.build(MissionObjectInfo('all', mission_id, cadence=1800, author="TESS-SPOC"),
+                mission_lightcurve_builder.build(MissionObjectInfo('all', mission_id, cadence='long'),
                                                      create_target_input.target_dir,
                                                      create_target_input.cache_dir)
-            lc_df = prepare_lc_data(mission_id, lcbuild_long.lc_data,
+            prepare_lc_data(file_prefix, mission_id, lcbuild_long.lc_data,
                                     create_target_input.injected_files_df['duration(h)'] / 24,
                                     create_target_input.injected_files_df['period'],
-                                    create_target_input.injected_files_df['epoch'], True)
-            lc_df.to_csv(file_name)
+                                    create_target_input.injected_files_df['epoch'],
+                                    lcbuild_long.star_info.ra, lcbuild_long.star_info.dec, lcbuild_long.star_info, True)
     except Exception as e:
         logging.exception("Failed long cadence for %s", mission_id)

@@ -78,14 +78,14 @@ def create_targets_df(tces_dir):
     result_df.to_csv(tces_dir + '/injected_objects.csv')
 
 
-def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_count() - 1):
+def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_count() - 1, force=False):
     tces_df = pd.read_csv(csv, comment='#')
     tces_df = tces_df.sort_values(by=["kepid"], ascending=True)
     tces_df = tces_df.drop_duplicates(subset=["kepid"], keep='last')
     inputs = []
     for index, tce_row in tces_df.iterrows():
-        #tce_row = tces_df[tces_df['object_id'] == 'KIC 3245969'].iloc[0]
-        inputs = inputs + [CreateTargetInput('KIC', tce_row['object_id'], None, target_dir, None, tce_row, cache_dir)]
+        tce_row = tces_df[tces_df['object_id'] == 'KIC 1026032'].iloc[0]
+        inputs = inputs + [CreateTargetInput('KIC', tce_row['object_id'], None, target_dir, None, tce_row, cache_dir, force=force)]
     with Pool(processes=cores) as pool:
         pool.map(create_target_csv, inputs)
 
@@ -105,13 +105,13 @@ home_dir = '/home/martin/'
 df_dir = '/mnt/DATA-2/q1_q17/'
 lcs_dir = df_dir + '/lcs/'
 cache_dir = home_dir
-cores = 3
+cores = 1
 #uncompress_data('/mnt/DATA-2/ete6/backebs/BackEBs/')
 #uncompress_data('/mnt/DATA-2/ete6/ebs/EBs/')
 #uncompress_data('/mnt/DATA-2/ete6/planets/Planets/')
 #create_star_csv(CreateStarCsvInput('/home/mdevora/scratch/ml/q1_q17/lcs/KIC_100001645_lc_long.csv', 20.25, 6.5, "(KIC)_([0-9]+)_lc_long", KicStarCatalog(), lcs_dir))
 #create_targets_df(df_dir)
-#create_target_csvs(df_dir + '/classified_tces.csv', lcs_dir, cache_dir, cores)
+create_target_csvs(df_dir + '/classified_tces.csv', lcs_dir, cache_dir, cores, force=True)
 #create_star_csvs(lcs_dir, 50, 4, KicStarCatalog(), '*lc_long*.csv', "(KIC)_([0-9]+)_lc_long", cores)
 
 #_create_target_csv(CreateTargetInput(lcs_dir + '/tess2019128220341-0000000230382377-0016-s_lc.fits', root_dir, pd.read_csv(root_dir + '/injected_objects.csv')))
