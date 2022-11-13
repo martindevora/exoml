@@ -214,7 +214,12 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
             if cadences_ratio >= 0.75:
                 good_quality_t0s.append(t0)
             else:
-                tpf = tpf[(tpf.time.value < t0 - transit_duration) | (tpf.time.value > t0 + transit_duration)]
+                try:
+                    tpf = tpf[(tpf.time.value < t0 - transit_duration) | (tpf.time.value > t0 + transit_duration)]
+                    trash = tpf[0] #we try to make it crash and if so, we discard the TPF
+                except:
+                    logging.exception("TPF filtering error for %s and T0 %.02f", object_id, t0)
+                    continue
         if len(good_quality_t0s) == 0:
             continue
         hdu = tpf.hdu[2].header
@@ -222,8 +227,8 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
         centroids_drift = \
             Watson.compute_centroids_for_tpf(ra, dec, lc_data, tpf, wcs, transit_period, epoch, duration_to_period)
         optical_ghost_data = Watson.compute_optical_ghost_data(tpf, aperture, transit_period, epoch, duration_to_period)
-        pixel_values_i = np.array(range(tpf[0].shape[1]))
-        pixel_values_j = np.array(range(tpf[0].shape[2]))
+        pixel_values_i = np.array(range(tpf.shape[1]))
+        pixel_values_j = np.array(range(tpf.shape[2]))
         snr_map, ax = Watson.plot_pixels(tpf, title=mission_prefix + ' ' + str(id) + ' ' + sector_name + ' ' + str(sector) + ' TPF BLS Analysis',
                                          period=transit_period, epoch=epoch, duration=transit_duration, aperture_mask=aperture, dry=True)
         source_offset_px = Watson.light_centroid(snr_map, pixel_values_i, pixel_values_j)
@@ -331,7 +336,7 @@ def create_target_csv(create_target_input):
     file_prefix = create_target_input.target_dir + file_id
     try:
         logging.info("Trying to get short cadence info for %s", mission_id)
-        file_name = file_prefix + '_lc_short.csv'
+        file_name = file_prefix + '_metrics_short.csv'
         if create_target_input.force or not os.path.exists(file_name):
             lcbuild_short = \
                 mission_lightcurve_builder.build(MissionObjectInfo('all', mission_id, cadence='short'),
@@ -346,7 +351,7 @@ def create_target_csv(create_target_input):
         logging.exception("Failed short cadence for %s", mission_id)
     try:
         logging.info("Trying to get long cadence info for %s", mission_id)
-        file_name = file_prefix + '_lc_long.csv'
+        file_name = file_prefix + '_metrics_long.csv'
         if create_target_input.force or not os.path.exists(file_name):
             lcbuild_long = \
                 mission_lightcurve_builder.build(MissionObjectInfo('all', mission_id, cadence='long'),
