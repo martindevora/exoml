@@ -32,9 +32,10 @@ class BaseModel(WithLogging):
         super().__init__()
         self.name = name
         self.input_size = input_size
-        for class_id in class_ids.keys():
-            class_ids[class_id] = class_ids[class_id] if isinstance(class_ids[class_id], (list, np.ndarray)) \
-                else [class_ids[class_id]]
+        if class_ids is not None:
+            for class_id in class_ids.keys():
+                class_ids[class_id] = class_ids[class_id] if isinstance(class_ids[class_id], (list, np.ndarray)) \
+                    else [class_ids[class_id]]
         self.class_ids = class_ids
         self.type_to_label = type_to_label
         self.hyperparams = hyperparams
