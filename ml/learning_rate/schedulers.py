@@ -1,5 +1,5 @@
 import tensorflow as tf
-from keras.optimizer_v2.learning_rate_schedule import LearningRateSchedule
+from keras.optimizers.schedules.learning_rate_schedule import LearningRateSchedule
 
 
 class ExponentialRescaleDecay(LearningRateSchedule):
