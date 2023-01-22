@@ -64,85 +64,85 @@ def create_star_csvs(lcs_dir, search_radius, pixel_size, star_catalog, fileslist
 
 def create_star_csv(create_star_input):
     tries = 0
-    object_id = None
-    mission_id = None
-    while tries < 3:
-        try:
-            lc_filename_match = re.search(create_star_input.lcs_regex, create_star_input.lc_file)
-            object_id = int(lc_filename_match[2])
-            mission_id = lc_filename_match[1]
-            star_info = create_star_input.star_catalog.catalog_info(object_id)
-            star_df = pd.DataFrame(
-                columns=['id', 'ra', 'dec', 'ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h',
-                         'k',
-                         'dist_arcsec'])
-            star_df = star_df.append({'id': object_id, 'ra': star_info[11], 'dec': star_info[12],
-                                      'ld_a': star_info[0][0],
-                                      'ld_b': star_info[0][1], 'Teff': star_info[1],
-                                      'lum': star_info[2], 'logg': star_info[3], 'radius': star_info[5],
-                                      'mass': star_info[8], 'v': star_info[13], 'j': star_info[15],
-                                      'h': star_info[17],
-                                      'k': star_info[19], 'dist_arcsec': 0}, ignore_index=True)
-            break
-        except Exception as e:
-            logging.exception("Failed object %s try", object_id)
-            tries = tries + 1
-    if tries >= 3:
-        print("Failed downloading object id " + str(object_id))
-    assert tries < 3
-    try:  # Acquiring neighbours parameters
-        ra = star_df['ra'].iloc[0]
-        dec = star_df['dec'].iloc[0]
-        if ra is not None and dec is not None:
-            ticid = Catalogs.query_region(
-                SkyCoord(ra, dec, unit="deg"),
+    lc_filename_match = re.search(create_star_input.lcs_regex, create_star_input.lc_file)
+    object_id = int(lc_filename_match[2])
+    mission_id = lc_filename_match[1]
+    star_file = create_star_input.output_dir + '/' + mission_id + '_' + str(object_id) + '_star.csv'
+    if not os.path.exists(star_file):
+        while tries < 3:
+            try:
+                star_info = create_star_input.star_catalog.catalog_info(object_id)
+                star_df = pd.DataFrame(
+                    columns=['id', 'ra', 'dec', 'ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h',
+                             'k',
+                             'dist_arcsec'])
+                star_df = star_df.append({'id': object_id, 'ra': star_info[11], 'dec': star_info[12],
+                                          'ld_a': star_info[0][0],
+                                          'ld_b': star_info[0][1], 'Teff': star_info[1],
+                                          'lum': star_info[2], 'logg': star_info[3], 'radius': star_info[5],
+                                          'mass': star_info[8], 'v': star_info[13], 'j': star_info[15],
+                                          'h': star_info[17],
+                                          'k': star_info[19], 'dist_arcsec': 0}, ignore_index=True)
+                break
+            except Exception as e:
+                logging.exception("Failed object %s try", object_id)
+                tries = tries + 1
+        if tries >= 3:
+            print("Failed downloading object id " + str(object_id))
+        assert tries < 3
+        try:  # Acquiring neighbours parameters
+            ra = star_df['ra'].iloc[0]
+            dec = star_df['dec'].iloc[0]
+            if ra is not None and dec is not None:
+                ticid = Catalogs.query_region(
+                    SkyCoord(ra, dec, unit="deg"),
+                    radius=create_star_input.search_radius * create_star_input.pixel_size,
+                    catalog="TIC"
+                )[0]["ID"]
+            df = Catalogs.query_object(
+                "TIC" + str(ticid),
                 radius=create_star_input.search_radius * create_star_input.pixel_size,
                 catalog="TIC"
-            )[0]["ID"]
-        df = Catalogs.query_object(
-            "TIC" + str(ticid),
-            radius=create_star_input.search_radius * create_star_input.pixel_size,
-            catalog="TIC"
-        )
-        stars = df.to_pandas()
-        sep = [0]
-        pa = [0]
-        c_target = SkyCoord(
-            stars["ra"].values[0],
-            stars["dec"].values[0],
-            unit="deg"
-        )
-        for i in range(1, len(stars)):
-            c_star = SkyCoord(
-                stars["ra"].values[i],
-                stars["dec"].values[i],
+            )
+            stars = df.to_pandas()
+            sep = [0]
+            pa = [0]
+            c_target = SkyCoord(
+                stars["ra"].values[0],
+                stars["dec"].values[0],
                 unit="deg"
             )
-            sep.append(
-                np.round(
-                    c_target.separation(c_star).to(u.arcsec).value,
-                    3
+            for i in range(1, len(stars)):
+                c_star = SkyCoord(
+                    stars["ra"].values[i],
+                    stars["dec"].values[i],
+                    unit="deg"
                 )
-            )
-            pa.append(
-                np.round(
-                    c_target.position_angle(c_star).to(u.deg).value,
-                    3
+                sep.append(
+                    np.round(
+                        c_target.separation(c_star).to(u.arcsec).value,
+                        3
+                    )
                 )
-            )
-        stars["dist_arcsec"] = sep
-        stars["PA (E of N)"] = pa  # TODO should we use this?
-        for index, star in stars.iterrows():
-            star_df = star_df.append({'id': star['ID'], 'ra': star['ra'], 'dec': star['dec'], 'ld_a': 0,
-                                      'ld_b': 0, 'Teff': star['Teff'],
-                                      'lum': star['lum'], 'logg': star['logg'], 'radius': star['rad'],
-                                      'mass': star['mass'], 'v': star['Vmag'], 'j': star['Jmag'],
-                                      'h': star['Hmag'],
-                                      'k': star['Kmag'], 'dist_arcsec': star['dist_arcsec']}, ignore_index=True)
-        star_df = star_df.sort_values(["dist_arcsec"], ascending=True)
-    except Exception as e:
-        logging.exception('Something failed when retrieving neighbours info for object id %s', str(object_id))
-    star_df.to_csv(create_star_input.output_dir + '/' + mission_id + '_' + str(object_id) + '_star.csv')
+                pa.append(
+                    np.round(
+                        c_target.position_angle(c_star).to(u.deg).value,
+                        3
+                    )
+                )
+            stars["dist_arcsec"] = sep
+            stars["PA (E of N)"] = pa  # TODO should we use this?
+            for index, star in stars.iterrows():
+                star_df = star_df.append({'id': star['ID'], 'ra': star['ra'], 'dec': star['dec'], 'ld_a': 0,
+                                          'ld_b': 0, 'Teff': star['Teff'],
+                                          'lum': star['lum'], 'logg': star['logg'], 'radius': star['rad'],
+                                          'mass': star['mass'], 'v': star['Vmag'], 'j': star['Jmag'],
+                                          'h': star['Hmag'],
+                                          'k': star['Kmag'], 'dist_arcsec': star['dist_arcsec']}, ignore_index=True)
+            star_df = star_df.sort_values(["dist_arcsec"], ascending=True)
+        except Exception as e:
+            logging.exception('Something failed when retrieving neighbours info for object id %s', str(object_id))
+        star_df.to_csv(star_file)
     logging.info('Processed object id ' + str(object_id))
 
 def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_period, epoch, ra, dec, star_info, long_cadence):
@@ -164,6 +164,7 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
         median_flux = np.nanmedian(flux_values)
         flux_values = flux_values / median_flux
     time_values = np.array(lc_data.time)
+    transit_duration = transit_duration if transit_duration < transit_period else transit_period / 2
     duration_to_period = transit_duration / transit_period
     series_len = len(time_values)
     for j in np.arange(0, 1, 1):
