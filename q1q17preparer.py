@@ -1,6 +1,6 @@
 import logging
 import sys
-from preparation.q1q17dr25parser import create_target_csvs, create_targets_df
+from exoml.preparation.q1q17dr25parser import create_target_csvs, create_targets_df
 
 formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 logger = logging.getLogger()
@@ -12,11 +12,11 @@ handler.setLevel(logging.INFO)
 handler.setFormatter(formatter)
 logger.addHandler(handler)
 
-home_dir = '/home/martin/'
-df_dir = '/home/martin/ml/q1_q17/'
+home_dir = '/home/mdevo/'
+df_dir = '/data/scratch/ml/q1_q17/'
 lcs_dir = df_dir + '/lcs/'
 cache_dir = home_dir
-cores = 1
+cores = 4
 #uncompress_data('/mnt/DATA-2/ete6/backebs/BackEBs/')
 #uncompress_data('/mnt/DATA-2/ete6/ebs/EBs/')
 #uncompress_data('/mnt/DATA-2/ete6/planets/Planets/')
