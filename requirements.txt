@@ -3,4 +3,4 @@ tensorflow
 tensorflow-addons
 lcbuilder
 dearwatson
-#timesynth from github!
+timesynth @ git+https://https://github.com/TimeSynth/TimeSynth.git
