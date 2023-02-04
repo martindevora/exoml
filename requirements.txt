@@ -2,4 +2,5 @@ keras
 tensorflow
 tensorflow-addons
 lcbuilder
+dearwatson
 #timesynth from github!
