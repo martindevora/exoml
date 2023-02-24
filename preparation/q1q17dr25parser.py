@@ -83,5 +83,5 @@ def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_cou
     for index, tce_row in tces_df.iterrows():
         #tce_row = tces_df[tces_df['object_id'] == 'KIC 1026133'].iloc[0]
         inputs = inputs + [CreateTargetInput('KIC', tce_row['object_id'], None, target_dir, None, tce_row, cache_dir, force=force)]
-    with Pool(processes=cores) as pool:
+    with Pool(processes=cores, maxtasksperchild=1) as pool:
         pool.map(create_target_csv, inputs)
