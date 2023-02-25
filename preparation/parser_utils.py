@@ -335,33 +335,35 @@ def create_target_csv(create_target_input):
     mission_id = create_target_input.id
     file_id = mission_id.replace(' ', '_')
     file_prefix = create_target_input.target_dir + file_id
+    file_planet_prefix = file_prefix + '_' + \
+                         str(round(create_target_input.injected_files_df['period'], 2))
     try:
-        logging.info("Trying to get short cadence info for %s", mission_id)
-        file_name = file_prefix + '_metrics_short.csv'
+        logging.info("Trying to get short cadence info for %s", file_planet_prefix)
+        file_name = file_planet_prefix + '_metrics_short.csv'
         if create_target_input.force or not os.path.exists(file_name):
             lcbuild_short = \
                 mission_lightcurve_builder.build(MissionObjectInfo('all', mission_id, cadence='short'),
                                                  create_target_input.target_dir,
                                                  create_target_input.cache_dir)
-            prepare_lc_data(file_prefix, mission_id, lcbuild_short.lc_data,
+            prepare_lc_data(file_planet_prefix, mission_id, lcbuild_short.lc_data,
                             create_target_input.injected_files_df['duration(h)'] / 24,
                             create_target_input.injected_files_df['period'],
                             create_target_input.injected_files_df['epoch'],
                             lcbuild_short.star_info.ra, lcbuild_short.star_info.dec, lcbuild_short.star_info, False)
     except Exception as e:
-        logging.exception("Failed short cadence for %s", mission_id)
+        logging.exception("Failed short cadence for %s", file_planet_prefix)
     try:
-        logging.info("Trying to get long cadence info for %s", mission_id)
-        file_name = file_prefix + '_metrics_long.csv'
+        logging.info("Trying to get long cadence info for %s", file_planet_prefix)
+        file_name = file_planet_prefix + '_metrics_long.csv'
         if create_target_input.force or not os.path.exists(file_name):
             lcbuild_long = \
                 mission_lightcurve_builder.build(MissionObjectInfo('all', mission_id, cadence='long'),
                                                      create_target_input.target_dir,
                                                      create_target_input.cache_dir)
-            prepare_lc_data(file_prefix, mission_id, lcbuild_long.lc_data,
+            prepare_lc_data(file_planet_prefix, mission_id, lcbuild_long.lc_data,
                                     create_target_input.injected_files_df['duration(h)'] / 24,
                                     create_target_input.injected_files_df['period'],
                                     create_target_input.injected_files_df['epoch'],
                                     lcbuild_long.star_info.ra, lcbuild_long.star_info.dec, lcbuild_long.star_info, True)
     except Exception as e:
-        logging.exception("Failed long cadence for %s", mission_id)
+        logging.exception("Failed long cadence for %s", file_planet_prefix)
