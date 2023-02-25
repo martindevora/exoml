@@ -79,6 +79,7 @@ def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_cou
     tces_df = pd.read_csv(csv, comment='#')
     tces_df = tces_df.sort_values(by=["kepid"], ascending=True)
     #tces_df = tces_df.drop_duplicates(subset=["kepid"], keep='last')
+    tces_df = tces_df.sample(frac=1).reset_index(drop=True)
     print("Total number of targets is " + str(len(tces_df)))
     inputs = []
     for index, tce_row in tces_df.iterrows():
