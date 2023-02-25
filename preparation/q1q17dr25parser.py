@@ -78,10 +78,11 @@ def create_targets_df(tces_dir):
 def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_count() - 1, force=False):
     tces_df = pd.read_csv(csv, comment='#')
     tces_df = tces_df.sort_values(by=["kepid"], ascending=True)
-    tces_df = tces_df.drop_duplicates(subset=["kepid"], keep='last')
+    #tces_df = tces_df.drop_duplicates(subset=["kepid"], keep='last')
+    print("Total number of targets is " + str(len(tces_df)))
     inputs = []
     for index, tce_row in tces_df.iterrows():
         #tce_row = tces_df[tces_df['object_id'] == 'KIC 1026133'].iloc[0]
         inputs = inputs + [CreateTargetInput('KIC', tce_row['object_id'], None, target_dir, None, tce_row, cache_dir, force=force)]
     with Pool(processes=cores, maxtasksperchild=1) as pool:
-        pool.map(create_target_csv, inputs)
+        pool.map(create_target_csv, inputs, chunksize=1)
