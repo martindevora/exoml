@@ -1,4 +1,5 @@
 import logging
+import multiprocessing
 import os
 import pathlib
 import re
@@ -337,8 +338,9 @@ def create_target_csv(create_target_input):
     file_prefix = create_target_input.target_dir + file_id
     file_planet_prefix = file_prefix + '_' + \
                          str(round(create_target_input.injected_files_df['period'], 2))
+    pid = multiprocessing.current_process().pid
     try:
-        logging.info("Trying to get short cadence info for %s", file_planet_prefix)
+        logging.info("PID %s: Trying to get short cadence info for %s", pid, file_planet_prefix)
         file_name = file_planet_prefix + '_metrics_short.csv'
         if create_target_input.force or not os.path.exists(file_name):
             lcbuild_short = \
@@ -353,7 +355,7 @@ def create_target_csv(create_target_input):
     except Exception as e:
         logging.exception("Failed short cadence for %s", file_planet_prefix)
     try:
-        logging.info("Trying to get long cadence info for %s", file_planet_prefix)
+        logging.info("PID %s: Trying to get long cadence info for %s", pid, file_planet_prefix)
         file_name = file_planet_prefix + '_metrics_long.csv'
         if create_target_input.force or not os.path.exists(file_name):
             lcbuild_long = \
