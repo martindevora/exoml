@@ -353,7 +353,7 @@ def create_target_csv(create_target_input):
                             create_target_input.injected_files_df['epoch'],
                             lcbuild_short.star_info.ra, lcbuild_short.star_info.dec, lcbuild_short.star_info, False)
     except Exception as e:
-        logging.exception("Failed short cadence for %s", file_planet_prefix)
+        logging.exception("PID %s: Failed short cadence for %s", pid, file_planet_prefix)
     try:
         logging.info("PID %s: Trying to get long cadence info for %s", pid, file_planet_prefix)
         file_name = file_planet_prefix + '_metrics_long.csv'
@@ -368,4 +368,4 @@ def create_target_csv(create_target_input):
                                     create_target_input.injected_files_df['epoch'],
                                     lcbuild_long.star_info.ra, lcbuild_long.star_info.dec, lcbuild_long.star_info, True)
     except Exception as e:
-        logging.exception("Failed long cadence for %s", file_planet_prefix)
+        logging.exception("PID %s: Failed long cadence for %s", pid, file_planet_prefix)
