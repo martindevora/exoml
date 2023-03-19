@@ -64,6 +64,10 @@ def create_targets_df(tces_dir):
         result = disc_df.loc[index].combine_first(disc_df.loc[right_match_index[i]])
         result_df = pd.concat([result_df, result.to_frame().T], ignore_index=True)
     result_df.drop(result_df[result_df['duration(h)'].isnull()].index, inplace=True)
+    #
+    result_df.drop(result_df[result_df['object_id'] == 'KIC <NA>'].index, inplace=True)
+    # Remove latest KIC from the catalogue
+    result_df.drop(result_df[result_df['object_id'] == 'KIC 100001645'].index, inplace=True)
     result_df.to_csv(tces_dir + '/classified_tces.csv')
     #disc_df[disc_df['object_id'] == 'KIC 7377200'].iloc[0]['epoch']
     result_df = disc_df[disc_df['type'].isin(['fp', 'planet', 'planet_transit', 'tce'])]
@@ -75,15 +79,16 @@ def create_targets_df(tces_dir):
     result_df.to_csv(tces_dir + '/injected_objects.csv')
 
 
-def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_count() - 1, force=False):
+def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_count() - 1, force=False, ids=None):
     tces_df = pd.read_csv(csv, comment='#')
     tces_df = tces_df.sort_values(by=["kepid"], ascending=True)
     #tces_df = tces_df.drop_duplicates(subset=["kepid"], keep='last')
     tces_df = tces_df.sample(frac=1).reset_index(drop=True)
     print("Total number of targets is " + str(len(tces_df)))
     inputs = []
+    if ids is not None:
+        tces_df = tces_df[tces_df['object_id'].isin(ids)]
     for index, tce_row in tces_df.iterrows():
-        #tce_row = tces_df[tces_df['object_id'] == 'KIC 1026133'].iloc[0]
         inputs = inputs + [CreateTargetInput('KIC', tce_row['object_id'], None, target_dir, None, tce_row, cache_dir, force=force)]
     with Pool(processes=cores, maxtasksperchild=1) as pool:
         pool.map(create_target_csv, inputs, chunksize=1)
