@@ -45,39 +45,45 @@ def detrend(time_array, flux_array, detrend_window, time_threshold=0.0001, smoot
 
 
 class CreateStarCsvInput:
-    def __init__(self, lc_file, pixel_size, search_radius, lcs_regex, star_catalog, output_dir) -> None:
+    def __init__(self, object_id, pixel_size, search_radius, star_catalog, output_dir, force) -> None:
         super().__init__()
-        self.lc_file = lc_file
+        self.object_id = object_id
         self.search_radius = search_radius
         self.pixel_size = pixel_size * u.arcsec
-        self.lcs_regex = lcs_regex
         self.star_catalog = star_catalog
         self.output_dir = output_dir
+        self.force = force
 
-def create_star_csvs(lcs_dir, search_radius, pixel_size, star_catalog, fileslist_regex, object_id_regex,
-                     cores=os.cpu_count() - 1):
+def create_star_csvs(lcs_dir, search_radius, pixel_size, star_catalog, csv,
+                     cores=os.cpu_count() - 1, ids=None, force=False):
+    tces_df = pd.read_csv(csv, comment='#')
+    tces_df = tces_df.sort_values(by=["kepid"], ascending=True)
+    tces_df = tces_df.drop_duplicates(subset=["kepid"], keep='last')
+    tces_df = tces_df.sample(frac=1).reset_index(drop=True)
+    print("Total number of targets is " + str(len(tces_df)))
     create_star_inputs = []
-    for lc_file in list(pathlib.Path(lcs_dir).glob(fileslist_regex)):
-        create_star_inputs = create_star_inputs + [CreateStarCsvInput(str(lc_file), pixel_size, search_radius,
-                                                                      object_id_regex, star_catalog, lcs_dir)]
-    with Pool(processes=cores) as pool:
-        pool.map(create_star_csv, create_star_inputs)
+    if ids is not None:
+        tces_df = tces_df[tces_df['object_id'].isin(ids)]
+    for index, tce_row in tces_df.iterrows():
+        create_star_inputs = create_star_inputs + [CreateStarCsvInput(tce_row['object_id'], pixel_size,
+                                                                      search_radius, star_catalog, lcs_dir,
+                                                                      force)]
+    with Pool(processes=cores, maxtasksperchild=1) as pool:
+        pool.map(create_star_csv, create_star_inputs, chunksize=1)
 
 def create_star_csv(create_star_input):
     tries = 0
-    lc_filename_match = re.search(create_star_input.lcs_regex, create_star_input.lc_file)
-    object_id = int(lc_filename_match[2])
-    mission_id = lc_filename_match[1]
-    star_file = create_star_input.output_dir + '/' + mission_id + '_' + str(object_id) + '_star.csv'
-    if not os.path.exists(star_file):
+    star_file = create_star_input.output_dir + '/' + create_star_input.object_id + '_star.csv'
+    mission, mission_prefix, mission_id = LcBuilder().parse_object_info(create_star_input.object_id)
+    if not os.path.exists(star_file) or create_star_input.force:
         while tries < 3:
             try:
-                star_info = create_star_input.star_catalog.catalog_info(object_id)
+                star_info = create_star_input.star_catalog.catalog_info(mission_id)
                 star_df = pd.DataFrame(
                     columns=['id', 'ra', 'dec', 'ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h',
                              'k',
                              'dist_arcsec'])
-                star_df = star_df.append({'id': object_id, 'ra': star_info[11], 'dec': star_info[12],
+                star_df = star_df.append({'id': create_star_input.object_id, 'ra': star_info[11], 'dec': star_info[12],
                                           'ld_a': star_info[0][0],
                                           'ld_b': star_info[0][1], 'Teff': star_info[1],
                                           'lum': star_info[2], 'logg': star_info[3], 'radius': star_info[5],
@@ -86,10 +92,10 @@ def create_star_csv(create_star_input):
                                           'k': star_info[19], 'dist_arcsec': 0}, ignore_index=True)
                 break
             except Exception as e:
-                logging.exception("Failed object %s try", object_id)
+                logging.exception("Failed object %s try", create_star_input.object_id)
                 tries = tries + 1
         if tries >= 3:
-            print("Failed downloading object id " + str(object_id))
+            print("Failed downloading object id " + str(create_star_input.object_id))
         assert tries < 3
         try:  # Acquiring neighbours parameters
             ra = star_df['ra'].iloc[0]
@@ -142,9 +148,10 @@ def create_star_csv(create_star_input):
                                           'k': star['Kmag'], 'dist_arcsec': star['dist_arcsec']}, ignore_index=True)
             star_df = star_df.sort_values(["dist_arcsec"], ascending=True)
         except Exception as e:
-            logging.exception('Something failed when retrieving neighbours info for object id %s', str(object_id))
+            logging.exception('Something failed when retrieving neighbours info for object id %s',
+                              str(create_star_input.object_id))
         star_df.to_csv(star_file)
-    logging.info('Processed object id ' + str(object_id))
+    logging.info('Processed object id ' + str(create_star_input.object_id))
 
 def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_period, epoch, ra, dec, star_info, long_cadence):
     cadence = 'long' if long_cadence else 'short'
