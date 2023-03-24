@@ -1,6 +1,7 @@
 keras
 tensorflow
 tensorflow-addons
+ellc
 lcbuilder
 dearwatson
 timesynth @ git+https://https://github.com/TimeSynth/TimeSynth.git
