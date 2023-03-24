@@ -21,14 +21,15 @@ for filename in os.listdir(dir):
         logging.info("Removing %s", filename)
         os.remove(dir + '/' + filename)
 
+#df = pd.read_csv("/data/scratch/ml/q1_q17/injected_objects_tces.csv", index_col=False)
 df = pd.read_csv("/data/scratch/ml/q1_q17/classified_tces.csv", index_col=False)
-df = df.loc[df['type'].isin(['planet_transit', 'planet', 'tp', 'tce'])]
 #df = shuffle(df)
 #df.reset_index(inplace=True, drop=True)
 img = IatsonPlanetModelGenerator(df, dir, 1, [11, 135, 2500, 500, 500, 500, 500, 500, 500],
-                                 {'fp': [0], 'planet': [1], 'planet_transit': [1], 'tce': [0]}, from_arrays=False,
-                                 store_arrays=True, fixed_target_id=None, plot_inputs=False)
+                                 {'fp': [0], 'planet': [1], 'planet_transit': [1], 'tce': [0], 'candidate': [0],
+                                  'none': [0]}, from_arrays=False, store_arrays=True, plot_inputs=False)
 df_len = len(df)
 for i in range(0, df_len):
-    logging.info("Doing " + str(i) + " item of " + str(df_len))
+    object_id = df.iloc[i]['object_id']
+    logging.info("Doing " + object_id + " " + str(i) + " item of " + str(df_len))
     img.__getitem__(i)
