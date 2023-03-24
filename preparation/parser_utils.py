@@ -153,13 +153,20 @@ def create_star_csv(create_star_input):
         star_df.to_csv(star_file)
     logging.info('Processed object id ' + str(create_star_input.object_id))
 
-def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_period, epoch, ra, dec, star_info, long_cadence):
+def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_period, epoch, ra, dec, star_info,
+                    long_cadence, tpf_files=None):
     cadence = 'long' if long_cadence else 'short'
-    lc_data = lc_data.drop(['quality'], axis=1)
+    if 'quality' in lc_data.columns:
+        lc_data = lc_data.drop(['quality'], axis=1)
     lcbuilder = LcBuilder()
     mission, mission_prefix, id = lcbuilder.parse_object_info(object_id)
     author = lcbuilder.get_default_author(object_id, cadence)
-    tpfs = lightkurve.search_targetpixelfile(object_id, exptime=cadence, author=author).download_all()
+    if tpf_files is None:
+        tpfs = lightkurve.search_targetpixelfile(object_id, exptime=cadence, author=author).download_all()
+    else:
+        tpfs = []
+        for file in tpf_files:
+            tpfs.append(lightkurve.TessTargetPixelFile(file))
     lc_df = pd.DataFrame(columns=['#time', 'flux', 'flux_err', 'planet_model', 'eb_model', 'bckeb_model',
                                   'centroid_x', 'centroid_y', 'motion_x', 'motion_y', 'bck_flux'])
     flux_values = np.array(lc_data.flux)
@@ -302,7 +309,10 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
     geom_albedo = sec_depth * (semimajor_axis / rp)
     albedo = 0.5
     planet_eq_temp = star_info.teff * ((star_info.radius / (2 * semimajor_axis)) ** (1 / 2)) * ((1 - albedo) ** (1 / 4))
-    planet_eff_temp = star_info.teff * (sec_depth ** (1 / 4)) * (rp_rs ** (1 / 2))
+    if sec_depth < 0 or rp_rs < 0:
+        planet_eff_temp = np.nan
+    else:
+        planet_eff_temp = star_info.teff * (sec_depth ** (1 / 4)) * (rp_rs ** (1 / 2))
     statistics_df = pd.DataFrame(columns=['name', 'value'])
     statistics_df = statistics_df.append({'name': 'depth', 'value': depth}, ignore_index=True)
     statistics_df = statistics_df.append({'name': 'sec_depth', 'value': sec_depth}, ignore_index=True)
@@ -326,7 +336,8 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
     return lc_df
 
 class CreateTargetInput:
-    def __init__(self, mission, id, lc_file, target_dir, models_dir, injected_files_df, cache_dir, max_lc_length=20610, force=False) -> None:
+    def __init__(self, mission, id, lc_file, target_dir, models_dir, injected_files_df, cache_dir, max_lc_length=20610,
+                 force=False, tpf_files=None) -> None:
         super().__init__()
         self.mission = mission
         self.id = id
@@ -337,6 +348,7 @@ class CreateTargetInput:
         self.max_lc_length = max_lc_length
         self.cache_dir = cache_dir
         self.force = force
+        self.tpf_files = tpf_files
 
 def create_target_csv(create_target_input):
     mission_lightcurve_builder = MissionLightcurveBuilder()
