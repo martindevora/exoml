@@ -14,7 +14,7 @@ import pandas as pd
 
 class IatsonPlanetModelGenerator(Ete6ModelGenerator):
     def __init__(self, injected_objects_df, lcs_dir, batch_size, input_sizes, type_to_label, zero_epsilon=1e-7,
-                 measurements_per_point=3, plot_inputs=False, fixed_target_id=None, store_arrays=False,
+                 measurements_per_point=2, plot_inputs=False, fixed_target_id=None, store_arrays=False,
                  from_arrays=True):
         super().__init__(zero_epsilon)
         self.injected_objects_df = injected_objects_df
@@ -50,9 +50,9 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
 
     def _plot_input(self, input_array, input_err_array, type, scenario):
         if self.plot_inputs:
-            transposed_err_array = np.transpose(input_err_array)
+            transposed_err_array = []
             transposed_array = np.transpose(input_array)
-            fig, axs = plt.subplots(6, 2, figsize=(24, 12), constrained_layout=True)
+            fig, axs = plt.subplots(2, 2, figsize=(24, 12), constrained_layout=True)
             current_array = transposed_array[0]
             current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
             current_array = current_array[current_array_mask]
@@ -63,96 +63,99 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
             current_array = transposed_array[1]
             current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
             current_array = current_array[current_array_mask]
-            axs[0][1].errorbar(time_array[current_array_mask], current_array,
-                               yerr=transposed_err_array[1][current_array_mask], color="orange", alpha=0.5)
+            if input_err_array is not None:
+                transposed_err_array = np.transpose(input_err_array)
+                axs[0][1].errorbar(time_array[current_array_mask], current_array, ls='none',
+                                   yerr=transposed_err_array[1][current_array_mask], color="orange", alpha=0.5)
             axs[0][1].scatter(time_array[current_array_mask], current_array)
+            if len(transposed_array) > 2:
+                current_array = transposed_array[2]
+                current_array_mask = np.argwhere(
+                    (~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
+                current_array = current_array[current_array_mask]
+                if input_err_array is not None:
+                    axs[1][0].errorbar(time_array[current_array_mask], transposed_array[2], ls='none',
+                                       yerr=transposed_err_array[2][current_array_mask], color="orange", alpha=0.5)
+                axs[1][0].scatter(time_array[current_array_mask], current_array)
             #axs[0][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
             axs[0][1].set_title("Flux")
-            current_array = transposed_array[7]
-            current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            current_array = current_array[current_array_mask]
-            axs[1][0].errorbar(time_array[current_array_mask], current_array,
-                               yerr=transposed_err_array[7][current_array_mask], color="orange", alpha=0.5)
-            axs[1][0].scatter(time_array[current_array_mask], current_array)
-            # axs[1][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array),
-            #                    np.mean(current_array) + 6 * np.std(current_array))
             axs[1][0].set_title("Flux 1")
-            current_array = transposed_array[8]
-            current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            current_array = current_array[current_array_mask]
-            axs[1][1].errorbar(time_array[current_array_mask], current_array,
-                               yerr=transposed_err_array[8][current_array_mask], color="orange", alpha=0.5)
-            axs[1][1].scatter(time_array[current_array_mask], current_array)
-            # axs[1][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array),
-            #                    np.mean(current_array) + 6 * np.std(current_array))
-            axs[1][1].set_title("Flux 2")
-            current_array = transposed_array[9]
-            current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            current_array = current_array[current_array_mask]
-            axs[2][0].errorbar(time_array[current_array_mask], current_array,
-                               yerr=transposed_err_array[9][current_array_mask], color="orange", alpha=0.5)
-            axs[2][0].scatter(time_array[current_array_mask], current_array)
-            # axs[2][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array),
-            #                    np.mean(current_array) + 6 * np.std(current_array))
-            axs[2][0].set_title("Flux 3")
-            current_array = transposed_array[10]
-            current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            current_array = current_array[current_array_mask]
-            axs[2][1].errorbar(time_array[current_array_mask], current_array,
-                               yerr=transposed_err_array[10][current_array_mask], color="orange", alpha=0.5)
-            axs[2][1].scatter(time_array[current_array_mask], current_array)
-            # axs[2][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array),
-            #                    np.mean(current_array) + 6 * np.std(current_array))
-            axs[2][1].set_title("Flux 4")
-            current_array = transposed_array[11]
-            current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            current_array = current_array[current_array_mask]
-            axs[3][0].errorbar(time_array[current_array_mask], current_array,
-                               yerr=transposed_err_array[11][current_array_mask], color="orange", alpha=0.5)
-            axs[3][0].scatter(time_array[current_array_mask], current_array)
-            # axs[3][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array),
-            #                    np.mean(current_array) + 6 * np.std(current_array))
-            axs[3][0].set_title("Flux 5")
-            current_array = transposed_array[6]
-            current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            current_array = current_array[current_array_mask]
-            axs[3][1].errorbar(time_array[current_array_mask], current_array,
-                               yerr=transposed_err_array[6][current_array_mask], color="orange", alpha=0.5)
-            axs[3][1].scatter(time_array[current_array_mask], current_array)
-            # axs[3][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
-            axs[3][1].set_title("Bck Flux")
-            current_array = transposed_array[2]
-            current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            current_array = current_array[current_array_mask]
-            axs[4][0].errorbar(time_array[current_array_mask], current_array,
-                               yerr=transposed_err_array[2][current_array_mask], color="orange", alpha=0.5)
-            axs[4][0].scatter(time_array[current_array_mask], current_array)
-            # axs[4][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
-            axs[4][0].set_title("Centroid X")
-            current_array = transposed_array[3]
-            current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            current_array = current_array[current_array_mask]
-            axs[4][1].errorbar(time_array[current_array_mask], current_array,
-                               yerr=transposed_err_array[3][current_array_mask], color="orange", alpha=0.5)
-            axs[4][1].scatter(time_array[current_array_mask], current_array)
-            # axs[4][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
-            axs[4][1].set_title("Centroid Y")
-            current_array = transposed_array[4]
-            current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            current_array = current_array[current_array_mask]
-            axs[5][0].errorbar(time_array[current_array_mask], current_array,
-                               yerr=transposed_err_array[4][current_array_mask], color="orange", alpha=0.5)
-            axs[5][0].scatter(time_array[current_array_mask], current_array)
-            # axs[5][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
-            axs[5][0].set_title("Motion Y")
-            current_array = transposed_array[5]
-            current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            current_array = current_array[current_array_mask]
-            axs[5][1].errorbar(time_array[current_array_mask], current_array,
-                               yerr=transposed_err_array[5][current_array_mask], color="orange", alpha=0.5)
-            axs[5][1].scatter(time_array[current_array_mask], current_array)
-            # axs[5][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
-            axs[5][1].set_title("Motion Y")
+            # current_array = transposed_array[8]
+            # current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
+            # current_array = current_array[current_array_mask]
+            # axs[1][1].errorbar(time_array[current_array_mask], current_array,
+            #                    yerr=transposed_err_array[8][current_array_mask], color="orange", alpha=0.5)
+            # axs[1][1].scatter(time_array[current_array_mask], current_array)
+            # # axs[1][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array),
+            # #                    np.mean(current_array) + 6 * np.std(current_array))
+            # axs[1][1].set_title("Flux 2")
+            # current_array = transposed_array[9]
+            # current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
+            # current_array = current_array[current_array_mask]
+            # axs[2][0].errorbar(time_array[current_array_mask], current_array,
+            #                    yerr=transposed_err_array[9][current_array_mask], color="orange", alpha=0.5)
+            # axs[2][0].scatter(time_array[current_array_mask], current_array)
+            # # axs[2][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array),
+            # #                    np.mean(current_array) + 6 * np.std(current_array))
+            # axs[2][0].set_title("Flux 3")
+            # current_array = transposed_array[10]
+            # current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
+            # current_array = current_array[current_array_mask]
+            # axs[2][1].errorbar(time_array[current_array_mask], current_array,
+            #                    yerr=transposed_err_array[10][current_array_mask], color="orange", alpha=0.5)
+            # axs[2][1].scatter(time_array[current_array_mask], current_array)
+            # # axs[2][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array),
+            # #                    np.mean(current_array) + 6 * np.std(current_array))
+            # axs[2][1].set_title("Flux 4")
+            # current_array = transposed_array[11]
+            # current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
+            # current_array = current_array[current_array_mask]
+            # axs[3][0].errorbar(time_array[current_array_mask], current_array,
+            #                    yerr=transposed_err_array[11][current_array_mask], color="orange", alpha=0.5)
+            # axs[3][0].scatter(time_array[current_array_mask], current_array)
+            # # axs[3][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array),
+            # #                    np.mean(current_array) + 6 * np.std(current_array))
+            # axs[3][0].set_title("Flux 5")
+            # current_array = transposed_array[6]
+            # current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
+            # current_array = current_array[current_array_mask]
+            # axs[3][1].errorbar(time_array[current_array_mask], current_array,
+            #                    yerr=transposed_err_array[6][current_array_mask], color="orange", alpha=0.5)
+            # axs[3][1].scatter(time_array[current_array_mask], current_array)
+            # # axs[3][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
+            # axs[3][1].set_title("Bck Flux")
+            # current_array = transposed_array[2]
+            # current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
+            # current_array = current_array[current_array_mask]
+            # axs[4][0].errorbar(time_array[current_array_mask], current_array,
+            #                    yerr=transposed_err_array[2][current_array_mask], color="orange", alpha=0.5)
+            # axs[4][0].scatter(time_array[current_array_mask], current_array)
+            # # axs[4][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
+            # axs[4][0].set_title("Centroid X")
+            # current_array = transposed_array[3]
+            # current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
+            # current_array = current_array[current_array_mask]
+            # axs[4][1].errorbar(time_array[current_array_mask], current_array,
+            #                    yerr=transposed_err_array[3][current_array_mask], color="orange", alpha=0.5)
+            # axs[4][1].scatter(time_array[current_array_mask], current_array)
+            # # axs[4][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
+            # axs[4][1].set_title("Centroid Y")
+            # current_array = transposed_array[4]
+            # current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
+            # current_array = current_array[current_array_mask]
+            # axs[5][0].errorbar(time_array[current_array_mask], current_array,
+            #                    yerr=transposed_err_array[4][current_array_mask], color="orange", alpha=0.5)
+            # axs[5][0].scatter(time_array[current_array_mask], current_array)
+            # # axs[5][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
+            # axs[5][0].set_title("Motion Y")
+            # current_array = transposed_array[5]
+            # current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
+            # current_array = current_array[current_array_mask]
+            # axs[5][1].errorbar(time_array[current_array_mask], current_array,
+            #                    yerr=transposed_err_array[5][current_array_mask], color="orange", alpha=0.5)
+            # axs[5][1].scatter(time_array[current_array_mask], current_array)
+            # # axs[5][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
+            # axs[5][1].set_title("Motion Y")
             fig.suptitle(type + " " + scenario)
             plt.show()
             plt.clf()
@@ -160,7 +163,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
 
     def plot_single_data(self, lc_df, target_row):
         fig, axs = plt.subplots(1, 1, figsize=(8, 4), constrained_layout=True)
-        axs.scatter(lc_df['#time'], lc_df['flux_2'])
+        axs.scatter(lc_df['#time'], lc_df['flux_0'])
         axs.set_ylim(0.5 - target_row['tce_depth'] / 0.5e6, 0.505)
         plt.show()
         plt.clf()
@@ -188,12 +191,15 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
         folded_flux_even_har_array_err = np.empty((len(target_indexes), self.input_sizes[3], self.measurements_per_point))
         folded_flux_odd_har_array_err = np.empty((len(target_indexes), self.input_sizes[3], self.measurements_per_point))
         folded_centroids_array = np.empty((len(target_indexes), self.input_sizes[3], 3))
+        folded_centroids_array_err = np.empty((len(target_indexes), self.input_sizes[3], 3))
         folded_og_array = np.empty((len(target_indexes), self.input_sizes[3], 2))
+        folded_og_array_err = np.empty((len(target_indexes), self.input_sizes[3], 2))
         batch_data_values = np.empty((len(target_indexes), 1))
         i = 0
         for df_index, target_row in injected_objects_df.iterrows():
             if self.fixed_target_id is not None:
-                target_row = self.injected_objects_df[self.injected_objects_df['object_id'] == self.fixed_target_id].iloc[0]
+                target_row = self.injected_objects_df[self.injected_objects_df['object_id'] == self.fixed_target_id[0]]
+                target_row = target_row[target_row['period'] == self.fixed_target_id[1]]
             #TODO refactor to use mission for object_id
             object_id = target_row['object_id'].split(' ')
             mission_id = object_id[0]
@@ -204,7 +210,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
             duration_to_period = duration / period
             type = target_row['type']
             batch_data_values[i] = self.type_to_label[type]
-            file_prefix = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_' + str(np.round(period, 2))
+            file_prefix = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_' + str(round(period, 2))
             if self.from_arrays:
                 star_array[i] = [[e] for e in np.loadtxt(file_prefix + '_input_star.csv', delimiter=',')]
                 star_neighbours_array[i] = [[e] for e in np.loadtxt(file_prefix + '_input_nb.csv', delimiter=',')]
@@ -226,22 +232,20 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 folded_og_array[i] = np.loadtxt(file_prefix + '_input_og.csv', delimiter=',')
             else:
                 #TODO refactor to use mission for _lc files
-                lc_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_lc.csv'
-                centroids_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_cent.csv'
-                og_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_og.csv'
-                lc_short_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_lc_short.csv'
-                centroids_short_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_cent_short.csv'
-                og_short_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_og_short.csv'
-                lc_long_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_lc_long.csv'
-                centroids_long_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_cent_long.csv'
-                og_long_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_og_long.csv'
+                lc_filename = file_prefix + '_lc.csv'
+                centroids_filename = file_prefix + '_cent.csv'
+                og_filename = file_prefix + '_og.csv'
+                lc_short_filename = file_prefix + '_lc_short.csv'
+                centroids_short_filename = file_prefix + '_cent_short.csv'
+                og_short_filename = file_prefix + '_og_short.csv'
+                lc_long_filename = file_prefix + '_lc_long.csv'
+                centroids_long_filename = file_prefix + '_cent_long.csv'
+                og_long_filename = file_prefix + '_og_long.csv'
                 lc_df = None
                 centroids_df = None
                 og_df = None
                 if os.path.exists(lc_filename):
-                    read_df = pd.read_csv(lc_filename, usecols=['#time', 'flux', 'flux_0',
-                                                                'centroid_x', 'centroid_y', 'motion_x', 'motion_y',
-                                                                'bck_flux'], low_memory=True)
+                    read_df = pd.read_csv(lc_filename, usecols=['#time', 'flux_0'], low_memory=True)
                     lc_df = read_df if lc_df is None else lc_df.append(read_df, ignore_index=True)
                 if os.path.exists(centroids_filename):
                     read_centroids_df = pd.read_csv(centroids_filename, usecols=['time', 'centroids_ra', 'centroids_dec'],
@@ -254,9 +258,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                     og_df = read_og_df if og_df is None \
                         else centroids_df.append(read_og_df, ignore_index=True)
                 if os.path.exists(lc_long_filename):
-                    read_df = pd.read_csv(lc_long_filename, usecols=['#time', 'flux', 'flux_0',
-                                                                'centroid_x', 'centroid_y', 'motion_x', 'motion_y',
-                                                                'bck_flux'], low_memory=True)
+                    read_df = pd.read_csv(lc_long_filename, usecols=['#time', 'flux_0'], low_memory=True)
                     lc_df = read_df if lc_df is None else lc_df.append(read_df, ignore_index=True)
                 if os.path.exists(centroids_long_filename):
                     read_centroids_df = pd.read_csv(centroids_long_filename, usecols=['time', 'centroids_ra', 'centroids_dec'],
@@ -267,11 +269,9 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                     read_og_df = pd.read_csv(og_long_filename, usecols=['time', 'og_flux'],
                                              low_memory=True)
                     og_df = read_og_df if og_df is None \
-                        else centroids_df.append(read_og_df, ignore_index=True)
+                        else og_df.append(read_og_df, ignore_index=True)
                 if os.path.exists(lc_short_filename):
-                    read_df = pd.read_csv(lc_short_filename, usecols=['#time', 'flux', 'flux_0',
-                                                                'centroid_x', 'centroid_y', 'motion_x', 'motion_y',
-                                                                'bck_flux'], low_memory=True)
+                    read_df = pd.read_csv(lc_short_filename, usecols=['#time', 'flux_0'], low_memory=True)
                     lc_df = read_df if lc_df is None else lc_df.append(read_df, ignore_index=True)
                 if os.path.exists(centroids_short_filename):
                     read_centroids_df = pd.read_csv(centroids_short_filename, usecols=['time', 'centroids_ra', 'centroids_dec'],
@@ -282,25 +282,25 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                     read_og_df = pd.read_csv(og_short_filename, usecols=['time', 'og_flux'],
                                              low_memory=True)
                     og_df = read_og_df if og_df is None \
-                        else centroids_df.append(read_og_df, ignore_index=True)
+                        else og_df.append(read_og_df, ignore_index=True)
                 if lc_df is None:
-                    logging.warning("No curve for target " + str(target_row['object_id']))
+                    logging.warning("No curve for target " + file_prefix)
                 assert lc_df is not None
                 lc_df = lc_df.sort_values(by=['#time'])
                 centroids_df['time'] = foldedleastsquares.fold(centroids_df['time'].to_numpy(), period, epoch + period / 2)
                 og_df['time'] = foldedleastsquares.fold(og_df['time'].to_numpy(), period, epoch + period / 2)
                 centroids_df = centroids_df.sort_values(by=['time'])
                 og_df = og_df.sort_values(by=['time'])
-                centroids_df = centroids_df.dropna()
-                og_df = og_df.dropna()
+                centroids_df = self._prepare_input_centroids(centroids_df)
+                og_df = self._prepare_input_og(og_df)
                 og_df = og_df[(og_df['time'] > 0.5 - duration_to_period * 3) & (
                         og_df['time'] < 0.5 + duration_to_period * 3)]
                 centroids_df = centroids_df[(centroids_df['time'] > 0.5 - duration_to_period * 3) & (
                         centroids_df['time'] < 0.5 + duration_to_period * 3)]
-                folded_centroids_array[i], _ = self.bin_by_time(centroids_df.to_numpy(), self.input_sizes[3], target_row['object_id'])
-                folded_og_array[i], _ = self.bin_by_time(og_df.to_numpy(), self.input_sizes[3], target_row['object_id'])
+                folded_centroids_array[i], folded_centroids_array_err[i] = self.bin_by_time(centroids_df.to_numpy(), self.input_sizes[3], target_row['object_id'])
+                folded_og_array[i], folded_og_array_err[i] = self.bin_by_time(og_df.to_numpy(), self.input_sizes[3], target_row['object_id'])
                 #TODO refactor to use mission for star files
-                star_filename = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_star.csv'
+                star_filename = self.lcs_dir + '/' + mission_id + ' ' + str(target_id) + '_star.csv'
                 star_neighbours_df = pd.read_csv(star_filename,
                                                  usecols=['Teff', 'lum', 'v', 'j', 'k', 'h', 'radius', 'mass',
                                                           'dist_arcsec'], index_col=False)
@@ -405,6 +405,8 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
             self._plot_input(folded_flux_odd_subhar_array[i], folded_flux_odd_subhar_array_err[i], type, "odd_subhar")
             self._plot_input(folded_flux_even_har_array[i], folded_flux_even_har_array_err[i], type, "even_har")
             self._plot_input(folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i], type, "odd_har")
+            self._plot_input(folded_og_array[i], folded_og_array_err[i], type, "OG")
+            self._plot_input(folded_centroids_array[i], folded_centroids_array_err[i], type, "CENTROIDS")
             if self.store_arrays:
                 logging.info("Storing arrays into prefix " + file_prefix)
                 np.savetxt(file_prefix + '_input_star.csv', star_array[i], delimiter=',', fmt='%f')
@@ -431,11 +433,12 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
             i = i + 1
         filter_channels = np.array([0, 1, 6, 7, 8, 9, 10, 11])
         return [star_array, star_neighbours_array,
-                global_flux_array[:, :, filter_channels], global_flux_array_err[:, :, filter_channels],
-                folded_flux_even_array[:, :, filter_channels], folded_flux_even_array_err[:, :, filter_channels],
-                folded_flux_odd_array[:, :, filter_channels], folded_flux_odd_array_err[:, :, filter_channels],
-                folded_flux_even_subhar_array[:, :, filter_channels], folded_flux_even_subhar_array_err[:, :, filter_channels],
-                folded_flux_odd_subhar_array[:, :, filter_channels], folded_flux_odd_subhar_array_err[:, :, filter_channels],
-                folded_flux_even_har_array[:, :, filter_channels], folded_flux_even_har_array_err[:, :, filter_channels],
-                folded_flux_odd_har_array[:, :, filter_channels], folded_flux_odd_har_array_err[:, :, filter_channels],
-                folded_centroids_array, folded_og_array], batch_data_values
+                global_flux_array, global_flux_array_err,
+                folded_flux_even_array, folded_flux_even_array_err,
+                folded_flux_odd_array, folded_flux_odd_array_err,
+                folded_flux_even_subhar_array, folded_flux_even_subhar_array_err,
+                folded_flux_odd_subhar_array, folded_flux_odd_subhar_array_err,
+                folded_flux_even_har_array, folded_flux_even_har_array_err,
+                folded_flux_odd_har_array, folded_flux_odd_har_array_err,
+                folded_centroids_array, folded_centroids_array_err, folded_og_array, folded_og_array_err], \
+            batch_data_values
