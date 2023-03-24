@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import foldedleastsquares
 import scipy
 import timesynth
+from lcbuilder.helper import LcbuilderHelper
 from numpy.random import default_rng
 from scipy import stats
 
@@ -48,7 +49,13 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
                 try:
                     bin_means, bin_edges, binnumber = stats.binned_statistic(masked_time_array, nested_array,
                                                                              statistic='mean', bins=new_size)
-                    bin_stds, _, _ = stats.binned_statistic(masked_time_array, nested_array, statistic='std', bins=new_size)
+                    bin_stds, _, _ = stats.binned_statistic(masked_time_array, nested_array, statistic='std',
+                                                            bins=new_size)
+                    if new_size > len(nested_array):
+                        nans, x = self.nan_helper(bin_means)
+                        bin_means[nans] = np.interp(x(nans), x(~nans), bin_means[~nans])
+                        nans, x = self.nan_helper(bin_means)
+                        bin_stds[nans] = np.interp(x(nans), x(~nans), bin_stds[~nans])
                     bin_width = (bin_edges[1] - bin_edges[0])
                     bin_centers = bin_edges[1:] - bin_width / 2
                     if np.max(result[0]) == 0:
@@ -56,37 +63,71 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
                         result_err[0] = np.full((new_size), 0.5)
                     # Store binning values for flux
                     result[index] = bin_means
-                    result_err[index] = bin_stds
+                    result_err[index] = bin_stds if len(np.isnan(bin_stds)) == 0 else np.full((new_size), np.nanstd(bin_means))
                 except Exception as e:
                     logging.exception("Error when interpolating for target " + str(target) + ", will create empty input array")
         return np.transpose(np.nan_to_num(result)), np.transpose(np.nan_to_num(result_err))
+
+    @staticmethod
+    def nan_helper(y):
+        """Helper to handle indices and logical indices of NaNs.
+
+        Input:
+            - y, 1d numpy array with possible NaNs
+        Output:
+            - nans, logical indices of NaNs
+            - index, a function, with signature indices= index(logical_indices),
+              to convert logical indices of NaNs to 'equivalent' indices
+        Example:
+            >>> # linear interpolation of NaNs
+            >>> nans, x= nan_helper(y)
+            >>> y[nans]= np.interp(x(nans), x(~nans), y[~nans])
+        """
+        return np.isnan(y), lambda z: z.nonzero()[0]
+
+    def _prepare_input_centroids(self, input_df):
+        if len(input_df) > 0:
+            _, ra_outliers_mask = LcbuilderHelper.clip_outliers(input_df['centroids_ra'].to_numpy(), 3)
+            _, dec_outliers_mask = LcbuilderHelper.clip_outliers(input_df['centroids_dec'].to_numpy(), 3)
+            outliers_mask = np.logical_or(ra_outliers_mask, dec_outliers_mask)
+            input_df_clipped = input_df.loc[~outliers_mask]
+            if len(input_df_clipped) > 0:
+                min_value = np.nanmin(input_df['centroids_ra'])
+                input_df['centroids_ra'] = input_df['centroids_ra'] - min_value
+                input_df['centroids_ra'] = input_df['centroids_ra'] / np.nanmax(input_df['centroids_ra'])
+                input_df['centroids_ra'] = input_df['centroids_ra'] - np.nanmedian(input_df['centroids_ra']) + 0.5
+                min_value = np.nanmin(input_df['centroids_dec'])
+                input_df['centroids_dec'] = input_df['centroids_dec'] - min_value
+                input_df['centroids_dec'] = input_df['centroids_dec'] / np.nanmax(input_df['centroids_dec'])
+                input_df['centroids_dec'] = input_df['centroids_dec'] - np.nanmedian(input_df['centroids_dec']) + 0.5
+                input_df = input_df.fillna(self.zero_epsilon)
+                input_df = input_df.replace(0.0, self.zero_epsilon)
+                input_df = input_df.replace(0, self.zero_epsilon)
+        return input_df
+
+    def _prepare_input_og(self, input_df):
+        if len(input_df) > 0:
+            _, outliers_mask = LcbuilderHelper.clip_outliers(input_df['og_flux'].to_numpy(), 3)
+            input_df_clipped = input_df.loc[~outliers_mask]
+            if len(input_df_clipped) > 0:
+                min_value = np.nanmin(input_df['og_flux'])
+                input_df['og_flux'] = input_df['og_flux'] - min_value
+                input_df['og_flux'] = input_df['og_flux'] / np.nanmax(input_df['og_flux'])
+                input_df['og_flux'] = input_df['og_flux'] - np.nanmedian(input_df['og_flux']) + 0.5
+            input_df = input_df.fillna(self.zero_epsilon)
+            input_df = input_df.replace(0.0, self.zero_epsilon)
+            input_df = input_df.replace(0, self.zero_epsilon)
+        return input_df
 
     def _prepare_input_lc(self, input_df):
         time = input_df["#time"].to_numpy()
         # We don't want time encoding because time will be used for folding and then dropped
         #input_df["#time"] = value_encode_times(time - time[0])
-        dif = time[1:] - time[:-1]
-        jumps = np.where(np.abs(dif) > 0.25)[0]
-        jumps = np.append(jumps, len(input_df))
-        previous_jump_index = 0
-        epsilon = 1e-6
-        for jumpIndex in jumps:
-            token = input_df["centroid_x"][previous_jump_index:jumpIndex + 1].to_numpy()
-            input_df["centroid_x"][previous_jump_index:jumpIndex + 1] = token / (np.nanmedian(token) + epsilon)
-            token = input_df["centroid_y"][previous_jump_index:jumpIndex + 1].to_numpy()
-            input_df["centroid_y"][previous_jump_index:jumpIndex + 1] = token / (np.nanmedian(token) + epsilon)
-            token = input_df["motion_x"][previous_jump_index:jumpIndex + 1].to_numpy()
-            input_df["motion_x"][previous_jump_index:jumpIndex + 1] = token + 0.5
-            token = input_df["motion_y"][previous_jump_index:jumpIndex + 1].to_numpy()
-            input_df["motion_y"][previous_jump_index:jumpIndex + 1] = token + 0.5
-            token = input_df["bck_flux"][previous_jump_index:jumpIndex + 1].to_numpy()
-            input_df["bck_flux"][previous_jump_index:jumpIndex + 1] = token / (np.nanmedian(token) + epsilon)
-            previous_jump_index = jumpIndex + 1
-        red_noise_freq = self.random_number_generator.uniform(0.01, 0.1)
-        flux_std = np.std(input_df['flux'])
-        red_noise_sd = self.random_number_generator.uniform(0, flux_std * 3)
-        red_noise = timesynth.noise.RedNoise(std=red_noise_sd, tau=red_noise_freq)
-        timeseries_rn = np.zeros(len(time))
+        # red_noise_freq = self.random_number_generator.uniform(0.01, 0.1)
+        # flux_std = np.std(input_df['flux'])
+        # red_noise_sd = self.random_number_generator.uniform(0, flux_std * 3)
+        # red_noise = timesynth.noise.RedNoise(std=red_noise_sd, tau=red_noise_freq)
+        # timeseries_rn = np.zeros(len(time))
         # TODO red noise algorithm is too slow for long time series
         # timeseries_rn = []
         # for value in time:
@@ -94,32 +135,9 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         #     rn_value = rn_value[0] if isinstance(rn_value, (list, np.ndarray)) else rn_value
         #     timeseries_rn = timeseries_rn + [rn_value]
         # timeseries_rn = np.array(timeseries_rn)
-        input_df['flux'] = input_df['flux'] + timeseries_rn
-        input_df['flux_0'] = input_df['flux_0'] + timeseries_rn
-        input_df['flux_1'] = input_df['flux_1'] + timeseries_rn
-        input_df['flux_2'] = input_df['flux_2'] + timeseries_rn
-        input_df['flux_3'] = input_df['flux_3'] + timeseries_rn
-        input_df['flux_4'] = input_df['flux_4'] + timeseries_rn
-        input_df['flux'] = input_df['flux'] / 2
-        input_df['flux'][input_df['flux'] > 1] = 1
+        # input_df['flux_0'] = input_df['flux_0'] + timeseries_rn
         input_df['flux_0'] = input_df['flux_0'] / 2
         input_df['flux_0'][input_df['flux_0'] > 1] = 1
-        input_df['flux_1'] = input_df['flux_1'] / 2
-        input_df['flux_1'][input_df['flux_1'] > 1] = 1
-        input_df['flux_2'] = input_df['flux_2'] / 2
-        input_df['flux_2'][input_df['flux_2'] > 1] = 1
-        input_df['flux_3'] = input_df['flux_3'] / 2
-        input_df['flux_3'][input_df['flux_3'] > 1] = 1
-        input_df['flux_4'] = input_df['flux_4'] / 2
-        input_df['flux_4'][input_df['flux_4'] > 1] = 1
-        input_df['centroid_x'] = input_df['centroid_x'] / 2
-        input_df['centroid_x'][input_df['centroid_x'] > 1] = 1
-        input_df['centroid_y'] = input_df['centroid_y'] / 2
-        input_df['centroid_y'][input_df['centroid_y'] > 1] = 1
-        input_df['motion_x'][input_df['motion_x'] > 1] = 1
-        input_df['motion_y'][input_df['motion_y'] > 1] = 1
-        input_df['bck_flux'] = input_df['bck_flux'] / 2
-        input_df['bck_flux'][input_df['bck_flux'] > 1] = 1
         input_df = input_df.fillna(self.zero_epsilon)
         input_df = input_df.replace(0.0, self.zero_epsilon)
         input_df = input_df.replace(0, self.zero_epsilon)

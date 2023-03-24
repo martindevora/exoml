@@ -1,16 +1,24 @@
 import gzip
+import logging
 import multiprocessing
 import os
 import pathlib
 import shutil
 from multiprocessing import Pool
+
+import ellc
 import pandas as pd
 import numpy as np
+import timesynth
+from lcbuilder.star import starinfo
 from lcbuilder.star.TicStarCatalog import TicStarCatalog
+
+import astropy.units as u
+import astropy.constants as ac
 from lightkurve import TessLightCurve
 from numpy.random import default_rng
 from ml.physics.transit_functions import t14
-from preparation.parser_utils import CreateTargetInput, create_star_csvs, detrend
+from preparation.parser_utils import CreateTargetInput, create_star_csvs, detrend, prepare_lc_data
 
 
 def create_injection_dataframe(injections_dir, lcs_dir):
@@ -47,7 +55,7 @@ def create_injection_dataframe(injections_dir, lcs_dir):
         epoch = random_number_generator.uniform(min_lc_time, min_lc_time + period)
         duration = t14(star_radius, star_mass, period)
         duration = duration * 24
-        df = df.append({'object_id': 'TIC ' + object_id, 'type': 'none', 'period': period,
+        df = df.append({'object_id': 'TIC ' + str(object_id), 'type': 'none', 'period': period,
                    'epoch': epoch,
                    'Rsec/Rpri': 0,
                    'b': 0,
@@ -72,7 +80,7 @@ def create_injection_dataframe(injections_dir, lcs_dir):
             else:
                 duration = t14(star_radius, star_mass, period)
             duration = duration * 24
-            df = df.append({'object_id': 'TIC ' + target_row['TIC ID'], 'type': 'bckEB', 'period': period,
+            df = df.append({'object_id': 'TIC ' + str(int(target_row['TIC ID'])), 'type': 'bckEB', 'period': period,
                        'epoch': epoch,
                        'Rsec/Rpri': target_row['Secondary Rstar'] / target_row['Primary Rstar'],
                        'b': target_row['Impact Parameter'],
@@ -97,7 +105,7 @@ def create_injection_dataframe(injections_dir, lcs_dir):
             else:
                 duration = t14(star_radius, star_mass, period)
             duration = duration * 24
-            df = df.append({'object_id': 'TIC ' + target_row['TIC ID'], 'type': 'EB', 'period': period,
+            df = df.append({'object_id': 'TIC ' + str(int(target_row['TIC ID'])), 'type': 'EB', 'period': period,
                        'epoch': epoch,
                        'Rsec/Rpri': target_row['Secondary Rstar'] / target_row['Primary Rstar'],
                        'b': target_row['Impact Parameter'],
@@ -124,7 +132,7 @@ def create_injection_dataframe(injections_dir, lcs_dir):
                 else:
                     duration = t14(star_radius, star_mass, period)
                 duration = duration * 24
-            df = df.append({'object_id': 'TIC ' + target_row['TIC ID'], 'type': 'planet', 'period': period,
+            df = df.append({'object_id': 'TIC ' + str(int(target_row['TIC ID'])), 'type': 'planet', 'period': period,
                        'epoch': epoch,
                        'Rsec/Rpri': target_row['Rp/Rstar'],
                        'b': target_row['Impact Parameter'],
@@ -145,57 +153,217 @@ def create_injection_dataframe(injections_dir, lcs_dir):
     df.to_csv(injections_dir + '/injected_objects.csv')
 
 
-def create_target_csvs(lcs_dir, models_dir, cores=multiprocessing.cpu_count() - 1, max_lc_length=20610):
+def create_target_csvs(lcs_dir, models_dir, cores=multiprocessing.cpu_count() - 1, max_lc_length=20610, force=False):
     injected_files_df = pd.read_csv(models_dir + '/injected_objects.csv')
     inputs = []
-    for file in list(pathlib.Path(lcs_dir).glob('*.fits')):
-        lc_file = str(file)
-        inputs = inputs + [CreateTargetInput('TIC', None, str(lc_file), lcs_dir, models_dir, injected_files_df,
-                                             None, max_lc_length)]
-    with Pool(processes=cores) as pool:
-        pool.map(_create_target_csv, inputs)
-
+    for index, target_row in injected_files_df.iterrows():
+        object_id = target_row['object_id']
+        mission_id = object_id.split(' ')[1]
+        lc_file = lcs_dir + "/tess2019128220341-" + str(mission_id).zfill(16) + "-0016-s_lc.fits"
+        tpf_file = lcs_dir + "/tpfs/tess2019128220341-" + str(mission_id).zfill(16) + "-0016-s_tp.fits"
+        inputs = inputs + [CreateTargetInput('TIC', object_id, lc_file, lcs_dir, models_dir, target_row,
+                                             None, max_lc_length, tpf_files=[tpf_file], force=force)]
+    with Pool(processes=cores, maxtasksperchild=1) as pool:
+        pool.map(_create_target_csv, inputs, chunksize=1)
 
 def _create_target_csv(create_target_input):
-    print("Processing lc " + create_target_input.lc_file)
-    lc_df = pd.DataFrame(columns=['#time', 'flux', 'flux_err', 'planet_model', 'eb_model', 'bckeb_model',
+    pid = multiprocessing.current_process().pid
+    file_prefix = create_target_input.target_dir + '/' + create_target_input.id
+    file_planet_prefix = file_prefix + '_' + \
+                         str(round(create_target_input.injected_files_df['period'], 2))
+    logging.info("PID %s: Trying to get info for %s", pid, file_planet_prefix)
+    file_name = file_planet_prefix + '_metrics_short.csv'
+    if create_target_input.force or not os.path.exists(file_name):
+        try:
+            lc_df = pd.DataFrame(columns=['#time', 'flux', 'flux_err', 'planet_model', 'eb_model', 'bckeb_model',
+                                          'centroid_ra', 'centroid_dec', 'og_flux', 'bck_flux'])
+            lc = TessLightCurve.read(create_target_input.lc_file)
+            mission_id = lc.meta['OBJECT']
+            mission_id = int(mission_id.split(' ')[1])
+            leading_zeros_object_id = '{:09}'.format(mission_id)
+            lc_length = len(lc)
+            eb_model_flux = np.ones(lc_length)
+            backeb_model_flux = np.ones(lc_length)
+            planet_model_flux = np.ones(lc_length)
+            model_file = create_target_input.models_dir + '/ebs/EBs/EBs' + '_' + leading_zeros_object_id + '.txt'
+            if os.path.exists(model_file):
+                model_df = pd.read_csv(model_file, header=None)
+                eb_model_flux = model_df[0].to_numpy()
+                eb_model_flux = eb_model_flux / np.median(eb_model_flux)
+                eb_model_flux = resample_model(eb_model_flux, lc.time.value)
+            model_file = create_target_input.models_dir + '/backebs/BackEBs/BackEBs_' + '_' + leading_zeros_object_id + '.txt'
+            if os.path.exists(model_file):
+                model_df = pd.read_csv(model_file, header=None)
+                backeb_model_flux = model_df[0].to_numpy()
+                backeb_model_flux = backeb_model_flux / np.median(backeb_model_flux)
+                backeb_model_flux = resample_model(backeb_model_flux, lc.time.value)
+                # import matplotlib.pyplot as plt
+                # plt.scatter(np.linspace(lc.time.value[0], lc.time.value[-1], len(eb_model_flux)), eb_model_flux)
+                # plt.scatter(lc.time.value, lc.pdcsap_flux.value / np.median(lc.pdcsap_flux.value))
+                # plt.show()
+            model_file = create_target_input.models_dir + '/planets/Planets/Planets' + '_' + leading_zeros_object_id + '.txt'
+            if os.path.exists(model_file):
+                model_df = pd.read_csv(model_file, header=None)
+                planet_model_flux = model_df[0].to_numpy()
+                planet_model_flux = planet_model_flux / np.median(planet_model_flux)
+                planet_model_flux = resample_model(planet_model_flux, lc.time.value)
+            padding_zeros_count = create_target_input.max_lc_length - lc_length
+            padding_zeros_count = 0 if padding_zeros_count < 0 else padding_zeros_count
+            padding_zeros_count_left = padding_zeros_count // 2 + 1 if padding_zeros_count % 2 != 0 else padding_zeros_count // 2
+            padding_zeros_count_right = padding_zeros_count // 2
+            padding_zeros_left = np.zeros(padding_zeros_count_left)
+            padding_zeros_right = np.zeros(padding_zeros_count_right)
+            padding_ones_left = np.zeros(padding_zeros_count_left)
+            padding_ones_right = np.zeros(padding_zeros_count_right)
+            flux_values = np.array(lc.pdcsap_flux.value)
+            median_flux = np.median(flux_values)
+            flux_values = flux_values / median_flux
+            if len(np.argwhere(flux_values < 0).flatten()) > 0:
+                flux_values = np.array(lc.pdcsap_flux.value) + 2 * np.abs(np.nanmin(lc.pdcsap_flux.value))
+                median_flux = np.median(flux_values)
+                flux_values = flux_values / median_flux
+            time_values = lc.time.value
+            duration = create_target_input.injected_files_df['duration(h)'] / 24
+            duration_to_period = duration / create_target_input.injected_files_df['period']
+            flux_detrend_0 = detrend(time_values, flux_values, duration_to_period * 4)
+            lc_df['flux_0'] = flux_detrend_0
+            bck_flux_detrend = detrend(time_values, flux_values, duration_to_period * 4, smooth=False)
+            lc_df['background_flux'] = bck_flux_detrend
+            flux_err_values = np.array(lc.flux_err.value) / median_flux
+            lc_df['time'] = np.array(lc.time.value)
+            lc_df['flux'] = flux_values
+            lc_df['flux_err'] = flux_err_values
+            lc_df['centroids_x'] = np.array(lc.centroid_col.value)
+            lc_df['centroids_y'] = np.array(lc.centroid_row.value)
+            lc_df['motion_x'] = np.array(lc.mom_centr1.value)
+            lc_df['motion_y'] = np.array(lc.mom_centr2.value)
+            lc_df['eb_model'] = np.array(eb_model_flux)
+            lc_df['bckeb_model'] = np.array(backeb_model_flux)
+            lc_df['planet_model'] = np.array(planet_model_flux)
+            lc_df = lc_df.fillna(0)
+            star_info = starinfo.StarInfo(create_target_input.id, *TicStarCatalog().catalog_info(mission_id))
+            prepare_lc_data(file_planet_prefix, create_target_input.id, lc_df,
+                            create_target_input.injected_files_df['duration(h)'] / 24,
+                            create_target_input.injected_files_df['period'],
+                            create_target_input.injected_files_df['epoch'],
+                            star_info.ra, star_info.dec, star_info, False, tpf_files=create_target_input.tpf_files)
+        except Exception as e:
+            logging.exception("PID %s: Failed get info for %s", pid, file_planet_prefix)
+
+
+def create_injected_target_csvs(create_target_input):
+    random_number_generator = default_rng()
+    lc_df = pd.DataFrame(columns=['#time', 'flux', 'flux_err',
+                                  'centroid_x', 'centroid_y', 'motion_x', 'motion_y', 'bck_flux'])
+    lc_df_injected = pd.DataFrame(columns=['#time', 'flux', 'flux_err', 'planet_model',
                                   'centroid_x', 'centroid_y', 'motion_x', 'motion_y', 'bck_flux'])
     try:
         lc = TessLightCurve.read(create_target_input.lc_file)
     except Exception as e:
         print("Invalid fits file " + create_target_input.lc_file)
         return
+    try:
+        star_df = pd.read_csv(create_target_input.star_file)
+    except Exception as e:
+        print("Invalid fits file " + create_target_input.lc_file)
+        return
+    star_radius = star_df.loc[0, 'radius']
+    star_mass = star_df.loc[0, 'mass']
+    ld = (star_df.loc[0, 'ld_a'], star_df.loc[0, 'ld_b'])
     object_id = lc.meta['OBJECT']
     object_id = int(object_id.split(' ')[1])
     mission_id = 'TIC'
-    injected_file_row = create_target_input.injected_files_df[create_target_input.injected_files_df['TIC ID'] == object_id]
+    injected_file_row = create_target_input.injected_files_df[
+        create_target_input.injected_files_df['TIC ID'] == object_id]
     leading_zeros_object_id = '{:09}'.format(object_id)
     lc_length = len(lc)
-    eb_model_flux = np.ones(lc_length)
-    backeb_model_flux = np.ones(lc_length)
+    padding_zeros_count = create_target_input.max_lc_length - lc_length
+    padding_zeros_count = 0 if padding_zeros_count < 0 else padding_zeros_count
+    padding_zeros_count_left = padding_zeros_count // 2 + 1 if padding_zeros_count % 2 != 0 else padding_zeros_count // 2
+    padding_zeros_count_right = padding_zeros_count // 2
+    padding_zeros_left = np.zeros(padding_zeros_count_left)
+    padding_zeros_right = np.zeros(padding_zeros_count_right)
+    padding_ones_left = np.zeros(padding_zeros_count_left)
+    padding_ones_right = np.zeros(padding_zeros_count_right)
     planet_model_flux = np.ones(lc_length)
-    model_file = create_target_input.models_dir + '/ebs/EBs/EBs' + '_' + leading_zeros_object_id + '.txt'
-    if os.path.exists(model_file):
-        model_df = pd.read_csv(model_file, header=None)
-        eb_model_flux = model_df[0].to_numpy()
-        eb_model_flux = eb_model_flux / np.median(eb_model_flux)
-        eb_model_flux = resample_model(eb_model_flux, lc.time.value)
-    model_file = create_target_input.models_dir + '/backebs/BackEBs/BackEBs_' + '_' + leading_zeros_object_id + '.txt'
-    if os.path.exists(model_file):
-        model_df = pd.read_csv(model_file, header=None)
-        backeb_model_flux = model_df[0].to_numpy()
-        backeb_model_flux = backeb_model_flux / np.median(backeb_model_flux)
-        backeb_model_flux = resample_model(backeb_model_flux, lc.time.value)
-        # import matplotlib.pyplot as plt
-        # plt.scatter(np.linspace(lc.time.value[0], lc.time.value[-1], len(eb_model_flux)), eb_model_flux)
-        # plt.scatter(lc.time.value, lc.pdcsap_flux.value / np.median(lc.pdcsap_flux.value))
-        # plt.show()
-    model_file = create_target_input.models_dir + '/planets/Planets/Planets' + '_' + leading_zeros_object_id + '.txt'
-    if os.path.exists(model_file):
-        model_df = pd.read_csv(model_file, header=None)
-        planet_model_flux = model_df[0].to_numpy()
-        planet_model_flux = planet_model_flux / np.median(planet_model_flux)
-        planet_model_flux = resample_model(planet_model_flux, lc.time.value)
+    planets_num = random_number_generator.uniform(1, 3)
+    planet_periods = np.zeros(planets_num)
+    planet_t0s = np.zeros(planets_num)
+    planet_radius = np.zeros(planets_num)
+    rms = np.std(lc.flux)
+    rms_ppm = np.std(lc.flux) * 1000000 # ppms
+    times = lc.time.value
+    flux = lc.flux.value
+    modified_flux = flux
+    max_period = 0.5
+    red_noise_number = random_number_generator.uniform(0, 3)
+    for red_noise in red_noise_number:
+        red_noise_freq = random_number_generator.uniform(0.01, 2)
+        flux_std = rms
+        red_noise_sd = random_number_generator.uniform(0, flux_std * 3)
+        red_noise = timesynth.noise.RedNoise(std=red_noise_sd, tau=red_noise_freq)
+        timeseries_rn = np.zeros(len(times))
+        timeseries_rn = []
+        for value in times:
+            rn_value = red_noise.sample_next(value, None, None)
+            rn_value = rn_value[0] if isinstance(rn_value, (list, np.ndarray)) else rn_value
+            timeseries_rn = timeseries_rn + [rn_value]
+        timeseries_rn = np.array(timeseries_rn)
+        modified_flux = modified_flux + timeseries_rn
+    #TODO write flux with red noise
+    for planet in np.arange(0, planets_num):
+        planet_periods[planet] = random_number_generator.uniform(0.5, 20)
+        max_period = max_period if planet_periods[planet] < max_period else planet_periods[planet]
+        planet_t0s[planet] = lc.time[0] + planet_periods[planet] / random_number_generator.uniform(0, planet_periods[planet])
+        num_transits_pesimistic = planet_t0s[planet] // len(lc.time.value)
+        depth_ppm = random_number_generator(rms_ppm // num_transits_pesimistic, rms_ppm * 4)
+        planet_radius[planet] = np.sqrt((depth_ppm / 1e6) * (star_radius ** 2))
+        P1 = planet_periods[planet] * u.day
+        a = np.cbrt((ac.G * star_mass * u.M_sun * P1 ** 2) / (4 * np.pi ** 2)).to(u.au)
+        planet_model = ellc.lc(
+            t_obs=times,
+            radius_1=(star_radius * u.R_sun).to(u.au) / a,  # star radius convert from AU to in units of a
+            radius_2=(planet_radius * u.R_earth).to(u.au) / a,
+            # convert from Rearth (equatorial) into AU and then into units of a
+            sbratio=0,
+            incl=90,
+            light_3=0,
+            t_zero=planet_t0s[planet],
+            period=planet_periods[planet],
+            a=None,
+            q=1e-6,
+            f_c=None, f_s=None,
+            ldc_1=ld, ldc_2=None,
+            gdc_1=None, gdc_2=None,
+            didt=None,
+            domdt=None,
+            rotfac_1=1, rotfac_2=1,
+            hf_1=1.5, hf_2=1.5,
+            bfac_1=None, bfac_2=None,
+            heat_1=None, heat_2=None,
+            lambda_1=None, lambda_2=None,
+            vsini_1=None, vsini_2=None,
+            t_exp=None, n_int=None,
+            grid_1='default', grid_2='default',
+            ld_1='quad', ld_2=None,
+            shape_1='sphere', shape_2='sphere',
+            spots_1=None, spots_2=None,
+            exact_grav=False, verbose=1)
+        modified_flux = modified_flux - planet_model + 1
+    bck_flux_detrend = detrend(times, lc.background_flux.value, 1, smooth=False)
+    lc_df['bck_flux'] = np.concatenate((padding_ones_left, bck_flux_detrend, padding_ones_right))
+    flux_err_values = np.array(lc.flux_err.value) / np.nanmedian(modified_flux)
+    lc_df['#time'] = np.concatenate((padding_zeros_left, np.array(lc.time.value), padding_zeros_right))
+    lc_df['flux'] = np.concatenate((padding_ones_left, modified_flux, padding_ones_right))
+    lc_df['flux_err'] = np.concatenate((padding_zeros_left, flux_err_values, padding_zeros_right))
+    lc_df['centroid_x'] = np.concatenate((padding_zeros_left, np.array(lc.centroid_col.value), padding_zeros_right))
+    lc_df['centroid_y'] = np.concatenate((padding_zeros_left, np.array(lc.centroid_row.value), padding_zeros_right))
+    lc_df['motion_x'] = np.concatenate((padding_zeros_left, np.array(lc.mom_centr1.value), padding_zeros_right))
+    lc_df['motion_y'] = np.concatenate((padding_zeros_left, np.array(lc.mom_centr2.value), padding_zeros_right))
+    lc_df['planet_model'] = np.concatenate((padding_ones_left, np.array(planet_model_flux), padding_ones_right))
+    lc_df = lc_df.fillna(0)
+    lc_df.to_csv(lcs_dir + '/' + mission_id + '_' + str(object_id) + '_noise_lc.csv')
+    #TODO write final injected flux
     padding_zeros_count = create_target_input.max_lc_length - lc_length
     padding_zeros_count = 0 if padding_zeros_count < 0 else padding_zeros_count
     padding_zeros_count_left = padding_zeros_count // 2 + 1 if padding_zeros_count % 2 != 0 else padding_zeros_count // 2
@@ -205,19 +373,16 @@ def _create_target_csv(create_target_input):
     padding_ones_left = np.zeros(padding_zeros_count_left)
     padding_ones_right = np.zeros(padding_zeros_count_right)
     flux_values = np.array(lc.pdcsap_flux.value)
-    median_flux = np.median(flux_values)
+    median_flux = np.nanmedian(flux_values)
     flux_values = flux_values / median_flux
     if len(np.argwhere(flux_values < 0).flatten()) > 0:
         flux_values = np.array(lc.pdcsap_flux.value) + 2 * np.abs(np.nanmin(lc.pdcsap_flux.value))
         median_flux = np.median(flux_values)
         flux_values = flux_values / median_flux
     time_values = lc.time.value
-    duration = injected_file_row['duration(h)'].iloc[0] / 24
-    duration_to_period = duration / injected_file_row['period'].iloc[0]
-    for j in np.arange(0, 5, 1):
-        flux_detrend_j = detrend(time_values, flux_values, duration_to_period * (4 + j))
-        lc_df['flux_' + str(j)] = np.concatenate((padding_ones_left, flux_detrend_j, padding_ones_right))
-    bck_flux_detrend = detrend(time_values, flux_values, duration_to_period * 4, smooth=False)
+    duration = t14(star_radius, star_mass, max_period)
+    duration_to_period = duration / max_period
+    bck_flux_detrend = detrend(time_values, lc.background_flux.value, duration_to_period * 4, smooth=False)
     lc_df['bck_flux'] = np.concatenate((padding_ones_left, bck_flux_detrend, padding_ones_right))
     flux_err_values = np.array(lc.flux_err.value) / median_flux
     lc_df['#time'] = np.concatenate((padding_zeros_left, np.array(lc.time.value), padding_zeros_right))
@@ -227,11 +392,9 @@ def _create_target_csv(create_target_input):
     lc_df['centroid_y'] = np.concatenate((padding_zeros_left, np.array(lc.centroid_row.value), padding_zeros_right))
     lc_df['motion_x'] = np.concatenate((padding_zeros_left, np.array(lc.mom_centr1.value), padding_zeros_right))
     lc_df['motion_y'] = np.concatenate((padding_zeros_left, np.array(lc.mom_centr2.value), padding_zeros_right))
-    lc_df['eb_model'] = np.concatenate((padding_ones_left, np.array(eb_model_flux), padding_ones_right))
-    lc_df['bckeb_model'] = np.concatenate((padding_ones_left, np.array(backeb_model_flux), padding_ones_right))
     lc_df['planet_model'] = np.concatenate((padding_ones_left, np.array(planet_model_flux), padding_ones_right))
     lc_df = lc_df.fillna(0)
-    lc_df.to_csv(lcs_dir + '/' + mission_id + '_' + str(object_id) + '_lc.csv')
+    lc_df.to_csv(lcs_dir + '/' + mission_id + '_' + str(object_id) + '_injected_lc.csv')
 
 
 def resample_model(model, lc_time):
@@ -266,15 +429,3 @@ def uncompress_data(data_dir):
         with gzip.open(original_file_name, 'rb') as f_in:
             with open(destination_file_name, 'wb') as f_out:
                 shutil.copyfileobj(f_in, f_out)
-
-
-root_dir = '/mnt/DATA-2/ete6/'
-lcs_dir = root_dir + 'lcs/'
-cores = 10
-#uncompress_data('/mnt/DATA-2/ete6/backebs/BackEBs/')
-#uncompress_data('/mnt/DATA-2/ete6/ebs/EBs/')
-#uncompress_data('/mnt/DATA-2/ete6/planets/Planets/')
-create_star_csvs(lcs_dir, 10, 20.25, TicStarCatalog(), '*_lc.csv', "([0-9]+)_lc.csv", cores)
-#create_injection_dataframe(root_dir, lcs_dir)
-create_target_csvs(lcs_dir, root_dir)
-#_create_target_csv(CreateTargetInput(lcs_dir + '/tess2019128220341-0000000230382377-0016-s_lc.fits', root_dir, pd.read_csv(root_dir + '/injected_objects.csv')))
