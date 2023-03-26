@@ -153,9 +153,12 @@ def create_injection_dataframe(injections_dir, lcs_dir):
     df.to_csv(injections_dir + '/injected_objects.csv')
 
 
-def create_target_csvs(lcs_dir, models_dir, cores=multiprocessing.cpu_count() - 1, max_lc_length=20610, force=False):
+def create_target_csvs(lcs_dir, models_dir, cores=multiprocessing.cpu_count() - 1, max_lc_length=20610, force=False,
+                       ids=None):
     injected_files_df = pd.read_csv(models_dir + '/injected_objects.csv')
     inputs = []
+    if ids is not None:
+        injected_files_df = injected_files_df[injected_files_df['object_id'].isin(ids)]
     for index, target_row in injected_files_df.iterrows():
         object_id = target_row['object_id']
         mission_id = object_id.split(' ')[1]

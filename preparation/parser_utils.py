@@ -273,14 +273,26 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
     centroid_coords_df['time'] = list(chain.from_iterable(centroids_offsets_time_list))
     centroid_coords_df.fillna(0)
     centroid_coords_df.to_csv(file_prefix + '_cent_' + str(cadence) + '.csv')
-    source_offset_diffimg_ra = np.nanmedian(np.array(source_offsets_diffimg)[:, 0])
-    source_offset_diffimg_dec = np.nanmedian(np.array(source_offsets_diffimg)[:, 1])
-    source_offset_diffimg_ra_err = np.nanstd(np.array(source_offsets_diffimg)[:, 0])
-    source_offset_diffimg_dec_err = np.nanstd(np.array(source_offsets_diffimg)[:, 1])
-    source_offset_bls_ra = np.nanmedian(np.array(source_offsets_bls)[:, 0])
-    source_offset_bls_dec = np.nanmedian(np.array(source_offsets_bls)[:, 1])
-    source_offset_bls_ra_err = np.nanstd(np.array(source_offsets_bls)[:, 0])
-    source_offset_bls_dec_err = np.nanstd(np.array(source_offsets_bls)[:, 1])
+    if len(source_offsets_diffimg) > 0:
+        source_offset_diffimg_ra = np.nanmedian(np.array(source_offsets_diffimg)[:, 0])
+        source_offset_diffimg_dec = np.nanmedian(np.array(source_offsets_diffimg)[:, 1])
+        source_offset_diffimg_ra_err = np.nanstd(np.array(source_offsets_diffimg)[:, 0])
+        source_offset_diffimg_dec_err = np.nanstd(np.array(source_offsets_diffimg)[:, 1])
+    else:
+        source_offset_diffimg_ra = ra
+        source_offset_diffimg_dec = dec
+        source_offset_diffimg_ra_err = 0
+        source_offset_diffimg_dec_err = 0
+    if len(source_offsets_bls) > 0:
+        source_offset_bls_ra = np.nanmedian(np.array(source_offsets_bls)[:, 0])
+        source_offset_bls_dec = np.nanmedian(np.array(source_offsets_bls)[:, 1])
+        source_offset_bls_ra_err = np.nanstd(np.array(source_offsets_bls)[:, 0])
+        source_offset_bls_dec_err = np.nanstd(np.array(source_offsets_bls)[:, 1])
+    else:
+        source_offset_bls_ra = ra
+        source_offset_bls_dec = dec
+        source_offset_bls_ra_err = 0
+        source_offset_bls_dec_err = 0
     offset_ra = np.mean([source_offset_bls_ra, source_offset_diffimg_ra])
     offset_dec = np.mean([source_offset_bls_dec, source_offset_diffimg_dec])
     offset_ra_err = np.sqrt(source_offset_bls_ra_err ** 2 + source_offset_diffimg_ra_err ** 2)
