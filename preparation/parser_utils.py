@@ -211,9 +211,10 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
     og_time_list = []
     og_core_flux_list = []
     og_halo_flux_list = []
-    logging.info("Computing TPF data for %s", object_id)
+    logging.info("Computing TPFs data for %s", object_id)
     for tpf in tpfs:
         sector_name, sector = LcbuilderHelper.mission_lightkurve_sector_extraction(mission, tpf)
+        logging.info("Computing TPF data for %s sector %s", object_id, sector)
         aperture = tpf.pipeline_mask
         cadence_s = np.round(np.nanmedian(tpf.time.value[1:] - tpf.time.value[:-1]) * 3600 * 24)
         cadences_per_transit = LcbuilderHelper.estimate_transit_cadences(cadence_s, transit_duration * 2)
@@ -240,15 +241,19 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
             continue
         hdu = tpf.hdu[2].header
         wcs = WCS(hdu)
+        logging.info("Computing TPF data centroids for %s sector %s", object_id, sector)
         centroids_drift = \
             Watson.compute_centroids_for_tpf(ra, dec, lc_data, tpf, wcs, transit_period, epoch, duration_to_period)
+        logging.info("Computing TPF data og for %s sector %s", object_id, sector)
         optical_ghost_data = Watson.compute_optical_ghost_data(tpf, aperture, transit_period, epoch, duration_to_period)
         pixel_values_i = np.array(range(tpf.shape[1]))
         pixel_values_j = np.array(range(tpf.shape[2]))
+        logging.info("Computing TPF data per-pixel BLS for %s sector %s", object_id, sector)
         snr_map, ax = Watson.plot_pixels(tpf, title=mission_prefix + ' ' + str(id) + ' ' + sector_name + ' ' + str(sector) + ' TPF BLS Analysis',
                                          period=transit_period, epoch=epoch, duration=transit_duration, aperture_mask=aperture, dry=True)
         source_offset_px = Watson.light_centroid(snr_map, pixel_values_i, pixel_values_j)
         source_offset_bls = wcs.pixel_to_world(source_offset_px[1], source_offset_px[0])
+        logging.info("Computing TPF data differential image for %s sector %s", object_id, sector)
         tpf_sub = Watson.compute_tpf_diff_image(tpf, transit_period, epoch, transit_duration)
         source_offset_diffimg_px = Watson.light_centroid(tpf_sub, pixel_values_i, pixel_values_j)
         source_offset_diffimg = wcs.pixel_to_world(source_offset_diffimg_px[1], source_offset_diffimg_px[0])
