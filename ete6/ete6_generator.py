@@ -24,6 +24,9 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
     def __init__(self, zero_epsilon=1e-6):
         self.zero_epsilon = zero_epsilon
 
+    def fold(self, time, period, epoch):
+        return foldedleastsquares.fold(time, period, epoch) if len(time) > 0 else time
+
     def bin_interp(self, array, new_size):
         result = np.zeros((array.shape[1], new_size))
         for index, nested_array in enumerate(np.transpose(array)):

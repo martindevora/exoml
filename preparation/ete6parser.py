@@ -194,7 +194,7 @@ def _create_target_csv(create_target_input):
                 eb_model_flux = model_df[0].to_numpy()
                 eb_model_flux = eb_model_flux / np.median(eb_model_flux)
                 eb_model_flux = resample_model(eb_model_flux, lc.time.value)
-            model_file = create_target_input.models_dir + '/backebs/BackEBs/BackEBs_' + '_' + leading_zeros_object_id + '.txt'
+            model_file = create_target_input.models_dir + '/backebs/BackEBs/BackEBs_' + leading_zeros_object_id + '.txt'
             if os.path.exists(model_file):
                 model_df = pd.read_csv(model_file, header=None)
                 backeb_model_flux = model_df[0].to_numpy()
@@ -236,10 +236,10 @@ def _create_target_csv(create_target_input):
             lc_df['time'] = np.array(lc.time.value)
             lc_df['flux'] = flux_values
             lc_df['flux_err'] = flux_err_values
-            lc_df['centroids_x'] = np.array(lc.centroid_col.value)
-            lc_df['centroids_y'] = np.array(lc.centroid_row.value)
-            lc_df['motion_x'] = np.array(lc.mom_centr1.value)
-            lc_df['motion_y'] = np.array(lc.mom_centr2.value)
+            lc_df['centroids_x'] = np.array(lc.mom_centr1.value)
+            lc_df['centroids_y'] = np.array(lc.MOM_CENTR2.value)
+            lc_df['motion_x'] = np.array(lc.pos_corr1.value)
+            lc_df['motion_y'] = np.array(lc.pos_corr2.value)
             lc_df['eb_model'] = np.array(eb_model_flux)
             lc_df['bckeb_model'] = np.array(backeb_model_flux)
             lc_df['planet_model'] = np.array(planet_model_flux)

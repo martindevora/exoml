@@ -57,8 +57,8 @@ class CreateStarCsvInput:
 def create_star_csvs(lcs_dir, search_radius, pixel_size, star_catalog, csv,
                      cores=os.cpu_count() - 1, ids=None, force=False):
     tces_df = pd.read_csv(csv, comment='#')
-    tces_df = tces_df.sort_values(by=["kepid"], ascending=True)
-    tces_df = tces_df.drop_duplicates(subset=["kepid"], keep='last')
+    tces_df = tces_df.sort_values(by=["object_id"], ascending=True)
+    tces_df = tces_df.drop_duplicates(subset=["object_id"], keep='last')
     tces_df = tces_df.sample(frac=1).reset_index(drop=True)
     print("Total number of targets is " + str(len(tces_df)))
     create_star_inputs = []
@@ -166,7 +166,7 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
     else:
         tpfs = []
         for file in tpf_files:
-            tpfs.append(lightkurve.TessTargetPixelFile(file))
+            tpfs.append(lightkurve.TessTargetPixelFile(file, ignore_missing_simple=True))
     lc_df = pd.DataFrame(columns=['#time', 'flux', 'flux_err', 'planet_model', 'eb_model', 'bckeb_model',
                                   'centroid_x', 'centroid_y', 'motion_x', 'motion_y', 'bck_flux'])
     flux_values = np.array(lc_data.flux)
