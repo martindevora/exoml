@@ -237,7 +237,7 @@ def _create_target_csv(create_target_input):
             lc_df['flux'] = flux_values
             lc_df['flux_err'] = flux_err_values
             lc_df['centroids_x'] = np.array(lc.mom_centr1.value)
-            lc_df['centroids_y'] = np.array(lc.MOM_CENTR2.value)
+            lc_df['centroids_y'] = np.array(lc.mom_centr2.value)
             lc_df['motion_x'] = np.array(lc.pos_corr1.value)
             lc_df['motion_y'] = np.array(lc.pos_corr2.value)
             lc_df['eb_model'] = np.array(eb_model_flux)
