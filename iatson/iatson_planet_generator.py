@@ -13,12 +13,13 @@ import pandas as pd
 
 
 class IatsonPlanetModelGenerator(Ete6ModelGenerator):
-    def __init__(self, injected_objects_df, lcs_dir, batch_size, input_sizes, type_to_label, zero_epsilon=1e-7,
+    def __init__(self, injected_objects_df, kics_lcs_dir, tics_lcs_dir, batch_size, input_sizes, type_to_label, zero_epsilon=1e-7,
                  measurements_per_point=2, plot_inputs=False, fixed_target_id=None, store_arrays=False,
                  from_arrays=True):
         super().__init__(zero_epsilon)
         self.injected_objects_df = injected_objects_df
-        self.lcs_dir = lcs_dir
+        self.kics_lcs_dir = kics_lcs_dir
+        self.tics_lcs_dir = tics_lcs_dir
         self.batch_size = batch_size
         self.input_sizes = input_sizes
         self.random_number_generator = default_rng()
@@ -210,7 +211,9 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
             duration_to_period = duration / period
             type = target_row['type']
             batch_data_values[i] = self.type_to_label[type]
-            file_prefix = self.lcs_dir + '/' + mission_id + '_' + str(target_id) + '_' + str(round(period, 2))
+            lcs_dir = self.kics_lcs_dir if mission_id == 'KIC' else self.tics_lcs_dir
+            file_prefix = lcs_dir + '/' + mission_id + '_' + str(target_id) + '_' + str(round(period, 2)) \
+                if mission_id == 'KIC' else lcs_dir + '/' + mission_id + ' ' + str(target_id) + '_' + str(round(period, 2))
             if self.from_arrays:
                 star_array[i] = [[e] for e in np.loadtxt(file_prefix + '_input_star.csv', delimiter=',')]
                 star_neighbours_array[i] = [[e] for e in np.loadtxt(file_prefix + '_input_nb.csv', delimiter=',')]
@@ -244,19 +247,6 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 lc_df = None
                 centroids_df = None
                 og_df = None
-                if os.path.exists(lc_filename):
-                    read_df = pd.read_csv(lc_filename, usecols=['#time', 'flux_0'], low_memory=True)
-                    lc_df = read_df if lc_df is None else lc_df.append(read_df, ignore_index=True)
-                if os.path.exists(centroids_filename):
-                    read_centroids_df = pd.read_csv(centroids_filename, usecols=['time', 'centroids_ra', 'centroids_dec'],
-                                                    low_memory=True)
-                    centroids_df = read_centroids_df if centroids_df is None \
-                        else centroids_df.append(read_centroids_df, ignore_index=True)
-                if os.path.exists(og_filename):
-                    read_og_df = pd.read_csv(og_filename, usecols=['time', 'og_flux'],
-                                             low_memory=True)
-                    og_df = read_og_df if og_df is None \
-                        else centroids_df.append(read_og_df, ignore_index=True)
                 if os.path.exists(lc_long_filename):
                     read_df = pd.read_csv(lc_long_filename, usecols=['#time', 'flux_0'], low_memory=True)
                     lc_df = read_df if lc_df is None else lc_df.append(read_df, ignore_index=True)
@@ -287,8 +277,8 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                     logging.warning("No curve for target " + file_prefix)
                 assert lc_df is not None
                 lc_df = lc_df.sort_values(by=['#time'])
-                centroids_df['time'] = foldedleastsquares.fold(centroids_df['time'].to_numpy(), period, epoch + period / 2)
-                og_df['time'] = foldedleastsquares.fold(og_df['time'].to_numpy(), period, epoch + period / 2)
+                centroids_df['time'] = self.fold(centroids_df['time'].to_numpy(), period, epoch + period / 2)
+                og_df['time'] = self.fold(og_df['time'].to_numpy(), period, epoch + period / 2)
                 centroids_df = centroids_df.sort_values(by=['time'])
                 og_df = og_df.sort_values(by=['time'])
                 centroids_df = self._prepare_input_centroids(centroids_df)
@@ -300,7 +290,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 folded_centroids_array[i], folded_centroids_array_err[i] = self.bin_by_time(centroids_df.to_numpy(), self.input_sizes[3], target_row['object_id'])
                 folded_og_array[i], folded_og_array_err[i] = self.bin_by_time(og_df.to_numpy(), self.input_sizes[3], target_row['object_id'])
                 #TODO refactor to use mission for star files
-                star_filename = self.lcs_dir + '/' + mission_id + ' ' + str(target_id) + '_star.csv'
+                star_filename = lcs_dir + '/' + mission_id + ' ' + str(target_id) + '_star.csv'
                 star_neighbours_df = pd.read_csv(star_filename,
                                                  usecols=['Teff', 'lum', 'v', 'j', 'k', 'h', 'radius', 'mass',
                                                           'dist_arcsec'], index_col=False)
@@ -319,13 +309,13 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 # Global flux
                 # Shifting data 1/4 so that main transit and possible occultation don't get cut by the borders
                 lc_df_sorted_fold = lc_df.copy()
-                lc_df_sorted_fold['#time'] = foldedleastsquares.fold(time, period, epoch + period / 4)
+                lc_df_sorted_fold['#time'] = self.fold(time, period, epoch + period / 4)
                 lc_df_sorted_fold = lc_df_sorted_fold.sort_values(by=['#time'])
                 global_flux_array[i], global_flux_array_err[i] = \
                     self.bin_by_time(lc_df_sorted_fold.to_numpy(), self.input_sizes[2], target_row['object_id'])
                 # Focus flux even
                 lc_df_focus = lc_df.copy()
-                lc_df_focus['#time'] = foldedleastsquares.fold(time, period, epoch)
+                lc_df_focus['#time'] = self.fold(time, period, epoch)
                 lc_df_focus = lc_df_focus.sort_values(by=['#time'])
                 lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
                                           (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
@@ -333,7 +323,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                     self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[3], target_row['object_id'])
                 # Focus flux odd
                 lc_df_focus = lc_df.copy()
-                lc_df_focus['#time'] = foldedleastsquares.fold(time, period, epoch + period / 2)
+                lc_df_focus['#time'] = self.fold(time, period, epoch + period / 2)
                 lc_df_focus = lc_df_focus.sort_values(by=['#time'])
                 lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
                                           (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
@@ -341,7 +331,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                     self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[4], target_row['object_id'])
                 # Focus flux sub-harmonic even
                 lc_df_focus = lc_df.copy()
-                lc_df_focus['#time'] = foldedleastsquares.fold(time, period / 2, epoch)
+                lc_df_focus['#time'] = self.fold(time, period / 2, epoch)
                 lc_df_focus = lc_df_focus.sort_values(by=['#time'])
                 lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
                                           (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
@@ -349,7 +339,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                     self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[5], target_row['object_id'])
                 # Focus flux sub-harmonic odd
                 lc_df_focus = lc_df.copy()
-                lc_df_focus['#time'] = foldedleastsquares.fold(time, period / 2, epoch + period / 4)
+                lc_df_focus['#time'] = self.fold(time, period / 2, epoch + period / 4)
                 lc_df_focus = lc_df_focus.sort_values(by=['#time'])
                 lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
                                           (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
@@ -357,7 +347,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                     self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[6], target_row['object_id'])
                 # Focus flux harmonic even
                 lc_df_focus = lc_df.copy()
-                lc_df_focus['#time'] = foldedleastsquares.fold(time, period * 2, epoch)
+                lc_df_focus['#time'] = self.fold(time, period * 2, epoch)
                 lc_df_focus = lc_df_focus.sort_values(by=['#time'])
                 lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
                                           (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
@@ -365,7 +355,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                     self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[7], target_row['object_id'])
                 # Focus flux harmonic odd
                 lc_df_focus = lc_df.copy()
-                lc_df_focus['#time'] = foldedleastsquares.fold(time, period * 2, epoch + period * 3 / 2)
+                lc_df_focus['#time'] = self.fold(time, period * 2, epoch + period * 3 / 2)
                 lc_df_focus = lc_df_focus.sort_values(by=['#time'])
                 lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
                                           (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
