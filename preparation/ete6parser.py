@@ -3,14 +3,17 @@ import logging
 import multiprocessing
 import os
 import pathlib
+import random
 import shutil
 from multiprocessing import Pool
+from random import randrange
 
 import ellc
 import pandas as pd
 import numpy as np
 import timesynth
 from lcbuilder.star import starinfo
+from lcbuilder.star.HabitabilityCalculator import HabitabilityCalculator
 from lcbuilder.star.TicStarCatalog import TicStarCatalog
 
 import astropy.units as u
@@ -70,12 +73,12 @@ def create_injection_dataframe(injections_dir, lcs_dir):
         for index, target_row in target_rows.iterrows():
             period = target_row['Orbital Period']
             epoch = target_row['Epoch [BTJD]']
-            Rsec_Rpri = target_row['Primary Rstar'] / target_row['Secondary Rstar']
+            Rsec_Rpri = target_row['Secondary Rstar'] / target_row['Primary Rstar']
             if not np.isnan(Rsec_Rpri) and Rsec_Rpri > 0 and Rsec_Rpri < 1:
                 radius_secondary = star_radius * target_row['Rsec/Rpri']
                 duration = t14(star_radius, star_mass, period, R_p=radius_secondary)
-            elif not np.isnan(target_row['Secondary Star Depth']) and target_row['Secondary Star Depth'] > 0:
-                radius_secondary = np.sqrt((target_row['Secondary Star Depth'] / 1e6) * (star_radius ** 2))
+            elif not np.isnan(target_row['Primary Star Depth']) and target_row['Primary Star Depth'] > 0:
+                radius_secondary = np.sqrt((target_row['Primary Star Depth'] / 1e6) * (star_radius ** 2))
                 duration = t14(star_radius, star_mass, period, R_p=radius_secondary)
             else:
                 duration = t14(star_radius, star_mass, period)
@@ -169,8 +172,27 @@ def create_target_csvs(lcs_dir, models_dir, cores=multiprocessing.cpu_count() - 
     with Pool(processes=cores, maxtasksperchild=1) as pool:
         pool.map(_create_target_csv, inputs, chunksize=1)
 
+def create_injected_target_csvs(lcs_dir, models_dir, cores=multiprocessing.cpu_count() - 1,
+                                max_lc_length=20610, force=False, ids=None):
+    injected_files_df = pd.read_csv(models_dir + '/injected_objects.csv')
+    injected_files_df = injected_files_df[injected_files_df['type'] == 'none']
+    inputs = []
+    if ids is not None:
+        injected_files_df = injected_files_df[injected_files_df['object_id'].isin(ids)]
+    for index, target_row in injected_files_df.iterrows():
+        object_id = target_row['object_id']
+        mission_id = object_id.split(' ')[1]
+        lc_file = lcs_dir + "/tess2019128220341-" + str(mission_id).zfill(16) + "-0016-s_lc.fits"
+        tpf_file = lcs_dir + "/tpfs/tess2019128220341-" + str(mission_id).zfill(16) + "-0016-s_tp.fits"
+        inputs = inputs + [CreateTargetInput('TIC', object_id, lc_file, lcs_dir, models_dir, target_row,
+                                             None, max_lc_length, tpf_files=[tpf_file], force=force,
+                                             inject_random=True)]
+    with Pool(processes=cores, maxtasksperchild=1) as pool:
+        pool.map(_create_target_csv, inputs, chunksize=1)
+
 def _create_target_csv(create_target_input):
     pid = multiprocessing.current_process().pid
+    type_dict = {0: 'none', 1: 'bckEB', 2: 'EB', 3: 'planet'}
     file_prefix = create_target_input.target_dir + '/' + create_target_input.id
     file_planet_prefix = file_prefix + '_' + \
                          str(round(create_target_input.injected_files_df['period'], 2))
@@ -189,6 +211,120 @@ def _create_target_csv(create_target_input):
             backeb_model_flux = np.ones(lc_length)
             planet_model_flux = np.ones(lc_length)
             model_file = create_target_input.models_dir + '/ebs/EBs/EBs' + '_' + leading_zeros_object_id + '.txt'
+            star_info = starinfo.StarInfo(create_target_input.id, *TicStarCatalog().catalog_info(mission_id))
+            if create_target_input.inject_random:
+                type_random = randrange(4)
+                type = type_dict[type_random]
+                rstar = star_info.radius * u.Rsun
+                time = lc.time.value
+                flux = lc.flux.value
+                period = create_target_input.injected_files_df['period']
+                t0 = create_target_input.injected_files_df['epoch']
+                texpo = 120 / 60. / 60. / 24.
+                if type == 'none':
+                    a = 1
+                elif type == 'bckEB':
+                    rtransit = random.uniform(0.1, rstar / 2) * u.Rsun
+                    a = HabitabilityCalculator().calculate_semi_major_axis(period, star_info.mass)
+                    model = lc(
+                        t_obs=time,
+                        radius_1=rstar.to(u.au) / a,  # star radius convert from AU to in units of a
+                        radius_2=rtransit.to(u.au) / a,
+                        # convert from Rearth (equatorial) into AU and then into units of a
+                        sbratio=0,
+                        incl=90,
+                        light_3=0,
+                        t_zero=t0,
+                        period=period,
+                        a=None,
+                        q=1e-6,
+                        f_c=None, f_s=None,
+                        ldc_1=[0.5, 0.5], ldc_2=None,
+                        gdc_1=None, gdc_2=None,
+                        didt=None,
+                        domdt=None,
+                        rotfac_1=1, rotfac_2=1,
+                        hf_1=1.5, hf_2=1.5,
+                        bfac_1=None, bfac_2=None,
+                        heat_1=None, heat_2=None,
+                        lambda_1=None, lambda_2=None,
+                        vsini_1=None, vsini_2=None,
+                        t_exp=texpo, n_int=None,
+                        grid_1='default', grid_2='default',
+                        ld_1='quad', ld_2=None,
+                        shape_1='sphere', shape_2='sphere',
+                        spots_1=None, spots_2=None,
+                        exact_grav=False, verbose=1)
+                    model = model / 10
+                    planet_model_flux = flux + model - 1.
+                elif type == 'EB':
+                    rtransit = random.uniform(0.1, rstar / 2) * u.Rsun
+                    a = HabitabilityCalculator().calculate_semi_major_axis(period, star_info.mass)
+                    model = lc(
+                        t_obs=time,
+                        radius_1=rstar.to(u.au) / a,  # star radius convert from AU to in units of a
+                        radius_2=rtransit.to(u.au) / a,
+                        # convert from Rearth (equatorial) into AU and then into units of a
+                        sbratio=0,
+                        incl=90,
+                        light_3=0,
+                        t_zero=t0,
+                        period=period,
+                        a=None,
+                        q=1e-6,
+                        f_c=None, f_s=None,
+                        ldc_1=[0.5, 0.5], ldc_2=None,
+                        gdc_1=None, gdc_2=None,
+                        didt=None,
+                        domdt=None,
+                        rotfac_1=1, rotfac_2=1,
+                        hf_1=1.5, hf_2=1.5,
+                        bfac_1=None, bfac_2=None,
+                        heat_1=None, heat_2=None,
+                        lambda_1=None, lambda_2=None,
+                        vsini_1=None, vsini_2=None,
+                        t_exp=texpo, n_int=None,
+                        grid_1='default', grid_2='default',
+                        ld_1='quad', ld_2=None,
+                        shape_1='sphere', shape_2='sphere',
+                        spots_1=None, spots_2=None,
+                        exact_grav=False, verbose=1)
+                    planet_model_flux = flux + model - 1.
+                elif type == 'planet':
+                    curve_rms = np.std(flux)
+                    rms_in_radius = (curve_rms * (star_info.radius ** 2)) ** (1 / 2)
+                    rtransit = random.uniform(rms_in_radius / 3, 0.1) * u.Rsun
+                    a = HabitabilityCalculator().calculate_semi_major_axis(period, star_info.mass)
+                    model = lc(
+                        t_obs=time,
+                        radius_1=rstar.to(u.au) / a,  # star radius convert from AU to in units of a
+                        radius_2=rtransit.to(u.au) / a,
+                        # convert from Rearth (equatorial) into AU and then into units of a
+                        sbratio=0,
+                        incl=90,
+                        light_3=0,
+                        t_zero=t0,
+                        period=period,
+                        a=None,
+                        q=1e-6,
+                        f_c=None, f_s=None,
+                        ldc_1=[0.5, 0.5], ldc_2=None,
+                        gdc_1=None, gdc_2=None,
+                        didt=None,
+                        domdt=None,
+                        rotfac_1=1, rotfac_2=1,
+                        hf_1=1.5, hf_2=1.5,
+                        bfac_1=None, bfac_2=None,
+                        heat_1=None, heat_2=None,
+                        lambda_1=None, lambda_2=None,
+                        vsini_1=None, vsini_2=None,
+                        t_exp=texpo, n_int=None,
+                        grid_1='default', grid_2='default',
+                        ld_1='quad', ld_2=None,
+                        shape_1='sphere', shape_2='sphere',
+                        spots_1=None, spots_2=None,
+                        exact_grav=False, verbose=1)
+                    planet_model_flux = flux + model - 1.
             if os.path.exists(model_file):
                 model_df = pd.read_csv(model_file, header=None)
                 eb_model_flux = model_df[0].to_numpy()
@@ -244,7 +380,6 @@ def _create_target_csv(create_target_input):
             lc_df['bckeb_model'] = np.array(backeb_model_flux)
             lc_df['planet_model'] = np.array(planet_model_flux)
             lc_df = lc_df.fillna(0)
-            star_info = starinfo.StarInfo(create_target_input.id, *TicStarCatalog().catalog_info(mission_id))
             prepare_lc_data(file_planet_prefix, create_target_input.id, lc_df,
                             create_target_input.injected_files_df['duration(h)'] / 24,
                             create_target_input.injected_files_df['period'],

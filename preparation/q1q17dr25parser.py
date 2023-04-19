@@ -64,19 +64,15 @@ def create_targets_df(tces_dir):
         result = disc_df.loc[index].combine_first(disc_df.loc[right_match_index[i]])
         result_df = pd.concat([result_df, result.to_frame().T], ignore_index=True)
     result_df.drop(result_df[result_df['duration(h)'].isnull()].index, inplace=True)
-    #
     result_df.drop(result_df[result_df['object_id'] == 'KIC <NA>'].index, inplace=True)
     # Remove latest KIC from the catalogue
     result_df.drop(result_df[result_df['object_id'] == 'KIC 100001645'].index, inplace=True)
     result_df.to_csv(tces_dir + '/classified_tces.csv')
     #disc_df[disc_df['object_id'] == 'KIC 7377200'].iloc[0]['epoch']
-    result_df = disc_df[disc_df['type'].isin(['fp', 'planet', 'planet_transit', 'tce'])]
-    result_df = result_df[result_df['object_id'] != 'KIC 100001645'] #This KIC doesn't seem to exist
+    result_df = result_df[result_df['type'].isin(['fp', 'planet', 'planet_transit', 'tce'])]
     #TODO this next statement is to prevent confirmed planets not matching any tce nor koi
     #result_df = result_df[~result_df['object_id'].str.contains('<NA')]
     result_df.to_csv(tces_dir + '/injected_objects_tces.csv')
-    result_df = disc_df[disc_df['type'].isin(['fp', 'planet', 'planet_transit'])]
-    result_df.to_csv(tces_dir + '/injected_objects.csv')
 
 
 def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_count() - 1, force=False, ids=None):

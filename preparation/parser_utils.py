@@ -354,7 +354,7 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
 
 class CreateTargetInput:
     def __init__(self, mission, id, lc_file, target_dir, models_dir, injected_files_df, cache_dir, max_lc_length=20610,
-                 force=False, tpf_files=None) -> None:
+                 force=False, tpf_files=None, inject_random=False) -> None:
         super().__init__()
         self.mission = mission
         self.id = id
@@ -366,6 +366,7 @@ class CreateTargetInput:
         self.cache_dir = cache_dir
         self.force = force
         self.tpf_files = tpf_files
+        self.inject_random = inject_random
 
 def create_target_csv(create_target_input):
     mission_lightcurve_builder = MissionLightcurveBuilder()
