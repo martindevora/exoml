@@ -5,9 +5,11 @@ import matplotlib.pyplot as plt
 import foldedleastsquares
 import scipy
 import timesynth
+import wotan
 from lcbuilder.helper import LcbuilderHelper
 from numpy.random import default_rng
 from scipy import stats
+from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
 from ml.encoding.time_position import value_encode_times
 from sklearn.utils import shuffle
@@ -20,9 +22,22 @@ from ml.functions.functions import sigmoid
 
 class Ete6ModelGenerator(tf.keras.utils.Sequence):
     random_number_generator = default_rng()
+    standard_scaler = StandardScaler()
 
     def __init__(self, zero_epsilon=1e-6):
         self.zero_epsilon = zero_epsilon
+        self.minmax_scaler = MinMaxScaler(feature_range=(self.zero_epsilon, 1 - self.zero_epsilon))
+
+    def assert_in_range(self, object_id, array, array_err, values_range=(0, 1)):
+        if np.isnan(array).any() or (array_err is not None and np.isnan(array_err).any()):
+            raise ValueError("Target " + str(object_id) + " contains NaN values")
+        elif np.max(array) > values_range[1] or (array_err is not None and np.max(array_err) > values_range[1]):
+            raise ValueError("Target " + str(object_id) + " contains values > 1")
+        elif np.min(array) < values_range[0] or (array_err is not None and np.max(array_err) < values_range[0]):
+            raise ValueError("Target " + str(object_id) + " contains values < 0")
+        elif np.all(array == values_range[0]) or (array_err is not None and np.all(array_err == values_range[0])):
+            raise ValueError("Target " + str(object_id) + " contains all values == 0")
+
 
     def fold(self, time, period, epoch):
         return foldedleastsquares.fold(time, period, epoch) if len(time) > 0 else time
@@ -39,9 +54,9 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
                 # logging.exception("Error when interpolating, will create empty input array")
         return np.transpose(result)
 
-    def bin_by_time(self, array, new_size, target):
-        result = np.zeros((array.shape[1], new_size))
-        result_err = np.zeros((array.shape[1], new_size))
+    def bin_by_time(self, array, new_size, target, min_points=50):
+        result = np.full((array.shape[1], new_size), self.zero_epsilon)
+        result_err = np.full((array.shape[1], new_size), self.zero_epsilon)
         transposed_array = np.transpose(array)
         time_array = transposed_array[0]
         for index, nested_array in enumerate(transposed_array):
@@ -49,19 +64,20 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
                 mask = nested_array > self.zero_epsilon
                 nested_array = nested_array[mask]
                 masked_time_array = time_array[mask]
+                if len(masked_time_array) < min_points:
+                    continue
                 try:
                     bin_means, bin_edges, binnumber = stats.binned_statistic(masked_time_array, nested_array,
                                                                              statistic='mean', bins=new_size)
                     bin_stds, _, _ = stats.binned_statistic(masked_time_array, nested_array, statistic='std',
                                                             bins=new_size)
-                    if new_size > len(nested_array):
-                        nans, x = self.nan_helper(bin_means)
-                        bin_means[nans] = np.interp(x(nans), x(~nans), bin_means[~nans])
-                        nans, x = self.nan_helper(bin_means)
-                        bin_stds[nans] = np.interp(x(nans), x(~nans), bin_stds[~nans])
+                    nans, x = self.nan_helper(bin_means)
+                    bin_means[nans] = np.interp(x(nans), x(~nans), bin_means[~nans])
+                    nans, x = self.nan_helper(bin_stds)
+                    bin_stds[nans] = np.interp(x(nans), x(~nans), bin_stds[~nans])
                     bin_width = (bin_edges[1] - bin_edges[0])
                     bin_centers = bin_edges[1:] - bin_width / 2
-                    if np.max(result[0]) == 0:
+                    if np.max(result[0]) == self.zero_epsilon:
                         result[0] = bin_centers
                         result_err[0] = np.full((new_size), 0.5)
                     # Store binning values for flux
@@ -89,38 +105,32 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         return np.isnan(y), lambda z: z.nonzero()[0]
 
     def _prepare_input_centroids(self, input_df):
+        input_df_clipped = input_df
         if len(input_df) > 0:
             _, ra_outliers_mask = LcbuilderHelper.clip_outliers(input_df['centroids_ra'].to_numpy(), 3)
             _, dec_outliers_mask = LcbuilderHelper.clip_outliers(input_df['centroids_dec'].to_numpy(), 3)
             outliers_mask = np.logical_or(ra_outliers_mask, dec_outliers_mask)
-            input_df_clipped = input_df.loc[~outliers_mask]
+            input_df_clipped = input_df.loc[~outliers_mask].copy()
             if len(input_df_clipped) > 0:
-                min_value = np.nanmin(input_df['centroids_ra'])
-                input_df['centroids_ra'] = input_df['centroids_ra'] - min_value
-                input_df['centroids_ra'] = input_df['centroids_ra'] / np.nanmax(input_df['centroids_ra'])
-                input_df['centroids_ra'] = input_df['centroids_ra'] - np.nanmedian(input_df['centroids_ra']) + 0.5
-                min_value = np.nanmin(input_df['centroids_dec'])
-                input_df['centroids_dec'] = input_df['centroids_dec'] - min_value
-                input_df['centroids_dec'] = input_df['centroids_dec'] / np.nanmax(input_df['centroids_dec'])
-                input_df['centroids_dec'] = input_df['centroids_dec'] - np.nanmedian(input_df['centroids_dec']) + 0.5
-                input_df = input_df.fillna(self.zero_epsilon)
-                input_df = input_df.replace(0.0, self.zero_epsilon)
-                input_df = input_df.replace(0, self.zero_epsilon)
-        return input_df
+                # transform data
+                input_df_clipped['centroids_ra'] = self.minmax_scaler.fit_transform(self.standard_scaler.fit_transform(input_df_clipped['centroids_ra'].values.reshape(-1, 1))).flatten()
+                input_df_clipped['centroids_dec'] = self.minmax_scaler.fit_transform(self.standard_scaler.fit_transform(input_df_clipped['centroids_dec'].values.reshape(-1, 1))).flatten()
+                input_df_clipped = input_df_clipped.fillna(self.zero_epsilon)
+                input_df_clipped = input_df_clipped.replace(0.0, self.zero_epsilon)
+                input_df_clipped = input_df_clipped.replace(0, self.zero_epsilon)
+        return input_df_clipped
 
     def _prepare_input_og(self, input_df):
+        input_df_clipped = input_df
         if len(input_df) > 0:
             _, outliers_mask = LcbuilderHelper.clip_outliers(input_df['og_flux'].to_numpy(), 3)
-            input_df_clipped = input_df.loc[~outliers_mask]
+            input_df_clipped = input_df.loc[~outliers_mask].copy()
             if len(input_df_clipped) > 0:
-                min_value = np.nanmin(input_df['og_flux'])
-                input_df['og_flux'] = input_df['og_flux'] - min_value
-                input_df['og_flux'] = input_df['og_flux'] / np.nanmax(input_df['og_flux'])
-                input_df['og_flux'] = input_df['og_flux'] - np.nanmedian(input_df['og_flux']) + 0.5
-            input_df = input_df.fillna(self.zero_epsilon)
-            input_df = input_df.replace(0.0, self.zero_epsilon)
-            input_df = input_df.replace(0, self.zero_epsilon)
-        return input_df
+                input_df_clipped['og_flux'] = self.minmax_scaler.fit_transform(self.standard_scaler.fit_transform(input_df_clipped['og_flux'].values.reshape(-1, 1))).flatten()
+            input_df_clipped = input_df_clipped.fillna(self.zero_epsilon)
+            input_df_clipped = input_df_clipped.replace(0.0, self.zero_epsilon)
+            input_df_clipped = input_df_clipped.replace(0, self.zero_epsilon)
+        return input_df_clipped
 
     def _prepare_input_lc(self, input_df):
         time = input_df["#time"].to_numpy()
@@ -165,7 +175,7 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         star_df['j'] = star_df['j'].fillna(-10)
         star_df['k'] = star_df['k'].fillna(-10)
         star_df['h'] = star_df['h'].fillna(-10)
-        star_df['Teff'] = star_df['Teff'] / 40000
+        star_df['Teff'] = star_df['Teff'] / 60000
         star_df['radius'] = star_df['radius'] / 3
         star_df['radius'] = star_df['radius'] if star_df['radius'].iloc[0] <= 1 else 1
         star_df['mass'] = star_df['mass'] / 3

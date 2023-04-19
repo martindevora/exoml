@@ -13,13 +13,13 @@ import pandas as pd
 
 
 class IatsonPlanetModelGenerator(Ete6ModelGenerator):
-    def __init__(self, injected_objects_df, kics_lcs_dir, tics_lcs_dir, batch_size, input_sizes, type_to_label, zero_epsilon=1e-7,
+    def __init__(self, injected_objects_df, lcs_dir, batch_size, input_sizes, type_to_label, zero_epsilon=1e-7,
                  measurements_per_point=2, plot_inputs=False, fixed_target_id=None, store_arrays=False,
                  from_arrays=True):
         super().__init__(zero_epsilon)
         self.injected_objects_df = injected_objects_df
-        self.kics_lcs_dir = kics_lcs_dir
-        self.tics_lcs_dir = tics_lcs_dir
+        self.kics_lcs_dir = lcs_dir + '/q1_q17/lcs/'
+        self.tics_lcs_dir = lcs_dir + '/ete6/lcs/'
         self.batch_size = batch_size
         self.input_sizes = input_sizes
         self.random_number_generator = default_rng()
@@ -210,7 +210,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
             duration = target_row['duration(h)'] / 24
             duration_to_period = duration / period
             type = target_row['type']
-            batch_data_values[i] = self.type_to_label[type]
+            batch_data_values[i] = [float(x) for x in self.type_to_label[type]]
             lcs_dir = self.kics_lcs_dir if mission_id == 'KIC' else self.tics_lcs_dir
             file_prefix = lcs_dir + '/' + mission_id + '_' + str(target_id) + '_' + str(round(period, 2)) \
                 if mission_id == 'KIC' else lcs_dir + '/' + mission_id + ' ' + str(target_id) + '_' + str(round(period, 2))
@@ -232,7 +232,9 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 folded_flux_odd_har_array[i] = np.loadtxt(file_prefix + '_input_odd_h.csv', delimiter=',')
                 folded_flux_odd_har_array_err[i] = np.loadtxt(file_prefix + '_input_odd_h_err.csv', delimiter=',')
                 folded_centroids_array[i] = np.loadtxt(file_prefix + '_input_centroids.csv', delimiter=',')
+                folded_centroids_array_err[i] = np.loadtxt(file_prefix + '_input_centroids_err.csv', delimiter=',')
                 folded_og_array[i] = np.loadtxt(file_prefix + '_input_og.csv', delimiter=',')
+                folded_og_array_err[i] = np.loadtxt(file_prefix + '_input_og_err.csv', delimiter=',')
             else:
                 #TODO refactor to use mission for _lc files
                 lc_filename = file_prefix + '_lc.csv'
@@ -275,7 +277,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                         else og_df.append(read_og_df, ignore_index=True)
                 if lc_df is None:
                     logging.warning("No curve for target " + file_prefix)
-                assert lc_df is not None
+                    raise ValueError("No curve for target " + file_prefix)
                 lc_df = lc_df.sort_values(by=['#time'])
                 centroids_df['time'] = self.fold(centroids_df['time'].to_numpy(), period, epoch + period / 2)
                 og_df['time'] = self.fold(og_df['time'].to_numpy(), period, epoch + period / 2)
@@ -361,17 +363,16 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                                           (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
                 folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i] = \
                     self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[8], target_row['object_id'])
-                if np.max(global_flux_array[i]) >= 2:
-                    logging.error("Wrong flux value for target " + str(target_row['object_id']))
-                assert np.max(global_flux_array[i]) < 2
-                assert not np.isnan(star_array[i]).any() and not np.isinf(star_array[i]).any()
-                assert not np.isnan(global_flux_array[i]).any() and not np.isinf(global_flux_array[i]).any()
-                assert not np.isnan(folded_flux_even_array[i]).any() and not np.isinf(folded_flux_even_array[i]).any()
-                assert not np.isnan(folded_flux_odd_array[i]).any() and not np.isinf(folded_flux_odd_array[i]).any()
-                assert not np.isnan(folded_flux_even_subhar_array[i]).any() and not np.isinf(folded_flux_even_subhar_array[i]).any()
-                assert not np.isnan(folded_flux_odd_subhar_array[i]).any() and not np.isinf(folded_flux_odd_subhar_array[i]).any()
-                assert not np.isnan(folded_flux_even_har_array[i]).any() and not np.isinf(folded_flux_even_har_array[i]).any()
-                assert not np.isnan(folded_flux_odd_har_array[i]).any() and not np.isinf(folded_flux_odd_har_array[i]).any()
+            self.assert_in_range(object_id, global_flux_array[i], global_flux_array_err[i])
+            self.assert_in_range(object_id, star_array[i], None)
+            self.assert_in_range(object_id, folded_flux_even_array[i], folded_flux_even_array_err[i])
+            self.assert_in_range(object_id, folded_flux_odd_array[i], folded_flux_odd_array_err[i])
+            self.assert_in_range(object_id, folded_flux_even_subhar_array[i], folded_flux_even_subhar_array_err[i])
+            self.assert_in_range(object_id, folded_flux_odd_subhar_array[i], folded_flux_odd_subhar_array_err[i])
+            self.assert_in_range(object_id, folded_flux_even_har_array[i], folded_flux_even_har_array_err[i])
+            self.assert_in_range(object_id, folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i])
+            self.assert_in_range(object_id, folded_centroids_array[i], folded_centroids_array_err[i])
+            self.assert_in_range(object_id, folded_og_array[i], folded_og_array_err[i])
                 # logging.info("GENERATOR Star Inputs max " + str(np.max(star_array[i])) + " and min " +
                 #              str(np.min(star_array[i])))
                 # logging.info("GENERATOR Global Flux Inputs max " + str(np.max(global_flux_array[i])) + " and min " +
@@ -399,27 +400,26 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
             self._plot_input(folded_centroids_array[i], folded_centroids_array_err[i], type, "CENTROIDS")
             if self.store_arrays:
                 logging.info("Storing arrays into prefix " + file_prefix)
-                np.savetxt(file_prefix + '_input_star.csv', star_array[i], delimiter=',', fmt='%f')
-                np.savetxt(file_prefix + '_input_nb.csv', star_neighbours_array[i], delimiter=',', fmt='%f')
-                np.savetxt(file_prefix + '_input_global.csv', global_flux_array[i], delimiter=',', fmt='%f')
-                np.savetxt(file_prefix + '_input_global_err.csv', global_flux_array_err[i], delimiter=',', fmt='%f')
-                np.savetxt(file_prefix + '_input_even.csv', folded_flux_even_array[i], delimiter=',', fmt='%f')
-                np.savetxt(file_prefix + '_input_even_err.csv', folded_flux_even_array_err[i], delimiter=',', fmt='%f')
-                np.savetxt(file_prefix + '_input_odd.csv', folded_flux_odd_array[i], delimiter=',', fmt='%f')
-                np.savetxt(file_prefix + '_input_odd_err.csv', folded_flux_odd_array_err[i], delimiter=',', fmt='%f')
-                np.savetxt(file_prefix + '_input_even_sh.csv', folded_flux_even_subhar_array[i], delimiter=',', fmt='%f')
-                np.savetxt(file_prefix + '_input_even_sh_err.csv', folded_flux_even_subhar_array_err[i], delimiter=',',
-                           fmt='%f')
-                np.savetxt(file_prefix + '_input_odd_sh.csv', folded_flux_odd_subhar_array[i], delimiter=',', fmt='%f')
-                np.savetxt(file_prefix + '_input_odd_sh_err.csv', folded_flux_odd_subhar_array_err[i], delimiter=',',
-                           fmt='%f')
-                np.savetxt(file_prefix + '_input_even_h.csv', folded_flux_even_har_array[i], delimiter=',', fmt='%f')
-                np.savetxt(file_prefix + '_input_even_h_err.csv', folded_flux_even_har_array_err[i], delimiter=',',
-                           fmt='%f')
-                np.savetxt(file_prefix + '_input_odd_h.csv', folded_flux_odd_har_array[i], delimiter=',', fmt='%f')
-                np.savetxt(file_prefix + '_input_odd_h_err.csv', folded_flux_odd_har_array_err[i], delimiter=',', fmt='%f')
-                np.savetxt(file_prefix + '_input_centroids.csv', folded_centroids_array[i], delimiter=',', fmt='%f')
-                np.savetxt(file_prefix + '_input_og.csv', folded_og_array[i], delimiter=',', fmt='%f')
+                np.savetxt(file_prefix + '_input_star.csv', star_array[i], delimiter=',')
+                np.savetxt(file_prefix + '_input_nb.csv', star_neighbours_array[i], delimiter=',')
+                np.savetxt(file_prefix + '_input_global.csv', global_flux_array[i], delimiter=',')
+                np.savetxt(file_prefix + '_input_global_err.csv', global_flux_array_err[i], delimiter=',')
+                np.savetxt(file_prefix + '_input_even.csv', folded_flux_even_array[i], delimiter=',')
+                np.savetxt(file_prefix + '_input_even_err.csv', folded_flux_even_array_err[i], delimiter=',')
+                np.savetxt(file_prefix + '_input_odd.csv', folded_flux_odd_array[i], delimiter=',')
+                np.savetxt(file_prefix + '_input_odd_err.csv', folded_flux_odd_array_err[i], delimiter=',')
+                np.savetxt(file_prefix + '_input_even_sh.csv', folded_flux_even_subhar_array[i], delimiter=',')
+                np.savetxt(file_prefix + '_input_even_sh_err.csv', folded_flux_even_subhar_array_err[i], delimiter=',')
+                np.savetxt(file_prefix + '_input_odd_sh.csv', folded_flux_odd_subhar_array[i], delimiter=',')
+                np.savetxt(file_prefix + '_input_odd_sh_err.csv', folded_flux_odd_subhar_array_err[i], delimiter=',')
+                np.savetxt(file_prefix + '_input_even_h.csv', folded_flux_even_har_array[i], delimiter=',')
+                np.savetxt(file_prefix + '_input_even_h_err.csv', folded_flux_even_har_array_err[i], delimiter=',')
+                np.savetxt(file_prefix + '_input_odd_h.csv', folded_flux_odd_har_array[i], delimiter=',')
+                np.savetxt(file_prefix + '_input_odd_h_err.csv', folded_flux_odd_har_array_err[i], delimiter=',')
+                np.savetxt(file_prefix + '_input_centroids.csv', folded_centroids_array[i], delimiter=',')
+                np.savetxt(file_prefix + '_input_centroids_err.csv', folded_centroids_array_err[i], delimiter=',')
+                np.savetxt(file_prefix + '_input_og.csv', folded_og_array[i], delimiter=',')
+                np.savetxt(file_prefix + '_input_og_err.csv', folded_og_array_err[i], delimiter=',')
             i = i + 1
         filter_channels = np.array([0, 1, 6, 7, 8, 9, 10, 11])
         return [star_array, star_neighbours_array,

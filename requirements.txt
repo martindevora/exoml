@@ -4,4 +4,14 @@ tensorflow-addons
 ellc
 lcbuilder
 dearwatson
-timesynth @ git+https://https://github.com/TimeSynth/TimeSynth.git
+timesynth @ git+https://github.com/TimeSynth/TimeSynth.git
+ruamel.yaml
+debugpy
+pydevd-pycharm~=223.8617.48
+pydot
+graphviz
+pandas
+scikit-learn
+matplotlib
+foldedleastsquares
+lcbuilder

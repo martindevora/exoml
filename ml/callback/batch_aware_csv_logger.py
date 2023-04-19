@@ -49,7 +49,7 @@ class BatchAwareCsvLogger(CSVLogger):
                 dialect=CustomDialect)
             if self.append_header:
                 self.writer.writeheader()
-        learning_rate = K.eval(self.model.optimizer._decayed_lr(tf.float64))
+        learning_rate = K.eval(self.model.optimizer.lr)
         row_dict = {'epoch': epoch, 'batch': batch, 'learning_rate': learning_rate}
         for metric_key in metric_fieldnames:
             row_dict[metric_key] = handle_value(logs[metric_key][0]

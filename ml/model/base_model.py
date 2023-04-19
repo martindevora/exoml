@@ -159,7 +159,9 @@ class BaseModel(WithLogging):
         elif balance_class_id is not None:
             training_dataset, test_dataset = \
                 self.balance_dataset_from_class(training_dataset, balance_class_id)
-        training_dataset = shuffle(training_dataset)
+        for labels in self.class_ids.values():
+            logging.info("%s items of class %s", labels, len(training_dataset[training_dataset['type'].isin(labels)]))
+        #training_dataset = shuffle(training_dataset)
         if training_set_limit is not None:
             if isinstance(training_dataset, pd.DataFrame):
                 training_dataset = training_dataset[:training_set_limit]
@@ -259,10 +261,9 @@ class BaseModel(WithLogging):
                          ") (self.input_size," + str(self.input_size) +
                          ") (zero_epsilon," + str(hyperparams.zero_epsilon) +
                          ")")
-            lcs_dir = training_dir + '/lcs/'
-            training_batch_generator = self.instance_generator(train_filenames, lcs_dir, hyperparams.batch_size,
+            training_batch_generator = self.instance_generator(train_filenames, training_dir, hyperparams.batch_size,
                                                                self.input_size, self.type_to_label, hyperparams.zero_epsilon)
-            validation_batch_generator = self.instance_generator(validation_filenames, lcs_dir, hyperparams.batch_size,
+            validation_batch_generator = self.instance_generator(validation_filenames, training_dir, hyperparams.batch_size,
                                                                  self.input_size, self.type_to_label, hyperparams.zero_epsilon)
             csv_log = model_path + '/training_log.csv'
             logging.info("Initializing csv logger with (csv_log," + str(csv_log) +

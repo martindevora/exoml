@@ -20,7 +20,7 @@ from ml.model.imbalanced_binary_model import ImbalancedBinaryModel
 
 
 class IATSON_planet(ImbalancedBinaryModel):
-    def __init__(self, class_ids, class_names, type_to_label, hyperparams, channels=12, name='IATSON_planet') -> None:
+    def __init__(self, class_ids, class_names, type_to_label, hyperparams, channels=2, name='IATSON_planet') -> None:
         super().__init__(name,
                          [11, 9 * 15, 2500, 500, 500, 500, 500, 500, 500],
                          class_ids,
@@ -48,35 +48,38 @@ class IATSON_planet(ImbalancedBinaryModel):
                                             num_blocks=transformer_blocks, classes=classes)(flux_input_final)
         return flux_input, flux_err_input, flux_branch
 
-    def _get_flux_conv_branch(self, name):
+    def _get_flux_conv_branch(self, name, channels=None):
         # (time, flux, [detrended_flux1 ... detrended_flux5], flux_model, centroidx, centroidy, motionx, motiony, bck)
         # flux model by transit params and stellar params
         # TODO use binning error as channel
+        if not channels:
+            channels = self.channels
         leaky_relu_alpha = 0.01
-        flux_input = keras.Input(shape=(self.input_size[2], self.channels), name=name)
-        flux_err_input = keras.Input(shape=(self.input_size[2], self.channels), name=name + "_err")
+        flux_input = keras.Input(shape=(self.input_size[2], channels), name=name)
+        flux_err_input = keras.Input(shape=(self.input_size[2], channels), name=name + "_err")
         flux_input_mod = keras.layers.Dropout(self.hyperparams.dropout_rate)(flux_input)
         flux_err_input_mod = keras.layers.Dropout(self.hyperparams.dropout_rate)(flux_err_input)
         if self.hyperparams.white_noise_std is not None:
             flux_input_mod = keras.layers.GaussianNoise(stddev=self.hyperparams.white_noise_std, name="gn_flux")(flux_input_mod)
             flux_err_input_mod = keras.layers.GaussianNoise(stddev=self.hyperparams.white_noise_std, name="gn_flux_err")(flux_err_input_mod)
         flux_input_final = keras.layers.concatenate([flux_input_mod, flux_err_input_mod], axis=2)
-        flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_input_final)
+        flux_branch = flux_input_final
+        #flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
         flux_branch = keras.layers.SpatialDropout1D(rate=self.hyperparams.dropout_rate)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=128, kernel_size=9, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
         flux_branch = keras.layers.MaxPooling1D(pool_size=10, strides=6)(flux_branch)
-        flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
+        #flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
         flux_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=64, kernel_size=7, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
         flux_branch = keras.layers.MaxPooling1D(pool_size=4, strides=3)(flux_branch)
-        flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
+        #flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
         flux_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=32, kernel_size=5, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
         flux_branch = keras.layers.MaxPooling1D(pool_size=3, strides=3)(flux_branch)
-        flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
+        #flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
         flux_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=16, kernel_size=3, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
@@ -93,18 +96,21 @@ class IATSON_planet(ImbalancedBinaryModel):
         flux_branch = keras.Model(inputs=[flux_input, flux_err_input], outputs=flux_branch)
         return flux_branch
 
-    def _get_focus_flux_conv_branch(self, name):
+    def _get_focus_flux_conv_branch(self, name, channels=None):
+        if not channels:
+            channels = self.channels
         leaky_relu_alpha = 0.01
         # TODO use binning error as channel
-        focus_flux_input = keras.Input(shape=(self.input_size[3], self.channels), name=name)
-        focus_flux_err_input = keras.Input(shape=(self.input_size[3], self.channels), name=name + "_err")
+        focus_flux_input = keras.Input(shape=(self.input_size[3], channels), name=name)
+        focus_flux_err_input = keras.Input(shape=(self.input_size[3], channels), name=name + "_err")
         focus_flux_input_mod = keras.layers.Dropout(self.hyperparams.dropout_rate)(focus_flux_input)
         focus_flux_err_input_mod = keras.layers.Dropout(self.hyperparams.dropout_rate)(focus_flux_err_input)
         if self.hyperparams.white_noise_std is not None:
             focus_flux_input_mod = keras.layers.GaussianNoise(stddev=self.hyperparams.white_noise_std)(focus_flux_input_mod)
             focus_flux_err_input_mod = keras.layers.GaussianNoise(stddev=self.hyperparams.white_noise_std)(focus_flux_err_input_mod)
         focus_flux_input_final = keras.layers.concatenate([focus_flux_input_mod, focus_flux_err_input_mod], axis=2)
-        focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_input_final)
+        focus_flux_branch = focus_flux_input_final
+        #focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_input_final)
         # (time, flux, detrended_flux1... detrended_flux5, flux_model, centroidx, centroidy, motionx, motiony, bck)
         # flux model by transit params and stellar params
         focus_flux_branch = keras.layers.SpatialDropout1D(rate=self.hyperparams.dropout_rate)(focus_flux_branch)
@@ -112,12 +118,12 @@ class IATSON_planet(ImbalancedBinaryModel):
                                                 activation=LeakyReLU(leaky_relu_alpha), use_bias=True)(
             focus_flux_branch)
         focus_flux_branch = keras.layers.MaxPooling1D(pool_size=5, strides=3)(focus_flux_branch)
-        focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_branch)
+        #focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_branch)
         focus_flux_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(focus_flux_branch)
         focus_flux_branch = keras.layers.Conv1D(filters=32, kernel_size=3, padding="same",
                                                 activation=LeakyReLU(leaky_relu_alpha), use_bias=True)(
             focus_flux_branch)
-        focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_branch)
+        #focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_branch)
         focus_flux_branch = keras.layers.MaxPooling1D(pool_size=3, strides=3)(focus_flux_branch)
         focus_flux_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha))(focus_flux_branch)
         focus_flux_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(focus_flux_branch)
@@ -319,16 +325,26 @@ class IATSON_planet(ImbalancedBinaryModel):
             stellar_neighbours_branch)
         flux_model_branch = self._get_flux_conv_model_branch()
         focus_flux_model_branch = self._get_focus_flux_conv_model_branch()
+        centroids_input, centroids_err_input, centroids_branch = self._get_focus_flux_conv_branch("centroids_branch", 3)
+        centroids_inputs = [centroids_input, centroids_err_input]
+        centroids_branch = keras.Model(inputs=centroids_inputs, outputs=centroids_branch)
+        centroids_inputs = centroids_branch.input
+        og_input, og_err_input, og_branch = self._get_focus_flux_conv_branch("og_branch", 2)
+        og_inputs = [og_input, og_err_input]
+        og_branch = keras.Model(inputs=og_inputs, outputs=og_branch)
+        og_inputs = og_branch.input
         final_branch = keras.layers.Concatenate(axis=1)(
-            [stellar_model_branch, stellar_neighbours_branch, flux_model_branch.output, focus_flux_model_branch.output])
+            [stellar_model_branch, stellar_neighbours_branch, flux_model_branch.output, focus_flux_model_branch.output,
+             centroids_branch.output, og_branch.output])
         final_branch = keras.layers.GlobalAveragePooling1D()(final_branch)
         final_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha), name="final-dense1")(final_branch)
         final_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(final_branch)
         final_branch = keras.layers.Dense(32, activation=LeakyReLU(leaky_relu_alpha), name="final-dense2")(final_branch)
         final_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(final_branch)
         final_branch = keras.layers.Dense(1, activation="sigmoid", name="logits")(final_branch)
-        inputs = [stellar_model_input,
-                  stellar_neighbours_input] + flux_model_branch.inputs + focus_flux_model_branch.inputs
+        inputs = [stellar_model_input, stellar_neighbours_input] + \
+                 flux_model_branch.inputs + focus_flux_model_branch.inputs + \
+                 centroids_inputs + og_inputs
         return inputs, final_branch
 
     def build_transformer(self, transformer_blocks=6, transformer_heads=6):
@@ -372,8 +388,11 @@ class IATSON_planet(ImbalancedBinaryModel):
 
     def load_training_set(self, **kwargs):
         training_dir = kwargs.get('training_dir')
-        injected_objects_df = pd.read_csv(training_dir + "/injected_objects.csv", index_col=None)
-        injected_objects_df = shuffle(injected_objects_df)
+        injected_objects_df_q1_q17 = pd.read_csv(training_dir + "/q1_q17/injected_objects_tces.csv", index_col=None)
+        injected_objects_df_ete6 = pd.read_csv(training_dir + "/ete6/injected_objects.csv", index_col=None)
+        injected_objects_df = [injected_objects_df_ete6, injected_objects_df_q1_q17]
+        injected_objects_df = pd.concat(injected_objects_df)
+        #injected_objects_df = shuffle(injected_objects_df)
         injected_objects_df.reset_index(inplace=True, drop=True)
         return injected_objects_df
 
