@@ -1,4 +1,4 @@
-from keras.activations import softmax
+from keras.activations import softmax, sigmoid
 from keras.losses import CategoricalCrossentropy, BinaryCrossentropy, binary_crossentropy
 from keras.metrics import CategoricalAccuracy, BinaryAccuracy
 import tensorflow as tf
@@ -23,7 +23,7 @@ def categorical_cross_entropy_with_dca_loss(y_true, y_pred, alpha=1., beta=10., 
 
 
 def binary_cross_entropy_with_dca_loss(y_true, y_pred, alpha=1., beta=10., from_logits=False,
-                                       activation_function=softmax):
+                                       activation_function=sigmoid):
     """
     DCA loss applied to binary classification
     :param y_true: the real labels values (typically one hot encoded)
