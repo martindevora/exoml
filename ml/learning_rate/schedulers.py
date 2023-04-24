@@ -1,7 +1,10 @@
+import dataclasses
+
 import tensorflow as tf
 from keras.optimizers.schedules.learning_rate_schedule import LearningRateSchedule
 
 
+@dataclasses.dataclass(init=False)
 class ExponentialRescaleDecay(LearningRateSchedule):
     def __init__(
             self,
