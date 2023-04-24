@@ -1,6 +1,9 @@
+import dataclasses
+import json
 import logging
 import os
 from copy import deepcopy
+from typing import List, Dict, Union, Any, Optional, Literal
 
 import numpy as np
 import tensorflow as tf
@@ -19,6 +22,52 @@ from ml.callback.training_data_aware import ValidationDataAwareCallback, ModelDi
 from ml.learning_rate.schedulers import ExponentialRescaleDecay
 from ml.log.get_weights_logger import ModelWeightsLogger
 from ml.log.with_logging import WithLogging
+from keras.optimizers.schedules.learning_rate_schedule import LearningRateSchedule
+
+
+@dataclasses.dataclass
+class HyperParams:
+    batch_size: int = 20
+    epochs: int = 20
+    initial_learning_rate: float = 0.01,
+    dataset_iterations_per_epoch: float = 1
+    train_percent: float = 0.8
+    validation_percent: float = 0.1
+    training_set_limit: Optional[int] = None
+    dry_run: bool = True
+    zero_epsilon = 1e-7
+    gradient_clip_norm: Optional[float] = 0.01
+    gradient_clip_value: Optional[float] = 0.5
+    cores: int = 0
+    metrics: List = dataclasses.field(default_factory=lambda: [])
+    callbacks: List = dataclasses.field(default_factory=lambda: [])
+    learning_rate_decay: float = 0.98
+    learning_rate_schedule: Optional[LearningRateSchedule] = None
+    balance_class_id: Optional[str] = None
+    balance_class_sampling: Optional[List] = None
+    class_loss_weights: Optional[Union[Dict, Literal['auto']]] = None
+    early_stopping_delta: float = 0
+    early_stopping_patience: int = 0
+    custom_loss: Optional[Any] = None
+    run_eagerly: bool = False
+    l1_regularization: float = 0.0
+    l2_regularization: float = 0.0
+    dropout_rate: float = 0.1
+    white_noise_std: Optional[float] = 0.0
+
+
+class CategoricalPredictionSetStats:
+    """
+    Statistics of categorical predictions.
+    """
+    def __init__(self, tp, fp, fn, accuracy, precision, recall) -> None:
+        super().__init__()
+        self.tp = tp
+        self.fp = fp
+        self.fn = fn
+        self.accuracy = accuracy
+        self.precision = precision
+        self.recall = recall
 
 
 class BaseModel(WithLogging):
@@ -152,6 +201,7 @@ class BaseModel(WithLogging):
     def prepare_training_data(self, training_dir, output_dir, batch_size, train_percent=0.8, validation_percent=0.1,
                               training_set_limit=None, balance_class_id=None, balance_class_sampling=None):
         training_dataset = self.load_training_set(training_dir=training_dir)
+        training_dataset = shuffle(training_dataset)
         test_dataset = None
         if balance_class_sampling is not None:
             training_dataset, test_dataset = \
@@ -159,15 +209,16 @@ class BaseModel(WithLogging):
         elif balance_class_id is not None:
             training_dataset, test_dataset = \
                 self.balance_dataset_from_class(training_dataset, balance_class_id)
-        for labels in self.class_ids.values():
-            logging.info("%s items of class %s", labels, len(training_dataset[training_dataset['type'].isin(labels)]))
-        #training_dataset = shuffle(training_dataset)
+        training_dataset = shuffle(training_dataset)
         if training_set_limit is not None:
             if isinstance(training_dataset, pd.DataFrame):
                 training_dataset = training_dataset[:training_set_limit]
             else:
                 training_dataset = training_dataset[:training_set_limit]
         dataset_length = len(training_dataset)
+        for labels in self.class_ids.values():
+            class_len = len(training_dataset[training_dataset['type'].isin(labels)])
+            logging.info("%s (%s %%) items of class %s", class_len, class_len / len(training_dataset) * 100, labels)
         train_last_index = int(dataset_length * train_percent)
         train_last_index = train_last_index - train_last_index % batch_size
         validation_last_index = train_last_index + int(dataset_length * validation_percent)
@@ -190,14 +241,34 @@ class BaseModel(WithLogging):
             validation_filenames = training_dataset.iloc[train_last_index:validation_last_index]
             train_filenames.to_csv(train_dataset_filename)
             validation_filenames.to_csv(validation_dataset_filename)
+            train_dataset_len = len(train_filenames)
+            validation_dataset_len = len(validation_filenames)
+            logging.info("Training set is of length %s (%s %%)", len(train_filenames),
+                         len(train_filenames) / dataset_length * 100)
+            logging.info("Validation set is of length %s (%s %%)", len(validation_filenames),
+                         len(validation_filenames) / dataset_length * 100)
+            logging.info("Testing set is of length %s (%s %%)", len(test_filenames),
+                         len(test_filenames) / dataset_length * 100)
+            for labels in self.class_ids.values():
+                class_len = len(train_filenames[train_filenames['type'].isin(labels)])
+                logging.info("Training set contains %s (%s %%) items of class %s", class_len,
+                             class_len / train_dataset_len * 100, labels)
+            for labels in self.class_ids.values():
+                class_len = len(validation_filenames[validation_filenames['type'].isin(labels)])
+                logging.info("Validation set contains %s (%s %%) items of class %s", class_len,
+                             class_len / validation_dataset_len * 100, labels)
             if validation_last_index != test_last_index:
                 test_filenames = test_dataset if test_dataset is not None else train_filenames.iloc[:0, :].copy()
-                test_filenames = test_filenames.append(training_dataset.iloc[validation_last_index:test_last_index],
-                                                       ignore_index=True)
+                test_filenames = pd.concat([test_filenames, training_dataset.iloc[validation_last_index:test_last_index]])
                 test_filenames.to_csv(test_dataset_filename)
-        else:
-            train_filenames = training_dataset[0:train_last_index]
-            validation_filenames = training_dataset[train_last_index:validation_last_index]
+                test_dataset_len = len(test_filenames)
+                for labels in self.class_ids.values():
+                    class_len = len(test_filenames[test_filenames['type'].isin(labels)])
+                    logging.info("Testing set contains %s (%s %%) items of class %s", class_len,
+                                 class_len / test_dataset_len * 100, labels)
+            else:
+                train_filenames = training_dataset[0:train_last_index]
+                validation_filenames = training_dataset[train_last_index:validation_last_index]
             with open(train_dataset_filename, 'w') as file:
                 file.write('file_name')
                 file.write('\n'.join(train_filenames))
@@ -210,6 +281,22 @@ class BaseModel(WithLogging):
                     file.write('file_name')
                     file.write('\n'.join(test_filenames))
         return train_filenames, validation_filenames, test_filenames
+
+    def compute_class_weights(self, train_filenames):
+        train_len = len(train_filenames)
+        label_counts = {}
+        for type, label in self.type_to_label.items():
+            class_len = len(train_filenames[train_filenames['type'] == type])
+            if label[0] in label_counts:
+                label_counts[label[0]] = label_counts[label[0]] + class_len
+            else:
+                label_counts[label[0]] = class_len
+        class_weights = {}
+        for label, count in label_counts.items():
+            logging.info("Label %s contains %s (%s %%) items", label, count,
+                         count / train_len * 100)
+            class_weights[label] = 1 / (count / train_len)
+        return class_weights
 
     def train(self, training_dir, output_dir, hyperparams):
         logging.info("Preparing training data with (training_dir," + str(training_dir) +
@@ -229,25 +316,28 @@ class BaseModel(WithLogging):
         test_dataset_size = len(validation_filenames)
         steps_per_epoch = int(hyperparams.dataset_iterations_per_epoch * train_dataset_size // hyperparams.batch_size)
         total_steps = steps_per_epoch * hyperparams.epochs
-        if hyperparams.learning_rate_schedule is None:
-            learning_rate_decay_steps = steps_per_epoch // 2
-            learning_rate_decay_steps = learning_rate_decay_steps if learning_rate_decay_steps > steps_per_epoch \
-                else steps_per_epoch
-            logging.info("Initializing optimizer with learning_rate_decay_steps," + str(learning_rate_decay_steps) +
-                         ") (gradient_clip_norm," + str(hyperparams.gradient_clip_norm) +
-                         ")")
-            powers_for_half_learning_rate_decay = np.log(hyperparams.learning_rate_decay / 2) // \
-                                                  np.log(hyperparams.learning_rate_decay)
-            hyperparams.learning_rate_schedule = ExponentialRescaleDecay(hyperparams.initial_learning_rate,
-                                                             decay_steps=learning_rate_decay_steps,
-                                                             decay_rate=hyperparams.learning_rate_decay,
-                                                             restore_steps=learning_rate_decay_steps *
-                                                                           powers_for_half_learning_rate_decay,
-                                                             restore_rate=1.5,
-                                                             staircase=True)
+        # if hyperparams.learning_rate_schedule is None:
+        #     learning_rate_decay_steps = steps_per_epoch // 2
+        #     learning_rate_decay_steps = learning_rate_decay_steps if learning_rate_decay_steps > steps_per_epoch \
+        #         else steps_per_epoch
+        #     logging.info("Initializing optimizer with learning_rate_decay_steps," + str(learning_rate_decay_steps) +
+        #                  ") (gradient_clip_norm," + str(hyperparams.gradient_clip_norm) +
+        #                  ")")
+        #     powers_for_half_learning_rate_decay = np.log(hyperparams.learning_rate_decay / 2) // \
+        #                                           np.log(hyperparams.learning_rate_decay)
+        #     hyperparams.learning_rate_schedule = ExponentialRescaleDecay(hyperparams.initial_learning_rate,
+        #                                                      decay_steps=learning_rate_decay_steps,
+        #                                                      decay_rate=hyperparams.learning_rate_decay,
+        #                                                      restore_steps=learning_rate_decay_steps *
+        #                                                                    powers_for_half_learning_rate_decay,
+        #                                                      restore_rate=1.5,
+        #                                                      staircase=True)
         logging.info("Initializing optimizer with (initial_learning_rate," + str(hyperparams.initial_learning_rate) +
                      ")")
-        optimizer = tf.keras.optimizers.Adam(hyperparams.learning_rate_schedule, beta_1=0.9, beta_2=0.98, epsilon=1e-9,
+        optimizer = tf.keras.optimizers.Adam(hyperparams.learning_rate_schedule
+                                             if hyperparams.learning_rate_schedule is not None
+                                             else hyperparams.initial_learning_rate,
+                                             beta_1=0.9, beta_2=0.98, epsilon=1e-9,
                                              clipnorm=hyperparams.gradient_clip_norm,
                                              clipvalue=hyperparams.gradient_clip_value)
         # We don't use SparseCategoricalCrossentropy because our targets are one-hot encoded
@@ -265,26 +355,16 @@ class BaseModel(WithLogging):
                                                                self.input_size, self.type_to_label, hyperparams.zero_epsilon)
             validation_batch_generator = self.instance_generator(validation_filenames, training_dir, hyperparams.batch_size,
                                                                  self.input_size, self.type_to_label, hyperparams.zero_epsilon)
-            csv_log = model_path + '/training_log.csv'
-            logging.info("Initializing csv logger with (csv_log," + str(csv_log) +
-                         ") (steps_per_epoch," + str(steps_per_epoch) +
-                         ")")
-            csv_logger = BatchAwareCsvLogger(csv_log, steps_per_epoch)
-            logging.info("Initializing model checkpoint with (model_path," + str(model_path) +
-                         ") (steps_per_epoch," + str(steps_per_epoch) +
-                         ")")
             for callback in hyperparams.callbacks:
                 if issubclass(callback.__class__, ModelDirDataAwareCallback):
                     callback.set_model_dir(model_path)
                 if issubclass(callback.__class__, ValidationDataAwareCallback):
                     callback.set_validation_data(validation_batch_generator)
-            cp_callback = tf.keras.callbacks.ModelCheckpoint(
-                filepath=model_path,
-                verbose=1,
-                save_weights_only=False,
-                save_freq='epoch')
+            hyperparams.callbacks = hyperparams.callbacks + [BatchAwareCsvLogger(model_path + '/training_log.csv', steps_per_epoch),
+                                                             GetWeights(model_weights_logger),
+                                                             MetricsPlotCallback(self, model_path, steps_per_epoch)]
             if hyperparams.early_stopping_patience > 0 and hyperparams.early_stopping_delta > 0:
-                early_stopping_callback = ExoMlEarlyStopping(
+                hyperparams.callbacks = hyperparams.callbacks + [ExoMlEarlyStopping(
                     monitor="val_loss",
                     min_delta=hyperparams.early_stopping_delta,
                     patience=hyperparams.early_stopping_patience,
@@ -292,12 +372,12 @@ class BaseModel(WithLogging):
                     mode="auto",
                     baseline=None,
                     restore_best_weights=False,
-                )
-                hyperparams.callbacks = hyperparams.callbacks + [early_stopping_callback]
-            get_weights_callback = GetWeights(model_weights_logger)
+                )]
             model_validation_steps = int(test_dataset_size // hyperparams.batch_size)
             class_weights = hyperparams.class_loss_weights if hyperparams.class_loss_weights is not None \
                 else training_batch_generator.class_weights()
+            if isinstance(class_weights, str) and 'auto' == class_weights:
+                class_weights = self.compute_class_weights(train_filenames)
             logging.info("Initializing training with (epochs," + str(hyperparams.epochs) +
                          ") (steps_per_epoch," + str(steps_per_epoch) +
                          ") (model_validation_steps," + str(model_validation_steps) +
@@ -309,26 +389,25 @@ class BaseModel(WithLogging):
                            epochs=hyperparams.epochs, verbose=1, class_weight=class_weights,
                            validation_data=validation_batch_generator,
                            validation_steps=model_validation_steps,
-                           callbacks=[csv_logger, cp_callback, get_weights_callback,
-                                      MetricsPlotCallback(self, model_path, steps_per_epoch)] +
-                                      hyperparams.callbacks,
+                           callbacks=hyperparams.callbacks,
                            use_multiprocessing=hyperparams.cores > 0, workers=1 if hyperparams.cores <= 0
                 else hyperparams.cores)
             self.save(output_dir)
         else:
             logging.warning("dry_run was activated and 'training' will not be launched")
 
-    def __write_hyperparameters(self, hyperparameters, output_dir):
+    def __write_hyperparameters(self, hyperparameters: HyperParams, output_dir):
         only_attributes_hyperparameters = deepcopy(hyperparameters)
         yaml = ruamel.yaml.YAML()
         yaml.register_class(HyperParams)
         if len(only_attributes_hyperparameters.callbacks) > 0:
-            only_attributes_hyperparameters.callbacks = ""
+            only_attributes_hyperparameters.callbacks = []
             for i, callback in enumerate(hyperparameters.callbacks):
                 only_attributes_hyperparameters.callbacks = only_attributes_hyperparameters.callbacks + \
-                                                            str(type(only_attributes_hyperparameters.callbacks[i]))
+                                                            [str(type(hyperparameters.callbacks[i]))]
         if only_attributes_hyperparameters.learning_rate_schedule is not None:
-            only_attributes_hyperparameters.learning_rate_schedule = str(type(hyperparameters.learning_rate_schedule))
+            only_attributes_hyperparameters.learning_rate_schedule = json.dumps(
+                dataclasses.asdict(only_attributes_hyperparameters.learning_rate_schedule))
         if only_attributes_hyperparameters.custom_loss is not None:
             only_attributes_hyperparameters.custom_loss = str(type(hyperparameters.custom_loss))
         with open(output_dir + '/hp.yaml', 'w', newline='') as f:
@@ -348,76 +427,3 @@ class BaseModel(WithLogging):
 
     def _get_model_dir(self):
         return self.name + '_model/'
-
-
-class HyperParams:
-    batch_size = 20
-    epochs = 20
-    initial_learning_rate = 0.01,
-    dataset_iterations_per_epoch = 1
-    train_percent = 0.8,
-    validation_percent = 0.1
-    training_set_limit = None
-    dry_run = True
-    zero_epsilon = 1e-7,
-    gradient_clip_norm = 0.01
-    cores = 0
-    metrics = []
-    callbacks = []
-    learning_rate_decay = 0.98
-    learning_rate_schedule = None
-    balance_class_id = None
-    balance_class_sampling = None
-    class_loss_weights = None
-    early_stopping_delta = 0
-    early_stopping_patience = 0,
-    custom_loss = None
-    run_eagerly = False
-
-    def __init__(self, batch_size=20, epochs=20, initial_learning_rate=0.01,
-              dataset_iterations_per_epoch=1, train_percent=0.8,
-              validation_percent=0.1, training_set_limit=None, dry_run=True, zero_epsilon=1e-7,
-              gradient_clip_norm=0.01, gradient_clip_value=0.5, cores=0, metrics=[], callbacks=[], learning_rate_decay=0.98,
-              learning_rate_schedule=None, balance_class_id=None, balance_class_sampling=None,
-              class_loss_weights=None, early_stopping_delta=0, early_stopping_patience=0,
-              custom_loss=None, run_eagerly=False, dropout_rate=0.1, white_noise_std=None) -> None:
-        super().__init__()
-        self.batch_size = batch_size
-        self.epochs = epochs
-        self.initial_learning_rate = initial_learning_rate
-        self.dataset_iterations_per_epoch = dataset_iterations_per_epoch
-        self.train_percent = train_percent
-        self.validation_percent = validation_percent
-        self.training_set_limit = training_set_limit
-        self.dry_run = dry_run
-        self.zero_epsilon = zero_epsilon
-        self.gradient_clip_norm = gradient_clip_norm
-        self.gradient_clip_value = gradient_clip_value
-        self.cores = cores
-        self.metrics = metrics
-        self.callbacks = callbacks
-        self.learning_rate_decay = learning_rate_decay
-        self.learning_rate_schedule = learning_rate_schedule
-        self.balance_class_id = balance_class_id
-        self.balance_class_sampling = balance_class_sampling
-        self.class_loss_weights = class_loss_weights
-        self.early_stopping_delta = early_stopping_delta
-        self.early_stopping_patience = early_stopping_patience
-        self.custom_loss = custom_loss
-        self.run_eagerly = run_eagerly
-        self.dropout_rate = dropout_rate
-        self.white_noise_std = white_noise_std
-
-
-class CategoricalPredictionSetStats:
-    """
-    Statistics of categorical predictions.
-    """
-    def __init__(self, tp, fp, fn, accuracy, precision, recall) -> None:
-        super().__init__()
-        self.tp = tp
-        self.fp = fp
-        self.fn = fn
-        self.accuracy = accuracy
-        self.precision = precision
-        self.recall = recall
