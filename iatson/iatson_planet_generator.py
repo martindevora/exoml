@@ -175,6 +175,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
         max_index = len(self.injected_objects_df) if max_index > len(self.injected_objects_df) else max_index
         target_indexes = np.arange(idx * self.batch_size, max_index, 1)
         injected_objects_df = self.injected_objects_df.iloc[target_indexes]
+        injected_objects_df = shuffle(injected_objects_df)
         star_array = np.empty((len(target_indexes), self.input_sizes[0], 1))
         star_neighbours_array = np.empty((len(target_indexes), self.input_sizes[1], 1))
         global_flux_array = np.empty((len(target_indexes), self.input_sizes[2], self.measurements_per_point))
@@ -422,13 +423,25 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 np.savetxt(file_prefix + '_input_og_err.csv', folded_og_array_err[i], delimiter=',')
             i = i + 1
         filter_channels = np.array([0, 1, 6, 7, 8, 9, 10, 11])
-        return [star_array, star_neighbours_array,
-                global_flux_array, global_flux_array_err,
-                folded_flux_even_array, folded_flux_even_array_err,
-                folded_flux_odd_array, folded_flux_odd_array_err,
-                folded_flux_even_subhar_array, folded_flux_even_subhar_array_err,
-                folded_flux_odd_subhar_array, folded_flux_odd_subhar_array_err,
-                folded_flux_even_har_array, folded_flux_even_har_array_err,
-                folded_flux_odd_har_array, folded_flux_odd_har_array_err,
-                folded_centroids_array, folded_centroids_array_err, folded_og_array, folded_og_array_err], \
+        return [star_array[:, [2, 5, 6]], #Only Teff, Rad and Mass
+                # star_neighbours_array,
+                global_flux_array,
+                folded_flux_even_array,
+                folded_flux_odd_array,
+                folded_flux_even_subhar_array,
+                folded_flux_odd_subhar_array,
+                folded_flux_even_har_array,
+                folded_flux_odd_har_array,
+                folded_centroids_array, folded_og_array], \
             batch_data_values
+        # return [star_array,
+        #         #star_neighbours_array,
+        #         global_flux_array, global_flux_array_err,
+        #         folded_flux_even_array, folded_flux_even_array_err,
+        #         folded_flux_odd_array, folded_flux_odd_array_err,
+        #         folded_flux_even_subhar_array, folded_flux_even_subhar_array_err,
+        #         folded_flux_odd_subhar_array, folded_flux_odd_subhar_array_err,
+        #         folded_flux_even_har_array, folded_flux_even_har_array_err,
+        #         folded_flux_odd_har_array, folded_flux_odd_har_array_err,
+        #         folded_centroids_array, folded_centroids_array_err, folded_og_array, folded_og_array_err], \
+        #     batch_data_values

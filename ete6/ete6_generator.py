@@ -28,6 +28,9 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         self.zero_epsilon = zero_epsilon
         self.minmax_scaler = MinMaxScaler(feature_range=(self.zero_epsilon, 1 - self.zero_epsilon))
 
+    def on_epoch_end(self):
+        self.injected_objects_df = shuffle(self.injected_objects_df)
+
     def assert_in_range(self, object_id, array, array_err, values_range=(0, 1)):
         if np.isnan(array).any() or (array_err is not None and np.isnan(array_err).any()):
             raise ValueError("Target " + str(object_id) + " contains NaN values")
