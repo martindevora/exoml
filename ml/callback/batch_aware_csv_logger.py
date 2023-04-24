@@ -42,7 +42,7 @@ class BatchAwareCsvLogger(CSVLogger):
         if not self.writer:
             class CustomDialect(csv.excel):
                 delimiter = self.sep
-            fieldnames = ['epoch', 'batch', 'learning_rate'] + metric_fieldnames
+            fieldnames = ['epoch', 'batch', 'lr'] + metric_fieldnames
             self.writer = csv.DictWriter(
                 self.csv_file,
                 fieldnames=fieldnames,
@@ -50,7 +50,7 @@ class BatchAwareCsvLogger(CSVLogger):
             if self.append_header:
                 self.writer.writeheader()
         learning_rate = K.eval(self.model.optimizer.lr)
-        row_dict = {'epoch': epoch, 'batch': batch, 'learning_rate': learning_rate}
+        row_dict = {'epoch': epoch, 'batch': batch, 'lr': learning_rate}
         for metric_key in metric_fieldnames:
             row_dict[metric_key] = handle_value(logs[metric_key][0]
                                                 if isinstance(logs[metric_key], (list, np.ndarray))

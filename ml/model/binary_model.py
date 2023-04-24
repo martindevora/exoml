@@ -18,7 +18,8 @@ class BinaryModel(BaseModel):
         return binary_focal_loss, BinaryAccuracy()
 
     def instance_metrics(self):
-        return [Precision(), Recall(), RecallAtPrecision(precision=0.99, name="r@p99"),
+        return [Precision(), Recall(), F1Score(num_classes=1, threshold=0.5, average='weighted'),
+                RecallAtPrecision(precision=0.99, name="r@p99"),
                 RecallAtPrecision(0.975, name="r@p975"),
                 RecallAtPrecision(0.95, name="r@p95"),
                 AUC(name="roc_auc"),
@@ -31,7 +32,7 @@ class BinaryModel(BaseModel):
         validation_log_df = training_log_df.dropna()
         fig, axs = plt.subplots(2, 2, figsize=(25, 7), constrained_layout=True)
         fig.suptitle(self.name + ' Model Metrics', fontsize=14)
-        axs[0][0].plot(training_log_df['batch_total'], training_log_df['learning_rate'])
+        axs[0][0].plot(training_log_df['batch_total'], training_log_df['lr'])
         axs[0][1].plot(training_log_df['batch_total'], training_log_df['loss'], color='blue', label='Train loss')
         if with_validation:
             axs[0][1].plot(validation_log_df['epoch'] * steps_per_epoch, validation_log_df['val_loss'], color='red',
