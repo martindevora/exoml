@@ -129,7 +129,7 @@ def categorical_focal_loss(y_true, y_pred, alpha=0.2, gamma=2.):
     return K.mean(K.sum(loss, axis=-1))
 
 
-def f1_loss(y_true, y_pred):
+def fb_loss(y_true, y_pred, beta=1):
     """
     The macro F1-score has one big trouble. It's non-differentiable. Which means we cannot use it as a loss function.
 
@@ -147,7 +147,7 @@ def f1_loss(y_true, y_pred):
     fn = K.sum(K.cast(y_true * (1 - y_pred), 'float'), axis=0)
     p = tp / (tp + fp + K.epsilon())
     r = tp / (tp + fn + K.epsilon())
-    f1 = 2 * p * r / (p + r + K.epsilon())
+    f1 = (1 + beta ** 2) * p * r / (beta ** 2 * p + r + K.epsilon())
     f1 = tf.where(tf.math.is_nan(f1), tf.zeros_like(f1), f1)
     return 1 - K.mean(f1)
 
@@ -185,3 +185,5 @@ def dice_bce_loss(targets, inputs, smooth=1e-6):
     dice_loss = 1 - (2 * intersection + smooth) / (K.sum(targets) + K.sum(inputs) + smooth)
     dice_bce = bce + dice_loss
     return dice_bce
+
+
