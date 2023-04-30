@@ -4,6 +4,7 @@ import sys
 
 import matplotlib.pyplot as plt
 import foldedleastsquares
+from lcbuilder.helper import LcbuilderHelper
 from numpy.random import default_rng
 from ete6.ete6_generator import Ete6ModelGenerator
 from ml.encoding.time_position import value_encode_times
@@ -15,7 +16,7 @@ import pandas as pd
 class IatsonPlanetModelGenerator(Ete6ModelGenerator):
     def __init__(self, injected_objects_df, lcs_dir, batch_size, input_sizes, type_to_label, zero_epsilon=1e-7,
                  measurements_per_point=2, plot_inputs=False, fixed_target_id=None, store_arrays=False,
-                 from_arrays=True):
+                 from_arrays=True, shuffle_batch=True):
         super().__init__(zero_epsilon)
         self.injected_objects_df = injected_objects_df
         self.kics_lcs_dir = lcs_dir + '/q1_q17/lcs/'
@@ -29,6 +30,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
         self.fixed_target_id = fixed_target_id
         self.store_arrays = store_arrays
         self.from_arrays = from_arrays
+        self.shuffle_batch = shuffle_batch
 
     def __len__(self):
         return (np.ceil(len(self.injected_objects_df) / float(self.batch_size))).astype(int)
@@ -175,9 +177,12 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
         max_index = len(self.injected_objects_df) if max_index > len(self.injected_objects_df) else max_index
         target_indexes = np.arange(idx * self.batch_size, max_index, 1)
         injected_objects_df = self.injected_objects_df.iloc[target_indexes]
-        injected_objects_df = shuffle(injected_objects_df)
+        if self.shuffle_batch:
+            injected_objects_df = shuffle(injected_objects_df)
         star_array = np.empty((len(target_indexes), self.input_sizes[0], 1))
         star_neighbours_array = np.empty((len(target_indexes), self.input_sizes[1], 1))
+        #[period, planet radius, number of transits, ratio of good transits, transit depth, transit_offset_pos - transit_offset_err]
+        scalar_values = np.empty((len(target_indexes), 8, 1))
         global_flux_array = np.empty((len(target_indexes), self.input_sizes[2], self.measurements_per_point))
         folded_flux_even_array = np.empty((len(target_indexes), self.input_sizes[3], self.measurements_per_point))
         folded_flux_odd_array = np.empty((len(target_indexes), self.input_sizes[3], self.measurements_per_point))
@@ -216,6 +221,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
             file_prefix = lcs_dir + '/' + mission_id + '_' + str(target_id) + '_' + str(round(period, 2)) \
                 if mission_id == 'KIC' else lcs_dir + '/' + mission_id + ' ' + str(target_id) + '_' + str(round(period, 2))
             if self.from_arrays:
+                scalar_values[i] = [[e] for e in np.loadtxt(file_prefix + '_input_scalar_values.csv', delimiter=',')]
                 star_array[i] = [[e] for e in np.loadtxt(file_prefix + '_input_star.csv', delimiter=',')]
                 star_neighbours_array[i] = [[e] for e in np.loadtxt(file_prefix + '_input_nb.csv', delimiter=',')]
                 global_flux_array[i] = np.loadtxt(file_prefix + '_input_global.csv', delimiter=',')
@@ -294,15 +300,60 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 folded_og_array[i], folded_og_array_err[i] = self.bin_by_time(og_df.to_numpy(), self.input_sizes[3], target_row['object_id'])
                 #TODO refactor to use mission for star files
                 star_filename = lcs_dir + '/' + mission_id + ' ' + str(target_id) + '_star.csv'
+                star_df = pd.read_csv(star_filename, index_col=False)
                 star_neighbours_df = pd.read_csv(star_filename,
                                                  usecols=['Teff', 'lum', 'v', 'j', 'k', 'h', 'radius', 'mass',
                                                           'dist_arcsec'], index_col=False)
                 star_neighbours_df = self._prepare_input_neighbour_stars(star_neighbours_df)
-                star_df = pd.read_csv(star_filename, index_col=False)
-                star_df = self._prepare_input_star(star_df)
-                lc_df = self._prepare_input_lc(lc_df)
+                star_df, ra, dec = self._prepare_input_star(star_df)
+                lc_df, good_transits_count, transits_count = self._prepare_input_lc(lc_df, period, epoch, duration)
                 not_null_times_args = np.argwhere(lc_df['#time'].to_numpy() > 0).flatten()
                 lc_df = lc_df.iloc[not_null_times_args]
+                offset_long_filename = file_prefix + '_offset_long.csv'
+                offset_short_filename = file_prefix + '_offset_short.csv'
+                offset_short_df = None
+                offset_long_df = None
+                offset_ra = None
+                offset_dec = None
+                offset_ra_err = None
+                offset_dec_err = None
+                if os.path.exists(offset_long_filename):
+                    offset_long_df = pd.read_csv(offset_long_filename, low_memory=True)
+                    row = offset_long_df[offset_long_df['name'] == 'mean'].iloc[0]
+                    offset_ra = row['ra']
+                    offset_dec = row['dec']
+                    offset_ra_err = row['ra_err']
+                    offset_dec_err = row['dec_err']
+                if os.path.exists(offset_short_filename):
+                    offset_short_df = pd.read_csv(offset_short_filename, low_memory=True)
+                    row = offset_short_df[offset_short_df['name'] == 'mean'].iloc[0]
+                    offset_ra = row['ra'] if offset_long_df is None or np.isnan(offset_ra) else np.mean(
+                        [row['ra'], offset_ra])
+                    offset_dec = row['dec'] if offset_long_df is None or np.isnan(offset_dec) else np.mean(
+                        [row['dec'], offset_dec])
+                    offset_ra_err = self.zero_epsilon if np.isnan(offset_ra) else offset_ra
+                    offset_dec_err = self.zero_epsilon if np.isnan(offset_dec) else offset_dec
+                    offset_ra_err = row['ra_err'] if offset_long_df is None or np.isnan(offset_ra_err) else np.sqrt(
+                        offset_ra_err ** 2 + row['ra_err'] ** 2)
+                    offset_dec_err = row['ra_err'] if offset_long_df is None or np.isnan(offset_dec_err) else np.sqrt(
+                        offset_dec_err ** 2 + row['dec_err'] ** 2)
+                offset_err = offset_ra_err if offset_ra_err > offset_dec_err else offset_dec_err
+                offset_err = offset_err * 60 * 60
+                target_dist = np.sqrt((offset_ra - ra) ** 2 + (offset_dec - dec) ** 2)
+                offset_err = offset_err if offset_err > 0 else target_dist * 2
+                offset_err = offset_err if offset_err < 1 else 1 - self.zero_epsilon
+                good_transits_count_norm = good_transits_count / 20
+                good_transits_count_norm = good_transits_count_norm if good_transits_count_norm < 1 else 1 - self.zero_epsilon
+                good_transits_ratio = good_transits_count / transits_count if transits_count > 0 else self.zero_epsilon
+                good_transits_ratio = good_transits_ratio if good_transits_ratio < 1 else 1 - self.zero_epsilon
+                planet_radius = target_row['radius(earth)'] / 300
+                planet_radius = planet_radius if planet_radius < 1 else 1 - self.zero_epsilon
+                depth = target_row['depth_primary'] / 1e6
+                depth = depth if depth < 1 else 1 - self.zero_epsilon
+                scalar_values[i] = np.transpose([[period / 1200, duration / 15, depth,
+                                                  planet_radius, good_transits_count_norm,
+                                                  good_transits_ratio,
+                                                  target_dist, offset_err]])
                 #['ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k'])
                 neighbours_array = star_neighbours_df.to_numpy().flatten()
                 star_neighbours_array[i] = np.transpose([neighbours_array if len(neighbours_array) == 9 * 15 \
@@ -332,22 +383,6 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                                           (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
                 folded_flux_odd_array[i], folded_flux_odd_array_err[i] = \
                     self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[4], target_row['object_id'])
-                # Focus flux sub-harmonic even
-                lc_df_focus = lc_df.copy()
-                lc_df_focus['#time'] = self.fold(time, period / 2, epoch)
-                lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-                lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                          (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-                folded_flux_even_subhar_array[i], folded_flux_even_subhar_array_err[i] = \
-                    self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[5], target_row['object_id'])
-                # Focus flux sub-harmonic odd
-                lc_df_focus = lc_df.copy()
-                lc_df_focus['#time'] = self.fold(time, period / 2, epoch + period / 4)
-                lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-                lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                          (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-                folded_flux_odd_subhar_array[i], folded_flux_odd_subhar_array_err[i] = \
-                    self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[6], target_row['object_id'])
                 # Focus flux harmonic even
                 lc_df_focus = lc_df.copy()
                 lc_df_focus['#time'] = self.fold(time, period * 2, epoch)
@@ -358,12 +393,36 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                     self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[7], target_row['object_id'])
                 # Focus flux harmonic odd
                 lc_df_focus = lc_df.copy()
-                lc_df_focus['#time'] = self.fold(time, period * 2, epoch + period * 3 / 2)
+                lc_df_focus['#time'] = self.fold(time, period * 2, epoch + period)
                 lc_df_focus = lc_df_focus.sort_values(by=['#time'])
                 lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
                                           (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
                 folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i] = \
                     self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[8], target_row['object_id'])
+                # Focus flux sub-harmonic even
+                lc_df_focus = pd.DataFrame(columns=['#time', 'flux_0'])
+                time, flux0, _ = LcbuilderHelper.mask_transits(time,
+                                                                lc_df.copy()['flux_0'].to_numpy(), period, duration * 6,
+                                                                epoch)
+                lc_df_focus['#time'] = time
+                lc_df_focus['flux_0'] = flux0
+                lc_df_focus['#time'] = self.fold(time, period / 2, epoch)
+                lc_df_focus = lc_df_focus.sort_values(by=['#time'])
+                lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
+                                          (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
+                folded_flux_even_subhar_array[i], folded_flux_even_subhar_array_err[i] = \
+                    self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[5], target_row['object_id'])
+                # Focus flux sub-harmonic odd
+                lc_df_focus = pd.DataFrame(columns=['#time', 'flux_0'])
+                lc_df_focus['#time'] = time
+                lc_df_focus['flux_0'] = flux0
+                lc_df_focus['#time'] = self.fold(time, period / 2, epoch + period / 4)
+                lc_df_focus = lc_df_focus.sort_values(by=['#time'])
+                lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
+                                          (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
+                folded_flux_odd_subhar_array[i], folded_flux_odd_subhar_array_err[i] = \
+                    self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[6], target_row['object_id'])
+            self.assert_in_range(object_id, scalar_values[i], None)
             self.assert_in_range(object_id, global_flux_array[i], global_flux_array_err[i])
             self.assert_in_range(object_id, star_array[i], None)
             self.assert_in_range(object_id, folded_flux_even_array[i], folded_flux_even_array_err[i])
@@ -390,17 +449,18 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 #              " and min " + str(np.min(folded_flux_even_har_array[i])))
                 # logging.info("GENERATOR Folded Odd Har Inputs max " + str(np.max(folded_flux_odd_har_array[i])) +
                 #              " and min " + str(np.min(folded_flux_odd_har_array[i])))
-            self._plot_input(global_flux_array[i], global_flux_array_err[i], type, "global")
-            self._plot_input(folded_flux_even_array[i], folded_flux_even_array_err[i], type, "even")
-            self._plot_input(folded_flux_odd_array[i], folded_flux_odd_array_err[i], type, "odd")
-            self._plot_input(folded_flux_even_subhar_array[i], folded_flux_even_subhar_array_err[i], type, "even_subhar")
-            self._plot_input(folded_flux_odd_subhar_array[i], folded_flux_odd_subhar_array_err[i], type, "odd_subhar")
-            self._plot_input(folded_flux_even_har_array[i], folded_flux_even_har_array_err[i], type, "even_har")
-            self._plot_input(folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i], type, "odd_har")
-            self._plot_input(folded_og_array[i], folded_og_array_err[i], type, "OG")
-            self._plot_input(folded_centroids_array[i], folded_centroids_array_err[i], type, "CENTROIDS")
+            self._plot_input(global_flux_array[i], global_flux_array_err[i], target_row['object_id'] + "_" + type, "global")
+            self._plot_input(folded_flux_even_array[i], folded_flux_even_array_err[i], target_row['object_id'] + "_" + type, "even")
+            self._plot_input(folded_flux_odd_array[i], folded_flux_odd_array_err[i], target_row['object_id'] + "_" + type, "odd")
+            self._plot_input(folded_flux_even_har_array[i], folded_flux_even_har_array_err[i], target_row['object_id'] + "_" + type, "even_har")
+            self._plot_input(folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i], target_row['object_id'] + "_" + type, "odd_har")
+            # self._plot_input(folded_flux_even_subhar_array[i], folded_flux_even_subhar_array_err[i], target_row['object_id'] + "_" + type, "even_subhar")
+            # self._plot_input(folded_flux_odd_subhar_array[i], folded_flux_odd_subhar_array_err[i], target_row['object_id'] + "_" + type, "odd_subhar")
+            self._plot_input(folded_og_array[i], folded_og_array_err[i], target_row['object_id'] + "_" + type, "OG")
+            self._plot_input(folded_centroids_array[i], folded_centroids_array_err[i], target_row['object_id'] + "_" + type, "CENTROIDS")
             if self.store_arrays:
                 logging.info("Storing arrays into prefix " + file_prefix)
+                np.savetxt(file_prefix + '_input_scalar_values.csv', scalar_values[i], delimiter=',')
                 np.savetxt(file_prefix + '_input_star.csv', star_array[i], delimiter=',')
                 np.savetxt(file_prefix + '_input_nb.csv', star_neighbours_array[i], delimiter=',')
                 np.savetxt(file_prefix + '_input_global.csv', global_flux_array[i], delimiter=',')
@@ -423,13 +483,14 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 np.savetxt(file_prefix + '_input_og_err.csv', folded_og_array_err[i], delimiter=',')
             i = i + 1
         filter_channels = np.array([0, 1, 6, 7, 8, 9, 10, 11])
-        return [star_array[:, [2, 5, 6]], #Only Teff, Rad and Mass
+        return [scalar_values[:, [0, 1, 2, 3, 4, 5]], scalar_values[:, [6, 7]],
+                star_array[:, [2, 5, 6]], #Only Teff, Rad and Mass
                 # star_neighbours_array,
                 global_flux_array,
                 folded_flux_even_array,
                 folded_flux_odd_array,
-                folded_flux_even_subhar_array,
-                folded_flux_odd_subhar_array,
+                # folded_flux_even_subhar_array,
+                # folded_flux_odd_subhar_array,
                 folded_flux_even_har_array,
                 folded_flux_odd_har_array,
                 folded_centroids_array, folded_og_array], \

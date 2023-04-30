@@ -135,8 +135,30 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
             input_df_clipped = input_df_clipped.replace(0, self.zero_epsilon)
         return input_df_clipped
 
-    def _prepare_input_lc(self, input_df):
+    def _prepare_input_lc(self, input_df, period, epoch, duration, focus_range_in_durations=6,
+                          required_range_percent=0.75):
         time = input_df["#time"].to_numpy()
+        cadence_s = np.round(np.nanmedian(time[1:] - time[:-1]) * 3600 * 24)
+        cadences_per_transit = LcbuilderHelper.estimate_transit_cadences(cadence_s, duration * focus_range_in_durations)
+        transit_t0s_list = LcbuilderHelper.compute_t0s(time, period, epoch, duration)
+        t0s_in_curve_indexes = np.argwhere((transit_t0s_list > time[0] - duration) &
+                                          (transit_t0s_list < time[-1] + duration)).flatten()
+        transit_t0s_list = transit_t0s_list[t0s_in_curve_indexes]
+        good_quality_t0s = []
+        t0s_with_data = []
+        for t0 in transit_t0s_list:
+            transit_with_baseline_half_length = (duration * focus_range_in_durations / 2)
+            t0_in_curve_indexes = np.argwhere((time > t0 - transit_with_baseline_half_length) &
+                                              (time < t0 + transit_with_baseline_half_length)).flatten()
+            cadences_ratio = len(t0_in_curve_indexes) / cadences_per_transit
+            if cadences_ratio > 0:
+                t0s_with_data.append(t0)
+            if cadences_ratio >= required_range_percent:
+                good_quality_t0s.append(t0)
+            else:
+                input_df = input_df[(input_df['#time'] < t0 - transit_with_baseline_half_length) |
+                                    (input_df['#time'] > t0 + transit_with_baseline_half_length)]
+
         # We don't want time encoding because time will be used for folding and then dropped
         #input_df["#time"] = value_encode_times(time - time[0])
         # red_noise_freq = self.random_number_generator.uniform(0.01, 0.1)
@@ -157,9 +179,11 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         input_df = input_df.fillna(self.zero_epsilon)
         input_df = input_df.replace(0.0, self.zero_epsilon)
         input_df = input_df.replace(0, self.zero_epsilon)
-        return input_df
+        return input_df, len(good_quality_t0s), len(t0s_with_data)
 
     def _prepare_input_star(self, star_df):
+        ra = star_df['ra'].iloc[0]
+        dec = star_df['dec'].iloc[0]
         star_df.drop('id', inplace=True, axis=1)
         star_df.drop('Unnamed: 0', inplace=True, axis=1)
         star_df.drop('ra', inplace=True, axis=1)
@@ -189,8 +213,7 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         star_df['j'] = (30 - star_df['j']) / 40
         star_df['k'] = (30 - star_df['k']) / 40
         star_df['h'] = (30 - star_df['h']) / 40
-        star_df = star_df.iloc[0]
-        return star_df
+        return star_df.iloc[0], ra, dec
 
     def _prepare_input_neighbour_stars(self, star_df):
         search_radius = 10
