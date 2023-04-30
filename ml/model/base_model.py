@@ -56,18 +56,20 @@ class HyperParams:
     white_noise_std: Optional[float] = 0.0
 
 
+@dataclasses.dataclass
 class CategoricalPredictionSetStats:
     """
     Statistics of categorical predictions.
     """
-    def __init__(self, tp, fp, fn, accuracy, precision, recall) -> None:
-        super().__init__()
-        self.tp = tp
-        self.fp = fp
-        self.fn = fn
-        self.accuracy = accuracy
-        self.precision = precision
-        self.recall = recall
+    tp: int
+    fp: int
+    fn: int
+    accuracy: float
+    precision: float
+    recall: float
+    mismatches: Optional[Dict] = None
+    mismatches_by_type: Optional[Dict] = None
+
 
 
 class BaseModel(WithLogging):
@@ -133,17 +135,19 @@ class BaseModel(WithLogging):
             if sampling > 1:
                 rows_for_type = training_set[training_set['type'].isin(labels)]
                 sampling = sampling - 1
-                training_set = training_set.append([rows_for_type] * np.floor(sampling).astype(int), ignore_index=True)
+                training_set = [training_set, rows_for_type * np.floor(sampling).astype(int)]
+                training_set = pd.concat(training_set)
                 class_expected_size_remainder = np.round(np.mod(sampling, 1) * class_count).astype(int)
-                training_set = training_set.append(training_set[training_set['type'].isin(labels)]
-                                                   .iloc[0:class_expected_size_remainder], ignore_index=True)
+                training_set = [training_set, training_set[training_set['type'].isin(labels)].iloc[0:class_expected_size_remainder]]
+                training_set = pd.concat(training_set)
             elif sampling < 1:
                 class_expected_size = np.round(class_expected_size).astype(int)
                 samples_to_keep = training_set[training_set['type'].isin(labels)].iloc[0:class_expected_size]
                 samples_to_remove = training_set[training_set['type'].isin(labels)].iloc[class_expected_size:]
                 dropped_samples = dropped_samples.append([samples_to_remove])
                 training_set.drop(training_set[training_set['type'].isin(labels)].index, inplace=True)
-                training_set = training_set.append([samples_to_keep], ignore_index=True)
+                training_set = [training_set, samples_to_keep]
+                training_set = pd.concat(training_set)
         return training_set, dropped_samples
 
     def balance_dataset_from_class(self, training_set, class_id):
@@ -269,17 +273,6 @@ class BaseModel(WithLogging):
             else:
                 train_filenames = training_dataset[0:train_last_index]
                 validation_filenames = training_dataset[train_last_index:validation_last_index]
-            with open(train_dataset_filename, 'w') as file:
-                file.write('file_name')
-                file.write('\n'.join(train_filenames))
-            with open(validation_dataset_filename, 'w') as file:
-                file.write('file_name')
-                file.write('\n'.join(validation_filenames))
-            if validation_last_index != test_last_index:
-                test_filenames = training_dataset[validation_last_index:test_last_index]
-                with open(test_dataset_filename, 'w') as file:
-                    file.write('file_name')
-                    file.write('\n'.join(test_filenames))
         return train_filenames, validation_filenames, test_filenames
 
     def compute_class_weights(self, train_filenames):
@@ -397,25 +390,28 @@ class BaseModel(WithLogging):
             logging.warning("dry_run was activated and 'training' will not be launched")
 
     def __write_hyperparameters(self, hyperparameters: HyperParams, output_dir):
-        only_attributes_hyperparameters = deepcopy(hyperparameters)
-        yaml = ruamel.yaml.YAML()
-        yaml.register_class(HyperParams)
-        if len(only_attributes_hyperparameters.callbacks) > 0:
-            only_attributes_hyperparameters.callbacks = []
-            for i, callback in enumerate(hyperparameters.callbacks):
-                only_attributes_hyperparameters.callbacks = only_attributes_hyperparameters.callbacks + \
-                                                            [str(type(hyperparameters.callbacks[i]))]
-        if only_attributes_hyperparameters.learning_rate_schedule is not None:
-            only_attributes_hyperparameters.learning_rate_schedule = json.dumps(
-                dataclasses.asdict(only_attributes_hyperparameters.learning_rate_schedule))
-        if only_attributes_hyperparameters.custom_loss is not None:
-            only_attributes_hyperparameters.custom_loss = str(type(hyperparameters.custom_loss))
-        with open(output_dir + '/hp.yaml', 'w', newline='') as f:
-            yaml.dump(only_attributes_hyperparameters, f)
+        pass
+        #only_attributes_hyperparameters = deepcopy(hyperparameters)
+        # yaml = ruamel.yaml.YAML()
+        # yaml.register_class(HyperParams)
+        # # if len(hyperparameters.callbacks) > 0:
+        # #     hyperparameters.callbacks = []
+        # #     for i, callback in enumerate(hyperparameters.callbacks):
+        # #         only_attributes_hyperparameters.callbacks = only_attributes_hyperparameters.callbacks + \
+        # #                                                     [str(type(hyperparameters.callbacks[i]))]
+        # # if only_attributes_hyperparameters.learning_rate_schedule is not None:
+        # #     only_attributes_hyperparameters.learning_rate_schedule = json.dumps(
+        # #         dataclasses.asdict(only_attributes_hyperparameters.learning_rate_schedule))
+        # # if only_attributes_hyperparameters.custom_loss is not None:
+        # #     only_attributes_hyperparameters.custom_loss = str(type(hyperparameters.custom_loss))
+        # with open(output_dir + '/hp.yaml', 'w', newline='') as f:
+        #     yaml.dump(hyperparameters, f)
 
-    def load_model(self, dir):
+    def load_model(self, dir, custom_objects={}):
+        custom_objects['ExponentialRescaleDecay'] = ExponentialRescaleDecay
+        logging.info("Loading model from %s", dir)
         self.set_model(tf.keras.models.load_model(dir,
-                                                  custom_objects={'ExponentialRescaleDecay': ExponentialRescaleDecay}))
+                                                  custom_objects=custom_objects))
         return self
 
     def set_model(self, model):
