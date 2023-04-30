@@ -30,16 +30,17 @@ def create_injection_dataframe(injections_dir, lcs_dir):
     planet_df = pd.read_csv(injections_dir + '/ete6_planet_data.txt', comment="#")
     df = pd.DataFrame(columns=['object_id', 'type', 'period', 'epoch', 'Rsec/Rpri', 'b',
                                 'a/Rstar', 'duration(h)', 'depth_primary', 'depth_secondary',
-                               'insolation', 'Rstar_primary', 'Rstar_secondary', 'contact_amplitude', 'Mstar'])
+                               'insolation', 'Rstar_primary', 'Rstar_secondary', 'contact_amplitude', 'Mstar',
+                               'radius(earth)'])
     i = 0
     log_count = 100
     random_number_generator = default_rng()
     for lc_file in list(pathlib.Path(lcs_dir).glob('*.fits')):
-        lc = TessLightCurve.read(lc_file)
-        object_id = lc.meta['OBJECT']
-        object_id = int(object_id.split(' ')[1])
-        leading_zeros_object_id = '{:09}'.format(object_id)
-        star_file = lcs_dir + '/' + leading_zeros_object_id + '_star.csv'
+        object_id_no = int(str(lc_file).split('-')[1])
+        object_id = 'TIC ' + str(object_id_no)
+        # lc = TessLightCurve.read(lc_file)
+        # object_id = lc.meta['OBJECT']
+        star_file = lcs_dir + '/' + object_id + '_star.csv'
         star_df = pd.read_csv(star_file)
         star_radius = star_df['radius'].iloc[0]
         try:
@@ -48,44 +49,27 @@ def create_injection_dataframe(injections_dir, lcs_dir):
             print("ERROR WITH " + str(star_file))
         star_mass = star_df['mass'].iloc[0]
         try:
-            star_mass = 1 if np.isnan(star_mass) else star_mass
+            if np.isnan(star_mass) and np.isnan(star_df['radius'].iloc[0]):
+                star_mass = 1
+            elif np.isnan(star_mass):
+                star_mass = star_radius ** (1 / 0.8)
         except:
             print("ERROR WITH " + str(star_file))
-        min_period = 0.5
-        max_period = 10
-        period = random_number_generator.uniform(min_period, max_period)
-        min_lc_time = 0.5
-        epoch = random_number_generator.uniform(min_lc_time, min_lc_time + period)
-        duration = t14(star_radius, star_mass, period)
-        duration = duration * 24
-        df = df.append({'object_id': 'TIC ' + str(object_id), 'type': 'none', 'period': period,
-                   'epoch': epoch,
-                   'Rsec/Rpri': 0,
-                   'b': 0,
-                   'a/Rstar': 0, 'duration(h)': duration,
-                   'depth_primary': 0,
-                   'depth_secondary': 0,
-                   'insolation': 0, 'Rstar_primary': 0,
-                   'Rstar_secondary': 0,
-                   'contact_amplitude': 0,
-                   'Mstar': 0}, ignore_index=True)
-        target_rows = backeb_df[backeb_df['TIC ID'] == object_id]
+        has_injected_object = False
+        target_rows = backeb_df[backeb_df['TIC ID'] == object_id_no]
         for index, target_row in target_rows.iterrows():
+            has_injected_object = True
             period = target_row['Orbital Period']
             epoch = target_row['Epoch [BTJD]']
-            Rsec_Rpri = target_row['Secondary Rstar'] / target_row['Primary Rstar']
-            if not np.isnan(Rsec_Rpri) and Rsec_Rpri > 0 and Rsec_Rpri < 1:
-                radius_secondary = star_radius * target_row['Rsec/Rpri']
-                duration = t14(star_radius, star_mass, period, R_p=radius_secondary)
-            elif not np.isnan(target_row['Primary Star Depth']) and target_row['Primary Star Depth'] > 0:
-                radius_secondary = np.sqrt((target_row['Primary Star Depth'] / 1e6) * (star_radius ** 2))
-                duration = t14(star_radius, star_mass, period, R_p=radius_secondary)
+            binary_rad = (target_row['Primary Star Depth'] * 1e-6 * (star_radius ** 2)) ** (1 / 2)
+            if not np.isnan(target_row['Primary Rstar']):
+                duration = t14(star_radius, star_mass, period, R_p=binary_rad)
             else:
                 duration = t14(star_radius, star_mass, period)
             duration = duration * 24
-            df = df.append({'object_id': 'TIC ' + str(int(target_row['TIC ID'])), 'type': 'bckEB', 'period': period,
+            df = df.append({'object_id': object_id, 'type': 'bckEB', 'period': period,
                        'epoch': epoch,
-                       'Rsec/Rpri': target_row['Secondary Rstar'] / target_row['Primary Rstar'],
+                       'Rsec/Rpri': binary_rad / star_radius,
                        'b': target_row['Impact Parameter'],
                        'a/Rstar': 0, 'duration(h)': duration,
                        'depth_primary': target_row['Primary Star Depth'],
@@ -93,24 +77,22 @@ def create_injection_dataframe(injections_dir, lcs_dir):
                        'insolation': 0, 'Rstar_primary': target_row['Primary Rstar'],
                        'Rstar_secondary': target_row['Secondary Rstar'],
                        'contact_amplitude': target_row['Contact Binary Amplitude'],
-                       'Mstar': 0}, ignore_index=True)
-        target_rows = eb_df[eb_df['TIC ID'] == object_id]
+                       'Mstar': star_mass,
+                       'radius(earth)': (binary_rad * u.R_sun).to(u.R_earth).value}, ignore_index=True)
+        target_rows = eb_df[eb_df['TIC ID'] == object_id_no]
         for index, target_row in target_rows.iterrows():
+            has_injected_object = True
             period = target_row['Orbital Period']
             epoch = target_row['Epoch [BTJD]']
-            Rsec_Rpri = target_row['Primary Rstar'] / target_row['Secondary Rstar']
-            if not np.isnan(Rsec_Rpri) and Rsec_Rpri > 0 and Rsec_Rpri < 1:
-                radius_secondary = star_radius * target_row['Rsec/Rpri']
-                duration = t14(star_radius, star_mass, period, R_p=radius_secondary)
-            elif not np.isnan(target_row['Secondary Star Depth']) and target_row['Secondary Star Depth'] > 0:
-                radius_secondary = np.sqrt((target_row['Secondary Star Depth'] / 1e6) * (star_radius ** 2))
-                duration = t14(star_radius, star_mass, period, R_p=radius_secondary)
+            if not np.isnan(target_row['Primary Rstar']):
+                duration = t14(star_radius, star_mass, period, R_p=target_row['Primary Rstar'])
             else:
                 duration = t14(star_radius, star_mass, period)
             duration = duration * 24
-            df = df.append({'object_id': 'TIC ' + str(int(target_row['TIC ID'])), 'type': 'EB', 'period': period,
+            binary_rad = (target_row['Primary Star Depth'] * 1e-6 * (star_radius ** 2)) ** (1 / 2)
+            df = df.append({'object_id': object_id, 'type': 'EB', 'period': period,
                        'epoch': epoch,
-                       'Rsec/Rpri': target_row['Secondary Rstar'] / target_row['Primary Rstar'],
+                       'Rsec/Rpri': binary_rad / star_radius,
                        'b': target_row['Impact Parameter'],
                        'a/Rstar': 0, 'duration(h)': duration,
                        'depth_primary': target_row['Primary Star Depth'],
@@ -118,24 +100,18 @@ def create_injection_dataframe(injections_dir, lcs_dir):
                        'insolation': 0, 'Rstar_primary': target_row['Primary Rstar'],
                        'Rstar_secondary': target_row['Secondary Rstar'],
                        'contact_amplitude': target_row['Contact Binary Amplitude'],
-                       'Mstar': 0}, ignore_index=True)
-        target_rows = planet_df[planet_df['TIC ID'] == object_id]
+                       'Mstar': star_mass,
+                       'radius(earth)': (binary_rad * u.R_sun).to(u.R_earth).value}, ignore_index=True)
+        target_rows = planet_df[planet_df['TIC ID'] == object_id_no]
         for index, target_row in target_rows.iterrows():
+            has_injected_object = True
             period = target_row['Orbital Period']
             epoch = target_row['Epoch [BTJD]']
             duration = target_row['duration[h]']
             if np.isnan(duration) or duration == 0:
-                Rsec_Rpri = target_row['Primary Rstar'] / target_row['Secondary Rstar']
-                if not np.isnan(Rsec_Rpri) and Rsec_Rpri > 0 and Rsec_Rpri < 1:
-                    radius_secondary = star_radius * target_row['Rsec/Rpri']
-                    duration = t14(star_radius, star_mass, period, R_p=radius_secondary)
-                elif not np.isnan(target_row['depth_secondary']) and target_row['depth_secondary'] > 0:
-                    radius_secondary = np.sqrt((target_row['depth_secondary'] / 1e6) * (star_radius ** 2))
-                    duration = t14(star_radius, star_mass, period, R_p=radius_secondary)
-                else:
-                    duration = t14(star_radius, star_mass, period)
+                duration = t14(star_radius, star_mass, period)
                 duration = duration * 24
-            df = df.append({'object_id': 'TIC ' + str(int(target_row['TIC ID'])), 'type': 'planet', 'period': period,
+            df = df.append({'object_id': object_id, 'type': 'planet', 'period': period,
                        'epoch': epoch,
                        'Rsec/Rpri': target_row['Rp/Rstar'],
                        'b': target_row['Impact Parameter'],
@@ -146,7 +122,28 @@ def create_injection_dataframe(injections_dir, lcs_dir):
                        'Rstar_primary': target_row['Rstar'],
                        'Rstar_secondary': target_row['Rstar'] * target_row['Rp/Rstar'],
                        'contact_amplitude': 0,
-                       'Mstar': target_row['Mstar']}, ignore_index=True)
+                       'Mstar': star_mass,
+                       'radius(earth)': target_row['Rp']}, ignore_index=True)
+        if not has_injected_object:
+            min_period = 0.5
+            max_period = 10
+            period = random_number_generator.uniform(min_period, max_period)
+            min_lc_time = 1612.85 + 0.5
+            epoch = random_number_generator.uniform(min_lc_time, min_lc_time + period)
+            duration = t14(star_radius, star_mass, period)
+            duration = duration * 24
+            df = df.append({'object_id': object_id, 'type': 'none', 'period': period,
+                            'epoch': epoch,
+                            'Rsec/Rpri': 1e-7,
+                            'b': 0,
+                            'a/Rstar': 1e-7, 'duration(h)': duration,
+                            'depth_primary': 1e-7,
+                            'depth_secondary': 0,
+                            'insolation': 0, 'Rstar_primary': 1e-7,
+                            'Rstar_secondary': 1e-7,
+                            'contact_amplitude': 0,
+                            'Mstar': star_mass,
+                            'radius(earth)': 1e-7}, ignore_index=True)
         if (i + 1) % log_count == 0:
             print("Processed " + str(i) + " TICs.")
             #df = df.sort_values(["TIC ID", "type"], ascending=True)
