@@ -200,7 +200,7 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
     lc_df['motion_x'] = np.array(lc_data.motion_x)
     lc_df['motion_y'] = np.array(lc_data.motion_y)
     lc_df = lc_df.fillna(0)
-    lc_df.to_csv(file_prefix + '_lc_' + str(cadence) + '.csv')
+    lc_df.to_csv(str(file_prefix) + '_lc_' + str(cadence) + '.csv')
     logging.info("Computing T0s for %s", object_id)
     t0s_list = LcbuilderHelper.compute_t0s(lc_data['time'].to_numpy(), transit_period, epoch, transit_duration)
     source_offsets_diffimg = []
