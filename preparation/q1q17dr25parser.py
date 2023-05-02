@@ -83,22 +83,27 @@ def create_targets_df(tces_dir):
                       (disc_df['type'] == 'tce') &
                       (disc_df['tce_model_snr'] > 3.5), 'type'] = 'tce_candidate'
     last_target = ''
-    last_period = 0
+    last_period = 0.5
     last_index = -1
     left_match_index = []
     right_match_index = []
     unpaired_index = disc_df.index.values
     for index, target_row in disc_df.iterrows():
-        if last_target == target_row['object_id'] and np.abs(target_row['period'] - last_period) < 0.05 * last_period:
+        period_diff = 0.2 / (last_period ** (1/2))
+        period_diff = 0.05 if period_diff > 0.05 else period_diff
+        current_period = target_row['period']
+        if last_target == target_row['object_id'] and np.abs(current_period - last_period) < period_diff * last_period:
             right_match_index = right_match_index + [index]
-            left_match_index = left_match_index + [last_index]
+            if last_index not in left_match_index:
+                left_match_index = left_match_index + [last_index]
             if last_index in unpaired_index:
                 unpaired_index = unpaired_index[unpaired_index != last_index]
             if index in unpaired_index:
                 unpaired_index = unpaired_index[unpaired_index != index]
+        else:
+            last_period = current_period
+            last_index = index
         last_target = target_row['object_id']
-        last_period = target_row['period']
-        last_index = index
     #disc_df = disc_df.loc[left_match_index].combine_first(disc_df.loc[right_match_index])
     result_df = disc_df.loc[unpaired_index]
     for i, index in enumerate(left_match_index):
@@ -111,7 +116,8 @@ def create_targets_df(tces_dir):
     result_df.to_csv(tces_dir + '/classified_tces.csv')
     #disc_df[disc_df['object_id'] == 'KIC 7377200'].iloc[0]['epoch']
     result_df = result_df[result_df['type'].isin(['fp', 'fa', 'planet', 'planet_transit', 'tce', 'tce_og',
-                                                  'tce_secondary', 'tce_source_offset', 'tce_centroids_offset'])]
+                                                  'tce_secondary', 'tce_source_offset', 'tce_centroids_offset',
+                                                  'tce_odd_even'])]
     result_df = result_df[~result_df['radius(earth)'].isna()]
     #TODO this next statement is to prevent confirmed planets not matching any tce nor koi
     #result_df = result_df[~result_df['object_id'].str.contains('<NA')]
