@@ -37,7 +37,8 @@ def row_regenerator(row_regenerator_input: RowRegeneratorInput):
                                      data_dir, 1, [11, 135, 300, 75, 75, 75, 75, 75, 75],
                                      {'fp': [0], 'fa': [0], 'planet': [1], 'planet_transit': [1], 'tce': [0],
                                       'tce_centroids_offset': [0],
-                                      'tce_source_offset': [0], 'tce_secondary': [0], 'tce_og': [0], 'none': [0],
+                                      'tce_source_offset': [0], 'tce_secondary': [0], 'tce_og': [0],
+                                      'tce_odd_even': [0], 'none': [0],
                                       'EB': [0], 'bckEB': [0]}, from_arrays=False, store_arrays=True,
                                      plot_inputs=False, shuffle_batch=False)
     img.__getitem__(0)
@@ -68,14 +69,14 @@ tic_dir = data_dir + "ete6/lcs"
 #df = pd.read_csv("/data/scratch/ml/q1_q17/injected_objects_tces.csv", index_col=False)
 df1 = pd.read_csv(data_dir + "q1_q17/injected_objects_tces.csv", usecols=['object_id', 'period', 'epoch', 'duration(h)', 'type', 'depth_primary', 'radius(earth)'])
 df2 = pd.read_csv(data_dir + "ete6/injected_objects.csv", usecols=['object_id', 'period', 'epoch', 'duration(h)', 'type', 'depth_primary', 'radius(earth)'])
-df = [df1]
+df = [df2]
 df = pd.concat(df)
-cores = 1
+cores = 10
 df_len = len(df)
 inputs = []
 df = df.reset_index(drop=True)
 range = range(0, df_len)
-range = df.index[df['object_id'] == 'KIC 5962532'].tolist()
+# range = df.index[df['object_id'] == 'KIC 5962532'].tolist()
 for i in range:
     inputs = inputs + [RowRegeneratorInput(df, i)]
 with Pool(processes=cores, maxtasksperchild=1) as pool:
