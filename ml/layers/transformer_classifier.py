@@ -170,14 +170,14 @@ class Transformer(tf.keras.layers.Layer):
 
 @tf.keras.utils.register_keras_serializable()
 class TransformerClassifier(tf.keras.layers.Layer):
-    def __init__(self, *args, transformer_input_size, patch_size, num_heads, mlp_dim, dropout, num_blocks, classes,
+    def __init__(self, *args, transformer_input_size, patch_size, num_heads, mlp_dim, hyperparams, num_blocks, classes,
                  **kwargs):
         super().__init__(*args, **kwargs)
         self.transformer_input_size = transformer_input_size
         self.patch_size = patch_size
         self.num_heads = num_heads
         self.mlp_dim = mlp_dim
-        self.dropout = dropout
+        self.hyperparams = hyperparams
         self.num_blocks = num_blocks
         self.classes = classes
         self.regularizer_value = 0.1
@@ -195,8 +195,8 @@ class TransformerClassifier(tf.keras.layers.Layer):
         # self.linear_proj = tf.keras.layers.Dense(self.transformer_input_size, activation="relu")
         #self.class_token = ClassToken(name="class_token")
         #self.add_pos_embedding = AddPositionEmbs(name="add_pos_embedding")
-        self.transformer = Transformer(num_heads=self.num_heads, mlp_dim=self.mlp_dim, dropout=self.dropout,
-                                       num_blocks=self.num_blocks)
+        self.transformer = Transformer(num_heads=self.num_heads, mlp_dim=self.mlp_dim,
+                                       dropout=self.hyperparams.dropout_rate, num_blocks=self.num_blocks)
         self.layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-6, name="Transformer/encoder_norm")
         #activation = "softmax" if self.classes > 1 else "sigmoid"
         self.head = tf.keras.layers.Dense(self.classes, name="head", activation=GELU())
