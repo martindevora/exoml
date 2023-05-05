@@ -124,26 +124,28 @@ def create_injection_dataframe(injections_dir, lcs_dir):
                        'contact_amplitude': 0,
                        'Mstar': star_mass,
                        'radius(earth)': target_row['Rp']}, ignore_index=True)
-        if not has_injected_object:
+        while not has_injected_object:
             min_period = 0.5
             max_period = 10
             period = random_number_generator.uniform(min_period, max_period)
             min_lc_time = 1612.85 + 0.5
             epoch = random_number_generator.uniform(min_lc_time, min_lc_time + period)
             duration = t14(star_radius, star_mass, period)
-            duration = duration * 24
-            df = df.append({'object_id': object_id, 'type': 'none', 'period': period,
-                            'epoch': epoch,
-                            'Rsec/Rpri': 1e-7,
-                            'b': 0,
-                            'a/Rstar': 1e-7, 'duration(h)': duration,
-                            'depth_primary': 1e-7,
-                            'depth_secondary': 0,
-                            'insolation': 0, 'Rstar_primary': 1e-7,
-                            'Rstar_secondary': 1e-7,
-                            'contact_amplitude': 0,
-                            'Mstar': star_mass,
-                            'radius(earth)': 1e-7}, ignore_index=True)
+            if 2 * duration < period:
+                duration = duration * 24
+                df = df.append({'object_id': object_id, 'type': 'none', 'period': period,
+                                'epoch': epoch,
+                                'Rsec/Rpri': 1e-7,
+                                'b': 0,
+                                'a/Rstar': 1e-7, 'duration(h)': duration,
+                                'depth_primary': 1e-7,
+                                'depth_secondary': 0,
+                                'insolation': 0, 'Rstar_primary': 1e-7,
+                                'Rstar_secondary': 1e-7,
+                                'contact_amplitude': 0,
+                                'Mstar': star_mass,
+                                'radius(earth)': 1e-7}, ignore_index=True)
+                has_injected_object = True
         if (i + 1) % log_count == 0:
             print("Processed " + str(i) + " TICs.")
             #df = df.sort_values(["TIC ID", "type"], ascending=True)
