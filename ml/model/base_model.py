@@ -24,6 +24,8 @@ from ml.log.get_weights_logger import ModelWeightsLogger
 from ml.log.with_logging import WithLogging
 from keras.optimizers.schedules.learning_rate_schedule import LearningRateSchedule
 
+from ml.metrics.auc import precision_at_k, mean_positive_value, mean_true_positive_value
+
 
 @dataclasses.dataclass
 class HyperParams:
@@ -409,6 +411,9 @@ class BaseModel(WithLogging):
 
     def load_model(self, dir, custom_objects={}):
         custom_objects['ExponentialRescaleDecay'] = ExponentialRescaleDecay
+        custom_objects['precision_at_k'] = precision_at_k
+        custom_objects['mean_positive_value'] = mean_positive_value
+        custom_objects['mean_true_positive_value'] = mean_true_positive_value
         logging.info("Loading model from %s", dir)
         self.set_model(tf.keras.models.load_model(dir,
                                                   custom_objects=custom_objects))

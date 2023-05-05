@@ -5,6 +5,7 @@ from keras.metrics import Precision, Recall, AUC, BinaryAccuracy, RecallAtPrecis
 from tensorflow_addons.metrics import F1Score
 
 from ml.loss.cross_entropy import binary_focal_loss
+from ml.metrics.auc import precision_at_k, mean_true_positive_value, mean_positive_value
 from ml.model.base_model import BaseModel
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -23,7 +24,8 @@ class BinaryModel(BaseModel):
                 RecallAtPrecision(0.975, name="r@p975"),
                 RecallAtPrecision(0.95, name="r@p95"),
                 AUC(name="roc_auc"),
-                AUC(curve="PR", name="pr_auc")]
+                AUC(curve="PR", name="pr_auc"),
+                precision_at_k, mean_positive_value, mean_true_positive_value]
 
     def plot_metrics(self, model_dir, steps_per_epoch, with_validation=False):
         logging.info("Plotting metrics")

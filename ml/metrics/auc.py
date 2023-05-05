@@ -1,14 +1,14 @@
 import tensorflow as tf
 import numpy as np
 import tensorflow.keras.backend as K
+from keras.metrics import TopKCategoricalAccuracy
+from tensorflow.python.ops.metrics_impl import precision
 
 
 @tf.function
 def tp_tf(y_true, y_pred, label_index=0, threshold=0.5):
-    y_true_label = tf.gather(y_true, [label_index], axis=1)
-    y_pred_label = tf.gather(y_pred, [label_index], axis=1)
-    y_true_label = y_true_label[:, 0]
-    y_pred_label = y_pred_label[:, 0]
+    y_true_label = y_true
+    y_pred_label = y_pred
     real_positive_indexes_mask = tf.math.greater(y_true_label, 0)
     predicted_positive_indexes_mask = tf.math.greater(y_pred_label, threshold)
     positive_indexes_intersect_mask = tf.math.logical_and(predicted_positive_indexes_mask, real_positive_indexes_mask)
@@ -20,10 +20,8 @@ def tp_tf(y_true, y_pred, label_index=0, threshold=0.5):
 
 @tf.function
 def fp_tf(y_true, y_pred, label_index=0, threshold=0.5):
-    y_true_label = tf.gather(y_true, [label_index], axis=1)
-    y_pred_label = tf.gather(y_pred, [label_index], axis=1)
-    y_true_label = y_true_label[:, 0]
-    y_pred_label = y_pred_label[:, 0]
+    y_true_label = y_true
+    y_pred_label = y_pred
     real_positive_indexes_mask = tf.math.greater(y_true_label, 0)
     predicted_positive_indexes_mask = tf.math.greater(y_pred_label, threshold)
     positive_indexes_intersect_mask = tf.math.logical_and(predicted_positive_indexes_mask, real_positive_indexes_mask)
@@ -85,6 +83,52 @@ def f1_score_tf(y_true, y_pred, label_index=0, threshold=0.5):
     recall = recall_tf(y_true, y_pred, label_index, threshold)
     return 2 * precision * recall / (precision + recall + K.epsilon())
 
+@tf.function
+def precision_at_k(y_true, y_pred, label_index=0, k=100, threshold=0.5):
+    y_true_label = tf.gather(y_true, [label_index], axis=1)
+    y_pred_label = tf.gather(y_pred, [label_index], axis=1)
+    y_true_label = y_true_label[:, 0]
+    y_pred_label = y_pred_label[:, 0]
+    values, indices = tf.math.top_k(y_pred_label, k=k)
+    y_true_label = tf.gather(y_true_label, indices)
+    y_pred_label = tf.gather(y_pred_label, indices)
+    return precision_tf(y_true_label, y_pred_label, label_index=0, threshold=threshold)
+
+@tf.function
+def mean_positive_value(y_true, y_pred, label_index=0, threshold=0.5):
+    y_true_label = tf.gather(y_true, [label_index], axis=1)
+    y_pred_label = tf.gather(y_pred, [label_index], axis=1)
+    y_true_label = y_true_label[:, 0]
+    y_pred_label = y_pred_label[:, 0]
+    positive_pred_indexes = tf.where(tf.greater(y_pred_label, threshold))
+    return tf.reduce_mean(tf.gather(y_pred_label, positive_pred_indexes))
+
+@tf.function
+def mean_true_positive_value(y_true, y_pred, label_index=0, threshold=0.5):
+    y_true_label = tf.gather(y_true, [label_index], axis=1)
+    y_pred_label = tf.gather(y_pred, [label_index], axis=1)
+    y_true_label = y_true_label[:, 0]
+    y_pred_label = y_pred_label[:, 0]
+    tp_pred_indexes = tf.where(tf.logical_and(tf.greater(y_pred_label, threshold), tf.equal(y_true_label, 1)))
+    return tf.reduce_mean(tf.gather(y_pred_label, tp_pred_indexes))
+
+@tf.function
+def mean_negative_value(y_true, y_pred, label_index=0, threshold=0.5):
+    y_true_label = tf.gather(y_true, [label_index], axis=1)
+    y_pred_label = tf.gather(y_pred, [label_index], axis=1)
+    y_true_label = y_true_label[:, 0]
+    y_pred_label = y_pred_label[:, 0]
+    negative_pred_indexes = tf.where(tf.less(y_pred_label, threshold))
+    return tf.reduce_mean(tf.gather(y_pred_label, negative_pred_indexes))
+
+@tf.function
+def mean_true_negative_value(y_true, y_pred, label_index=0, threshold=0.5):
+    y_true_label = tf.gather(y_true, [label_index], axis=1)
+    y_pred_label = tf.gather(y_pred, [label_index], axis=1)
+    y_true_label = y_true_label[:, 0]
+    y_pred_label = y_pred_label[:, 0]
+    tp_pred_indexes = tf.where(tf.logical_and(tf.less(y_pred_label, threshold), tf.equal(y_true_label, 0)))
+    return tf.reduce_mean(tf.gather(y_pred_label, tp_pred_indexes))
 
 @tf.function
 def confusion_matrix_values_tf(y_true, y_pred, label_index=0, threshold=0.5):
@@ -166,6 +210,7 @@ def area_under_curve(y_true, y_pred, label_index=0, thresholds=100, method='roc'
     y = precisions[~nan_values]
     threshold_values = threshold_values[~nan_values]
     return x, y, threshold_values, np.trapz(y, x)
+
 
 class CategoricalClassMetric(tf.keras.metrics.Metric):
     def __init__(self, class_index, metric_function, batch_size, name="categorical_class_metric", metric_threshold=0.5,
