@@ -20,13 +20,15 @@ from ml.model.imbalanced_binary_model import ImbalancedBinaryModel
 
 
 class IATSON_planet(ImbalancedBinaryModel):
-    def __init__(self, class_ids, class_names, type_to_label, hyperparams, channels=2, name='IATSON_planet') -> None:
+    def __init__(self, class_ids, class_names, type_to_label, hyperparams, channels=2, name='IATSON_planet',
+                 mode="all") -> None:
         super().__init__(name,
                          [11, 9 * 15, 300, 75, 75, 75, 75, 75, 75],
                          class_ids,
                          type_to_label,
                          hyperparams)
         self.channels = channels
+        self.mode = mode
 
     def _get_flux_transformer_branch(self, name, transformer_blocks=2, transformer_heads=2):
         # TODO use binning error as channel
@@ -40,8 +42,8 @@ class IATSON_planet(ImbalancedBinaryModel):
             #flux_err_input_mod = keras.layers.GaussianNoise(stddev=self.hyperparams.white_noise_std)(flux_err_input_mod)
         #flux_input_final = keras.layers.concatenate([flux_input_mod, flux_err_input_mod], axis=2)
         flux_input_final = flux_input_mod
-        transformer_input_size = 300
-        transformer_output_size = 300
+        transformer_input_size = self.input_size[2]
+        transformer_output_size = self.input_size[2]
         kernel_size = 25
         classes = 16
         flux_branch = TransformerClassifier(transformer_input_size=transformer_input_size, patch_size=kernel_size,
@@ -149,7 +151,8 @@ class IATSON_planet(ImbalancedBinaryModel):
         return focus_flux_input, focus_flux_branch
         #return focus_flux_input, focus_flux_err_input, focus_flux_branch
 
-    def _get_focus_flux_transformer_branch(self, name, transformer_blocks=6, transformer_heads=6):
+    def _get_focus_flux_transformer_branch(self, name, transformer_blocks=6, transformer_heads=6, additional_inputs=None):
+        leaky_relu_alpha = 0.01
         # TODO use binning error as channel
         focus_flux_input = keras.Input(shape=(self.input_size[3], self.channels), name=name)
         focus_flux_input_mod = focus_flux_input
@@ -161,14 +164,21 @@ class IATSON_planet(ImbalancedBinaryModel):
             #focus_flux_err_input_mod = keras.layers.GaussianNoise(stddev=self.hyperparams.white_noise_std)(focus_flux_err_input_mod)
         focus_flux_input_final = focus_flux_input_mod
         #focus_flux_input_final = keras.layers.concatenate([focus_flux_input_mod, focus_flux_err_input_mod], axis=2)
-        transformer_input_size = 100
-        transformer_output_size = 100
+        transformer_input_size = self.input_size[3]
+        transformer_output_size = self.input_size[3]
         kernel_size = 5
         classes = 16
         flux_branch = TransformerClassifier(transformer_input_size=transformer_input_size, patch_size=kernel_size,
                               num_heads=transformer_heads, mlp_dim=transformer_output_size, dropout=self.hyperparams.dropout_rate,
                               num_blocks=transformer_blocks, classes=classes)(focus_flux_input_final)
-        return focus_flux_input, flux_branch
+        if additional_inputs is not None:
+            focus_flux_branch = keras.layers.Flatten()(flux_branch)
+            focus_flux_branch = keras.layers.Concatenate(axis=1)([focus_flux_branch, keras.layers.Flatten()(additional_inputs)])
+        focus_flux_branch = keras.layers.Dense(64, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
+                                               activation=LeakyReLU(leaky_relu_alpha))(focus_flux_branch)
+        focus_flux_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(focus_flux_branch)
+        focus_flux_branch = keras.layers.LayerNormalization()(focus_flux_branch)
+        return focus_flux_input, focus_flux_branch
         #return focus_flux_input, focus_flux_err_input, flux_branch
 
     def _get_focus_flux_conv_model_branch(self, transit_params_input):
@@ -226,7 +236,7 @@ class IATSON_planet(ImbalancedBinaryModel):
         #          harmonic_odd_flux_input, harmonic_odd_flux_err_input]
         return input, focus_flux_branch
 
-    def _get_focus_flux_transformer_model_branch(self, transformer_blocks=6, transformer_heads=6):
+    def _get_focus_flux_transformer_model_branch(self, transformer_blocks=6, transformer_heads=6, transit_params_input=None):
         leaky_relu_alpha = 0.01
         # odd_flux_input, odd_flux_err_input, odd_flux_branch = self._get_focus_flux_transformer_branch("focus_odd_flux_branch")
         # even_flux_input, even_flux_err_input, even_flux_branch = self._get_focus_flux_transformer_branch("focus_even_flux_branch")
@@ -243,9 +253,9 @@ class IATSON_planet(ImbalancedBinaryModel):
         #     self._get_focus_flux_transformer_branch("focus_subharmonic_even_flux_branch", transformer_blocks,
         #                                             transformer_heads)
         odd_flux_input, odd_flux_branch = self._get_focus_flux_transformer_branch(
-            "focus_odd_flux_branch")
+            "focus_odd_flux_branch", additional_inputs=transit_params_input)
         even_flux_input, even_flux_branch = self._get_focus_flux_transformer_branch(
-            "focus_even_flux_branch")
+            "focus_even_flux_branch", additional_inputs=transit_params_input)
         harmonic_odd_flux_input, harmonic_odd_flux_branch = \
             self._get_focus_flux_transformer_branch("focus_harmonic_odd_flux_branch", transformer_blocks,
                                                     transformer_heads)
@@ -429,15 +439,10 @@ class IATSON_planet(ImbalancedBinaryModel):
 
     def build_transformer(self, transformer_blocks=6, transformer_heads=6):
         leaky_relu_alpha = 0.01
-        stellar_model_input = keras.Input(shape=(11, 1), name="stellar_model")
-        stellar_model_branch = keras.layers.Dense(16, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
-                                                  activation=LeakyReLU(leaky_relu_alpha), name="stellar-first")(
-            stellar_model_input)
-        stellar_model_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate,
-                                                    name="stellar-first-dropout-0.1")(stellar_model_branch)
-        stellar_model_branch = keras.layers.Dense(16, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
-                                                  activation=LeakyReLU(leaky_relu_alpha), name="stellar-refinement")(
-            stellar_model_branch)
+        transit_params_input = keras.Input(shape=(6, 1), name="transit_params")
+        offset_params_input = keras.Input(shape=(2, 1), name="offset_params")
+        stellar_model_input = keras.Input(shape=(3, 1), name="stellar_model")
+        stellar_model_branch = stellar_model_input
         #(TEFF, lum, 4 magnitudes, distance, radius, mass) * 15 stars
         # stellar_neighbours_input = keras.Input(shape=(9 * 15, 1), name="stellar_neighbours_model")
         # stellar_neighbours_branch = keras.layers.Dense(100, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
@@ -459,49 +464,60 @@ class IATSON_planet(ImbalancedBinaryModel):
         flux_model_input, flux_model_branch = \
             self._get_flux_transformer_branch("global_flux_branch", transformer_blocks, transformer_heads)
         focus_flux_model_input, focus_flux_model_branch = \
-            self._get_focus_flux_transformer_model_branch(transformer_blocks, transformer_heads)
+            self._get_focus_flux_transformer_model_branch(transformer_blocks, transformer_heads, transit_params_input)
         #centroids_input, centroids_err_input, centroids_branch = self._get_focus_flux_conv_branch("centroids_branch", 3)
-        centroids_input, centroids_branch = self._get_focus_flux_transformer_branch("centroids_branch", 3)
-        # centroids_inputs = [centroids_input, centroids_err_input]
-        centroids_inputs = [centroids_input]
-        centroids_branch = keras.Model(inputs=centroids_inputs, outputs=centroids_branch)
-        centroids_inputs = centroids_branch.input
+        centroids_input, centroids_branch = self._get_focus_flux_transformer_branch("centroids_branch", 3, offset_params_input)
         # og_input, og_err_input, og_branch = self._get_focus_flux_conv_branch("og_branch", 2)
         og_input, og_branch = self._get_focus_flux_transformer_branch("og_branch", 2)
-        # og_inputs = [og_input, og_err_input]
-        og_inputs = [og_input]
-        og_branch = keras.Model(inputs=og_inputs, outputs=og_branch)
-        og_inputs = og_branch.input
-        final_branch = keras.layers.Concatenate(axis=1)(
-            [stellar_model_branch,
-             #stellar_neighbours_branch,
-             flux_model_branch, focus_flux_model_branch])
-        final_branch = keras.layers.GlobalAveragePooling1D()(final_branch)
-        final_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha), name="final-dense1",
-                                          kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization))(final_branch)
+        final_branch = keras.layers.Concatenate(axis=-1)(
+            [keras.layers.Flatten()(stellar_model_branch),
+             # stellar_neighbours_branch,
+             keras.layers.Flatten()(flux_model_branch.output),
+             keras.layers.Flatten()(focus_flux_model_branch),
+             keras.layers.Flatten()(centroids_branch), keras.layers.Flatten()(og_branch)])
+        final_branch = keras.layers.Dense(1000, kernel_regularizer=tf.keras.regularizers.L1L2(
+            l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
+                                          activation=LeakyReLU(leaky_relu_alpha), name="final-dense2")(final_branch)
         final_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(final_branch)
-        final_branch = keras.layers.Dense(32, activation=LeakyReLU(leaky_relu_alpha), name="final-dense2",
-                                          kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization))(final_branch)
+        final_branch = keras.layers.Dense(250, kernel_regularizer=tf.keras.regularizers.L1L2(
+            l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
+                                          activation=LeakyReLU(leaky_relu_alpha), name="final-dense3")(final_branch)
+        final_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(final_branch)
+        final_branch = keras.layers.Dense(75, kernel_regularizer=tf.keras.regularizers.L1L2(
+            l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
+                                          activation=LeakyReLU(leaky_relu_alpha), name="final-dense4")(final_branch)
+        final_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(final_branch)
+        final_branch = keras.layers.Dense(35, kernel_regularizer=tf.keras.regularizers.L1L2(
+            l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
+                                          activation=LeakyReLU(leaky_relu_alpha), name="final-dense5")(final_branch)
+        final_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(final_branch)
+        final_branch = keras.layers.Dense(16, kernel_regularizer=tf.keras.regularizers.L1L2(
+            l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
+                                          activation=LeakyReLU(leaky_relu_alpha), name="final-dense6")(final_branch)
         final_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(final_branch)
         final_branch = keras.layers.Dense(1, activation="sigmoid", name="logits")(final_branch)
-        # inputs = [stellar_model_input,
-        #           # stellar_neighbours_input,
-        #           flux_model_input, flux_model_err_input] + \
-        #          focus_flux_model_input
-        inputs = [stellar_model_input,
-                  # stellar_neighbours_input,
-                  flux_model_input] + \
-                 focus_flux_model_input + \
-                 [centroids_inputs] + [og_inputs]
+        # inputs = [stellar_model_input, stellar_neighbours_input] + \
+        #                  flux_model_branch.inputs + focus_flux_model_branch.inputs + \
+        #                  centroids_inputs + og_inputs
+        inputs = [transit_params_input, offset_params_input, stellar_model_input] + \
+                 flux_model_branch.inputs + [focus_flux_model_input] + \
+                 [centroids_input, og_input]
         return inputs, final_branch
 
     def load_training_set(self, **kwargs):
         training_dir = kwargs.get('training_dir')
         injected_objects_df_q1_q17 = pd.read_csv(training_dir + "/q1_q17/injected_objects_tces.csv", index_col=None)
-        #injected_objects_df_ete6 = pd.read_csv(training_dir + "/ete6/injected_objects.csv", index_col=None)
-        injected_objects_df = injected_objects_df_q1_q17
-        #injected_objects_df = pd.concat(injected_objects_df)
-        #injected_objects_df.reset_index(inplace=True, drop=True)
+        injected_objects_df_ete6 = pd.read_csv(training_dir + "/ete6/injected_objects.csv", index_col=None)
+        #injected_objects_df = injected_objects_df_q1_q17
+        df = []
+        if self.mode == "q1q17":
+            df = [injected_objects_df_q1_q17]
+        elif self.mode == 'ete6':
+            df = [injected_objects_df_ete6]
+        else:
+            df = [injected_objects_df_ete6, injected_objects_df_q1_q17]
+        injected_objects_df = pd.concat(df)
+        injected_objects_df.reset_index(inplace=True, drop=True)
         return injected_objects_df
 
     def instance_generator(self, dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon):
@@ -512,9 +528,9 @@ class IATSON_planet(ImbalancedBinaryModel):
         return self.predict_threshold([prediction])
 
     def predict_batch(self, inputs, expected_outputs=None, dataset=None, training_dir=None, plot_mismatches=False,
-                      batch_size=20, cores=os.cpu_count() - 1):
+                      batch_size=20, cores=os.cpu_count() - 1, threshold=[0.5]):
         predictions = self.model.predict(inputs, use_multiprocessing=True, batch_size=batch_size, workers=cores)
-        max_prediction_indexes, max_prediction_values = self.predict_threshold(predictions)
+        max_prediction_indexes, max_prediction_values = self.predict_threshold(predictions, threshold)
         if expected_outputs is not None:
             planet_stats = self.test_metrics(expected_outputs, max_prediction_indexes, max_prediction_values, dataset,
                                              training_dir=training_dir, plot_mismatches=plot_mismatches)
@@ -545,13 +561,14 @@ class IATSON_planet(ImbalancedBinaryModel):
         for i in np.arange(0, len(test_dataset) // batch_size + 1, 1):
             input, expected_output = testing_batch_generator.__getitem__(i)
             expected_outputs = np.concatenate((expected_outputs, expected_output)) if expected_outputs is not None else expected_output
-        max_prediction_indexes, max_prediction_values, prediction_stats = \
-            self.predict_batch(testing_batch_generator, expected_outputs, test_dataset, training_dir, plot_mismatches,
-                               batch_size, cores=cores)
-        prediction_stats = prediction_stats[0]
-        logging.info("Prediction stats for label %.0f: TP=%.0f, FP=%.0f, FN=%.0f, ACC=%.3f, PRE=%.3f, REC=%.3f", 0,
-                     prediction_stats.tp, prediction_stats.fp, prediction_stats.fn, prediction_stats.accuracy,
-                     prediction_stats.precision, prediction_stats.recall)
+        for threshold in np.arange(0.5, 1, 0.01):
+            max_prediction_indexes, max_prediction_values, prediction_stats = \
+                self.predict_batch(testing_batch_generator, expected_outputs, test_dataset, training_dir, plot_mismatches,
+                                   batch_size, cores=cores, threshold=[threshold])
+            prediction_stats = prediction_stats[0]
+            logging.info("Prediction stats for label %.0f and threshold %s: TP=%.0f, FP=%.0f, FN=%.0f, ACC=%.3f, PRE=%.3f, REC=%.3f", 0,
+                         threshold, prediction_stats.tp, prediction_stats.fp, prediction_stats.fn, prediction_stats.accuracy,
+                         prediction_stats.precision, prediction_stats.recall)
 
 
     def test_metrics(self, expected_outputs, max_prediction_indexes, max_prediction_values, dataset=None, training_dir=None, plot_mismatches=False):
@@ -569,8 +586,8 @@ class IATSON_planet(ImbalancedBinaryModel):
         label_fp = len(label_fp_indexes)
         label_fn = len(label_fn_indexes)
         accuracy = (label_tp + label_tn) / len(expected_outputs)
-        precision = label_tp / (label_tp + label_fp)
-        recall = label_tp / (label_tp + label_fn)
+        precision = label_tp / (label_tp + label_fp + 1e-7)
+        recall = label_tp / (label_tp + label_fn + 1e-7)
         mismatches = {}
         mismatches_by_type = {}
         if dataset is not None:
