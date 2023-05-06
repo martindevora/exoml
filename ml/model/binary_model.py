@@ -31,7 +31,9 @@ class BinaryModel(BaseModel):
         logging.info("Plotting metrics")
         training_log_df = pd.read_csv(model_dir + '/training_log.csv')
         training_log_df['batch_total'] = training_log_df['batch'] + (training_log_df['epoch'] * steps_per_epoch)
-        validation_log_df = training_log_df.dropna()
+        validation_log_df = training_log_df.dropna(subset = ['val_precision', 'val_recall', 'val_r@p99', 'val_r@p975',
+                                                             'val_r@p95', 'val_loss', 'val_binary_accuracy',
+                                                             'val_pr_auc', 'val_roc_auc'])
         fig, axs = plt.subplots(2, 2, figsize=(25, 7), constrained_layout=True)
         fig.suptitle(self.name + ' Model Metrics', fontsize=14)
         axs[0][0].plot(training_log_df['batch_total'], training_log_df['lr'])
