@@ -189,9 +189,10 @@ class TransformerClassifier(tf.keras.layers.Layer):
             filters=self.transformer_input_size,
             kernel_size=self.patch_size,
             strides=self.patch_size,
-            padding="valid",
+            padding="same",
             name="embedding",
         )
+        #self.linear_proj = tf.keras.layers.Dense(self.transformer_input_size)
         # self.linear_proj = tf.keras.layers.Dense(self.transformer_input_size, activation="relu")
         #self.class_token = ClassToken(name="class_token")
         #self.add_pos_embedding = AddPositionEmbs(name="add_pos_embedding")
