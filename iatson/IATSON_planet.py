@@ -14,6 +14,7 @@ from sklearn.utils import shuffle
 from keras import backend as K
 
 from iatson.iatson_planet_generator import IatsonPlanetModelGenerator
+from ml.layers.dropout import AdaptiveStdDropout
 from ml.layers.transformer_classifier import ClassToken, AddPositionEmbs, TransformerClassifier
 from ml.model.base_model import CategoricalPredictionSetStats
 from ml.model.imbalanced_binary_model import ImbalancedBinaryModel
@@ -53,7 +54,8 @@ class IATSON_planet(ImbalancedBinaryModel):
                                             num_blocks=transformer_blocks, classes=classes)(flux_input_final)
         flux_branch = keras.layers.Dense(64, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                                activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
-        flux_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(flux_branch)
+        flux_branch = AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
+                                         max_rate=self.hyperparams.dropout_max_rate)(flux_branch)
         flux_branch = keras.layers.LayerNormalization()(flux_branch)
         #return flux_input, flux_err_input, flux_branch
         return flux_input, flux_branch
@@ -104,7 +106,8 @@ class IATSON_planet(ImbalancedBinaryModel):
         flux_input, flux_branch = self._get_flux_conv_branch("global_flux_branch")
         flux_branch = keras.layers.Dense(64, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                          activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
-        flux_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(flux_branch)
+        flux_branch = AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
+                                         max_rate=self.hyperparams.dropout_max_rate)(flux_branch)
         flux_branch = keras.layers.LayerNormalization()(flux_branch)
         #flux_branch = keras.Model(inputs=[flux_input, flux_err_input], outputs=flux_branch)
         flux_branch = keras.Model(inputs=[flux_input], outputs=flux_branch)
@@ -151,7 +154,8 @@ class IATSON_planet(ImbalancedBinaryModel):
             focus_flux_branch = keras.layers.Concatenate(axis=1)([focus_flux_branch, keras.layers.Flatten()(additional_inputs)])
         focus_flux_branch = keras.layers.Dense(64, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                                activation=LeakyReLU(leaky_relu_alpha))(focus_flux_branch)
-        focus_flux_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(focus_flux_branch)
+        focus_flux_branch = AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
+                                         max_rate=self.hyperparams.dropout_max_rate)(focus_flux_branch)
         focus_flux_branch = keras.layers.LayerNormalization()(focus_flux_branch)
         return focus_flux_input, focus_flux_branch
         #return focus_flux_input, focus_flux_err_input, focus_flux_branch
@@ -183,7 +187,8 @@ class IATSON_planet(ImbalancedBinaryModel):
             flux_branch = keras.layers.Concatenate(axis=1)([flux_branch, keras.layers.Flatten()(additional_inputs)])
         flux_branch = keras.layers.Dense(64, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                                activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
-        flux_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(flux_branch)
+        flux_branch = AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
+                                         max_rate=self.hyperparams.dropout_max_rate)(flux_branch)
         flux_branch = keras.layers.LayerNormalization()(flux_branch)
         return focus_flux_input, flux_branch
         #return focus_flux_input, focus_flux_err_input, flux_branch
@@ -423,19 +428,24 @@ class IATSON_planet(ImbalancedBinaryModel):
              keras.layers.Flatten()(og_branch)])
         final_branch = keras.layers.Dense(1000, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                           activation=LeakyReLU(leaky_relu_alpha), name="final-dense2")(final_branch)
-        final_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(final_branch)
+        final_branch = AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
+                                         max_rate=self.hyperparams.dropout_max_rate, name="final-dropout2")(final_branch)
         final_branch = keras.layers.Dense(250, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                           activation=LeakyReLU(leaky_relu_alpha), name="final-dense3")(final_branch)
-        final_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(final_branch)
+        final_branch = AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
+                                         max_rate=self.hyperparams.dropout_max_rate, name="final-dropout3")(final_branch)
         final_branch = keras.layers.Dense(75, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                           activation=LeakyReLU(leaky_relu_alpha), name="final-dense4")(final_branch)
-        final_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(final_branch)
+        final_branch = AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
+                                         max_rate=self.hyperparams.dropout_max_rate, name="final-dropout4")(final_branch)
         final_branch = keras.layers.Dense(35, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                           activation=LeakyReLU(leaky_relu_alpha), name="final-dense5")(final_branch)
-        final_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(final_branch)
+        final_branch = AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
+                                         max_rate=self.hyperparams.dropout_max_rate, name="final-dropout5")(final_branch)
         final_branch = keras.layers.Dense(16, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                           activation=LeakyReLU(leaky_relu_alpha), name="final-dense6")(final_branch)
-        final_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(final_branch)
+        final_branch = AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
+                                         max_rate=self.hyperparams.dropout_max_rate, name="final-dropout6")(final_branch)
         final_branch = keras.layers.Dense(1, activation="sigmoid", name="logits")(final_branch)
         # inputs = [stellar_model_input, stellar_neighbours_input] + \
         #                  flux_model_branch.inputs + focus_flux_model_branch.inputs + \
@@ -488,23 +498,28 @@ class IATSON_planet(ImbalancedBinaryModel):
         final_branch = keras.layers.Dense(1000, kernel_regularizer=tf.keras.regularizers.L1L2(
             l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                           activation=LeakyReLU(leaky_relu_alpha), name="final-dense2")(final_branch)
-        final_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(final_branch)
+        final_branch = AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
+                                         max_rate=self.hyperparams.dropout_max_rate)(final_branch)
         final_branch = keras.layers.Dense(250, kernel_regularizer=tf.keras.regularizers.L1L2(
             l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                           activation=LeakyReLU(leaky_relu_alpha), name="final-dense3")(final_branch)
-        final_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(final_branch)
+        final_branch = AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
+                                         max_rate=self.hyperparams.dropout_max_rate)(final_branch)
         final_branch = keras.layers.Dense(75, kernel_regularizer=tf.keras.regularizers.L1L2(
             l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                           activation=LeakyReLU(leaky_relu_alpha), name="final-dense4")(final_branch)
-        final_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(final_branch)
+        final_branch = AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
+                                         max_rate=self.hyperparams.dropout_max_rate)(final_branch)
         final_branch = keras.layers.Dense(35, kernel_regularizer=tf.keras.regularizers.L1L2(
             l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                           activation=LeakyReLU(leaky_relu_alpha), name="final-dense5")(final_branch)
-        final_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(final_branch)
+        final_branch = AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
+                                         max_rate=self.hyperparams.dropout_max_rate)(final_branch)
         final_branch = keras.layers.Dense(16, kernel_regularizer=tf.keras.regularizers.L1L2(
             l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                           activation=LeakyReLU(leaky_relu_alpha), name="final-dense6")(final_branch)
-        final_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(final_branch)
+        final_branch = AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
+                                         max_rate=self.hyperparams.dropout_max_rate)(final_branch)
         final_branch = keras.layers.Dense(1, activation="sigmoid", name="logits")(final_branch)
         # inputs = [stellar_model_input, stellar_neighbours_input] + \
         #                  flux_model_branch.inputs + focus_flux_model_branch.inputs + \
@@ -542,8 +557,8 @@ class IATSON_planet(ImbalancedBinaryModel):
         predictions = self.model.predict(inputs, use_multiprocessing=True, batch_size=batch_size, workers=cores)
         max_prediction_indexes, max_prediction_values = self.predict_threshold(predictions, threshold)
         if expected_outputs is not None:
-            planet_stats = self.test_metrics(expected_outputs, max_prediction_indexes, max_prediction_values, dataset,
-                                             training_dir=training_dir, plot_mismatches=plot_mismatches)
+            planet_stats = self.test_metrics(expected_outputs, max_prediction_indexes, max_prediction_values, predictions,
+                                             dataset, training_dir=training_dir, plot_mismatches=plot_mismatches)
             return max_prediction_indexes, max_prediction_values, [planet_stats]
         else:
             return max_prediction_indexes, max_prediction_values
@@ -557,10 +572,32 @@ class IATSON_planet(ImbalancedBinaryModel):
         max_prediction_indexes[np.argwhere(max_prediction_values < 0).flatten()] = -1
         return max_prediction_indexes, max_prediction_values
 
+    def predict_df(self, df, training_dir, batch_size=20, cores=os.cpu_count() - 1, zero_epsilon=1e-7,
+                   thresholds=[0.5], plot_mismatches=False):
+        expected_outputs = None
+        testing_batch_generator = IatsonPlanetModelGenerator(df, training_dir, batch_size,
+                                                             self.input_size,
+                                                             self.type_to_label, zero_epsilon, from_arrays=True,
+                                                             shuffle_batch=False)
+        for i in np.arange(0, len(df) // batch_size + 1, 1):
+            input, expected_output = testing_batch_generator.__getitem__(i)
+            expected_outputs = np.concatenate((expected_outputs, expected_output)) if expected_outputs is not None else expected_output
+        for threshold in thresholds:
+            max_prediction_indexes, max_prediction_values, prediction_stats = \
+                self.predict_batch(testing_batch_generator, expected_outputs, df, training_dir, plot_mismatches,
+                                   batch_size, cores=cores, threshold=[threshold])
+            prediction_stats = prediction_stats[0]
+            logging.info("Prediction stats for label %.0f and threshold %s: TP=%.0f, FP=%.0f, FN=%.0f, ACC=%.3f, PRE=%.3f, REC=%.3f", 0,
+                         threshold, prediction_stats.tp, prediction_stats.fp, prediction_stats.fn, prediction_stats.accuracy,
+                         prediction_stats.precision, prediction_stats.recall)
+            logging.info("Prediction stats @ k top predictions: \n%s", prediction_stats.k_df.to_string())
+            logging.info("Mismatches: \n%s", prediction_stats.mismatches_df.to_string())
+            logging.info("Mismatches by types: \n%s", prediction_stats.mismatches_df
+                         .groupby(by=['type', 'predicted_class'])['object_id'].count().to_string())
+
     def predict_test_set(self, training_dir, model_dir, batch_size=20, cores=os.cpu_count() - 1, test_set_limit=None,
                          zero_epsilon=1e-7, plot_mismatches=False):
         test_dataset = pd.read_csv(model_dir + '/test_dataset.csv')
-        test_dataset = shuffle(test_dataset)
         if test_set_limit is not None:
             test_dataset = test_dataset.iloc[0:test_set_limit]
         expected_outputs = None
@@ -579,9 +616,14 @@ class IATSON_planet(ImbalancedBinaryModel):
             logging.info("Prediction stats for label %.0f and threshold %s: TP=%.0f, FP=%.0f, FN=%.0f, ACC=%.3f, PRE=%.3f, REC=%.3f", 0,
                          threshold, prediction_stats.tp, prediction_stats.fp, prediction_stats.fn, prediction_stats.accuracy,
                          prediction_stats.precision, prediction_stats.recall)
+            logging.info("Prediction stats @ k top predictions: \n%s", prediction_stats.k_df.to_string())
+            logging.info("Mismatches: \n%s", prediction_stats.mismatches_df.to_string())
+            logging.info("Mismatches by types: \n%s", prediction_stats.mismatches_df
+                         .groupby(by=['type', 'predicted_class'])['object_id'].count().to_string())
 
 
-    def test_metrics(self, expected_outputs, max_prediction_indexes, max_prediction_values, dataset=None, training_dir=None, plot_mismatches=False):
+    def test_metrics(self, expected_outputs, max_prediction_indexes, max_prediction_values, predictions,
+                     dataset=None, training_dir=None, plot_mismatches=False):
         expected_outputs = expected_outputs.flatten()
         positive_preds = np.argwhere(max_prediction_indexes.flatten() != -1).flatten()
         negative_preds = np.argwhere(max_prediction_indexes.flatten() == -1).flatten()
@@ -598,8 +640,39 @@ class IATSON_planet(ImbalancedBinaryModel):
         accuracy = (label_tp + label_tn) / len(expected_outputs)
         precision = label_tp / (label_tp + label_fp + 1e-7)
         recall = label_tp / (label_tp + label_fn + 1e-7)
-        mismatches = {}
-        mismatches_by_type = {}
+        max_predictions = np.array([np.max(prediction) for prediction in predictions])
+        max_predictions_sort_args = np.flip(np.argsort(max_predictions))
+        max_predictions_sort = max_predictions[max_predictions_sort_args]
+        max_prediction_indexes_sort = max_prediction_indexes[max_predictions_sort_args]
+        max_prediction_values_sort = max_prediction_values[max_predictions_sort_args]
+        expected_outputs_sort = expected_outputs[max_predictions_sort_args]
+        k_df = pd.DataFrame(columns=['k', 'precision', 'recall', 'accuracy', 'tp', 'fp', 'tn', 'fn'])
+        if 100 < len(expected_outputs):
+            for k in np.arange(100, len(expected_outputs) if len(expected_outputs) < 2500 else 2500, 100):
+                max_predictions_sort_k = max_predictions_sort[0:k]
+                max_prediction_indexes_sort_k = max_prediction_indexes_sort[0:k]
+                max_prediction_values_sort_k = max_prediction_values_sort[0:k]
+                expected_outputs_sort_k = expected_outputs_sort[0:k]
+                positive_preds = np.argwhere(max_prediction_indexes_sort_k.flatten() != -1).flatten()
+                negative_preds = np.argwhere(max_prediction_indexes_sort_k.flatten() == -1).flatten()
+                positive_outputs = np.argwhere(expected_outputs_sort_k == 1).flatten()
+                negative_outputs = np.argwhere(expected_outputs_sort_k == 0).flatten()
+                label_tp_indexes = np.intersect1d(positive_preds, positive_outputs)
+                label_tn_indexes = np.intersect1d(negative_preds, negative_preds)
+                label_fp_indexes = positive_preds[np.isin(positive_preds, negative_outputs)]
+                label_fn_indexes = negative_preds[np.isin(negative_preds, positive_outputs)]
+                label_tp = len(label_tp_indexes)
+                label_tn = len(label_tn_indexes)
+                label_fp = len(label_fp_indexes)
+                label_fn = len(label_fn_indexes)
+                accuracy = (label_tp + label_tn) / len(expected_outputs_sort_k)
+                precision = label_tp / (label_tp + label_fp + 1e-7)
+                recall = label_tp / (label_tp + label_fn + 1e-7)
+                k_df = k_df.append(
+                    {'k': k, 'precision': precision, 'recall': recall, 'accuracy': accuracy, 'tp': label_tp,
+                     'fp': label_fp, 'fp': label_fp, 'fn': label_fn}, ignore_index=True)
+        mismatches_df = pd.DataFrame(columns=['object_id', 'type', 'expected_class', 'predicted_class',
+                                              'prediction_value'])
         if dataset is not None:
             found_classes = [0 if prediction  == -1 else 1 for prediction in max_prediction_values]
             dataset = dataset.reset_index(drop=True)
@@ -610,18 +683,11 @@ class IATSON_planet(ImbalancedBinaryModel):
                 expected_tag = row['type']
                 expected_output = expected_outputs[i]
                 predicted_output = found_classes[i]
-                predicted_value = max_prediction_values[i]
+                predicted_value = predictions[i][max_prediction_indexes[i]]
                 if expected_output != predicted_output:
-                    mismatches[object_id] = {"type": expected_tag, "expected_class": expected_output, "predicted_class": predicted_output,
-                                             "prediction_value": predicted_value}
-                    if expected_tag not in mismatches_by_type:
-                        mismatches_by_type[expected_tag] = {}
-                    if predicted_output not in mismatches_by_type[expected_tag]:
-                        mismatches_by_type[expected_tag][predicted_output] = 0
-                    mismatches_by_type[expected_tag][predicted_output] = \
-                        mismatches_by_type[expected_tag][predicted_output] + 1
-                    mismatches_by_type[expected_tag][predicted_output] = \
-                        mismatches_by_type[expected_tag][predicted_output] + 1
+                    mismatches_df = mismatches_df.append({'object_id': object_id + '_' + str(round(period, 2)), "type": expected_tag,
+                                          "expected_class": expected_output, "predicted_class": predicted_output,
+                                          "prediction_value": predicted_value}, ignore_index=True)
                     if plot_mismatches:
                         logging.info("%s with label %s mismatched with value %s", id, expected_tag, predicted_value)
                         IatsonPlanetModelGenerator(dataset[(dataset['object_id'] == object_id) & (dataset['period'] == period)],
@@ -631,4 +697,6 @@ class IATSON_planet(ImbalancedBinaryModel):
                                                                              from_arrays=True,
                                                                              shuffle_batch=False,
                                                                              plot_inputs=True).__getitem__(0)
-        return CategoricalPredictionSetStats(label_tp, label_fp, label_fn, accuracy, precision, recall, mismatches, mismatches_by_type)
+        mismatches_df = mismatches_df.sort_values(by=['type', 'predicted_class'])
+        return CategoricalPredictionSetStats(label_tp, label_fp, label_fn, accuracy, precision, recall, k_df,
+                                             mismatches_df)
