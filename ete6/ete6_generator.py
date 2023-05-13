@@ -24,12 +24,14 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
     random_number_generator = default_rng()
     standard_scaler = StandardScaler()
 
-    def __init__(self, zero_epsilon=1e-6):
+    def __init__(self, zero_epsilon=1e-6, shuffle_batch=True):
         self.zero_epsilon = zero_epsilon
         self.minmax_scaler = MinMaxScaler(feature_range=(self.zero_epsilon, 1 - self.zero_epsilon))
+        self.shuffle_batch = shuffle_batch
 
     def on_epoch_end(self):
-        self.injected_objects_df = shuffle(self.injected_objects_df)
+        if self.shuffle_batch:
+            self.injected_objects_df = shuffle(self.injected_objects_df)
 
     def assert_in_range(self, object_id, array, array_err, values_range=(0, 1)):
         if np.isnan(array).any() or (array_err is not None and np.isnan(array_err).any()):
