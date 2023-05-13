@@ -17,7 +17,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
     def __init__(self, injected_objects_df, lcs_dir, batch_size, input_sizes, type_to_label, zero_epsilon=1e-7,
                  measurements_per_point=2, plot_inputs=False, fixed_target_id=None, store_arrays=False,
                  from_arrays=True, shuffle_batch=True):
-        super().__init__(zero_epsilon)
+        super().__init__(zero_epsilon, shuffle_batch=shuffle_batch)
         self.injected_objects_df = injected_objects_df
         self.kics_lcs_dir = lcs_dir + '/q1_q17/lcs/'
         self.tics_lcs_dir = lcs_dir + '/ete6/lcs/'
@@ -30,7 +30,6 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
         self.fixed_target_id = fixed_target_id
         self.store_arrays = store_arrays
         self.from_arrays = from_arrays
-        self.shuffle_batch = shuffle_batch
 
     def __len__(self):
         return (np.ceil(len(self.injected_objects_df) / float(self.batch_size))).astype(int)
