@@ -4,6 +4,8 @@ import tensorflow_addons as tfa
 from keras.regularizers import L2
 from tensorflow_addons.layers import GELU
 
+from ml.layers.dropout import AdaptiveStdDropout
+
 
 @tf.keras.utils.register_keras_serializable()
 class ClassToken(tf.keras.layers.Layer):
@@ -68,11 +70,11 @@ class AddPositionEmbs(tf.keras.layers.Layer):
 class TransformerEncoder(tf.keras.layers.Layer):
     """Implements a Transformer block."""
 
-    def __init__(self, *args, num_heads, mlp_dim, dropout, **kwargs):
+    def __init__(self, *args, num_heads, mlp_dim, hyperparams, **kwargs):
         super().__init__(*args, **kwargs)
         self.num_heads = num_heads
         self.mlp_dim = mlp_dim
-        self.dropout = dropout
+        self.hyperparams = hyperparams
         self.regularizer_value = 0.1
 
     def build(self, input_shape):
@@ -82,9 +84,18 @@ class TransformerEncoder(tf.keras.layers.Layer):
         )
         self.mlpblock = tf.keras.Sequential(
             [
-                tf.keras.layers.Dense(self.mlp_dim, activation=GELU(), name=f"{self.name}/Dense_0"),
-                tf.keras.layers.Dropout(self.dropout),
-                tf.keras.layers.Dense(input_shape[-1], name=f"{self.name}/Dense_1", activation="linear")
+                tf.keras.layers.Dense(self.mlp_dim, activation=GELU(), name=f"{self.name}/Dense_0",
+                                      activity_regularizer=tf.keras.regularizers.L1L2(
+                                          l1=self.hyperparams.l1_regularization,
+                                          l2=self.hyperparams.l2_regularization)
+                                      ),
+                AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
+                                   max_rate=self.hyperparams.dropout_max_rate),
+                tf.keras.layers.Dense(input_shape[-1], name=f"{self.name}/Dense_1", activation=GELU(),
+                                      activity_regularizer=tf.keras.regularizers.L1L2(
+                                          l1=self.hyperparams.l1_regularization,
+                                          l2=self.hyperparams.l2_regularization)
+                                      )
             ],
             name="MlpBlock_3",
         )
@@ -97,11 +108,12 @@ class TransformerEncoder(tf.keras.layers.Layer):
         self.layernorm3 = tf.keras.layers.LayerNormalization(
             epsilon=1e-6, name="LayerNorm_3"
         )
-        self.dropout_layer = tf.keras.layers.Dropout(self.dropout)
+        self.dropout_layer = AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
+                                         max_rate=self.hyperparams.dropout_max_rate)
 
     def call(self, inputs, training=True, return_attention_scores=True):
         x = inputs
-        x = self.layernorm1(x)
+        #x = self.layernorm1(x)
         x, weights = self.att(x, x, training=training, return_attention_scores=return_attention_scores)
         x = self.dropout_layer(x, training=training)
         x = x + inputs
@@ -115,7 +127,7 @@ class TransformerEncoder(tf.keras.layers.Layer):
             {
                 "num_heads": self.num_heads,
                 "mlp_dim": self.mlp_dim,
-                "dropout": self.dropout,
+                "dropout": self.hyperparams.dropout_rate,
             }
         )
         return config
@@ -127,11 +139,11 @@ class TransformerEncoder(tf.keras.layers.Layer):
 
 @tf.keras.utils.register_keras_serializable()
 class Transformer(tf.keras.layers.Layer):
-    def __init__(self, *args, num_heads, mlp_dim, dropout, num_blocks, **kwargs):
+    def __init__(self, *args, num_heads, mlp_dim, hyperparams, num_blocks, **kwargs):
         super().__init__(*args, **kwargs)
         self.num_heads = num_heads
         self.mlp_dim = mlp_dim
-        self.dropout = dropout
+        self.hyperparams= hyperparams
         self.num_blocks = num_blocks
         self.transformer_encoders = []
         self.regularizer_value = 0.1
@@ -141,7 +153,7 @@ class Transformer(tf.keras.layers.Layer):
             self.transformer_encoders = self.transformer_encoders + [TransformerEncoder(
                 num_heads=self.num_heads,
                 mlp_dim=self.mlp_dim,
-                dropout=self.dropout,
+                hyperparams=self.hyperparams,
                 name=f"Transformer/encoderblock_{n}"
             )]
 
@@ -157,7 +169,7 @@ class Transformer(tf.keras.layers.Layer):
             {
                 "num_heads": self.num_heads,
                 "mlp_dim": self.mlp_dim,
-                "dropout": self.dropout,
+                "dropout": self.hyperparams.dropout_rate,
                 "num_blocks": self.num_blocks,
             }
         )
@@ -190,17 +202,21 @@ class TransformerClassifier(tf.keras.layers.Layer):
             kernel_size=self.patch_size,
             strides=self.patch_size,
             padding="same",
-            name="embedding",
+            name="embedding"
         )
         #self.linear_proj = tf.keras.layers.Dense(self.transformer_input_size)
         # self.linear_proj = tf.keras.layers.Dense(self.transformer_input_size, activation="relu")
         #self.class_token = ClassToken(name="class_token")
         #self.add_pos_embedding = AddPositionEmbs(name="add_pos_embedding")
         self.transformer = Transformer(num_heads=self.num_heads, mlp_dim=self.mlp_dim,
-                                       dropout=self.hyperparams.dropout_rate, num_blocks=self.num_blocks)
+                                       hyperparams=self.hyperparams, num_blocks=self.num_blocks)
         self.layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-6, name="Transformer/encoder_norm")
         #activation = "softmax" if self.classes > 1 else "sigmoid"
-        self.head = tf.keras.layers.Dense(self.classes, name="head", activation=GELU())
+        self.head = tf.keras.layers.Dense(self.classes, name="head", activation=GELU(),
+                                          activity_regularizer=tf.keras.regularizers.L1L2(
+                                              l1=self.hyperparams.l1_regularization,
+                                              l2=self.hyperparams.l2_regularization)
+                                          )
 
 
     def call(self, inputs, training=True):
