@@ -113,6 +113,15 @@ def mean_true_positive_value(y_true, y_pred, label_index=0, threshold=0.5):
     return tf.reduce_mean(tf.gather(y_pred_label, tp_pred_indexes))
 
 @tf.function
+def mean_false_positive_value(y_true, y_pred, label_index=0, threshold=0.5):
+    y_true_label = tf.gather(y_true, [label_index], axis=1)
+    y_pred_label = tf.gather(y_pred, [label_index], axis=1)
+    y_true_label = y_true_label[:, 0]
+    y_pred_label = y_pred_label[:, 0]
+    fp_pred_indexes = tf.where(tf.logical_and(tf.greater(y_pred_label, threshold), tf.equal(y_true_label, 0)))
+    return tf.reduce_mean(tf.gather(y_pred_label, fp_pred_indexes))
+
+@tf.function
 def mean_negative_value(y_true, y_pred, label_index=0, threshold=0.5):
     y_true_label = tf.gather(y_true, [label_index], axis=1)
     y_pred_label = tf.gather(y_pred, [label_index], axis=1)
@@ -128,6 +137,15 @@ def mean_true_negative_value(y_true, y_pred, label_index=0, threshold=0.5):
     y_true_label = y_true_label[:, 0]
     y_pred_label = y_pred_label[:, 0]
     tp_pred_indexes = tf.where(tf.logical_and(tf.less(y_pred_label, threshold), tf.equal(y_true_label, 0)))
+    return tf.reduce_mean(tf.gather(y_pred_label, tp_pred_indexes))
+
+@tf.function
+def mean_false_negative_value(y_true, y_pred, label_index=0, threshold=0.5):
+    y_true_label = tf.gather(y_true, [label_index], axis=1)
+    y_pred_label = tf.gather(y_pred, [label_index], axis=1)
+    y_true_label = y_true_label[:, 0]
+    y_pred_label = y_pred_label[:, 0]
+    tp_pred_indexes = tf.where(tf.logical_and(tf.less(y_pred_label, threshold), tf.equal(y_true_label, 1)))
     return tf.reduce_mean(tf.gather(y_pred_label, tp_pred_indexes))
 
 @tf.function
