@@ -5,7 +5,8 @@ from keras.metrics import Precision, Recall, AUC, BinaryAccuracy, RecallAtPrecis
 from tensorflow_addons.metrics import F1Score
 
 from ml.loss.cross_entropy import binary_focal_loss
-from ml.metrics.auc import precision_at_k, mean_true_positive_value, mean_positive_value
+from ml.metrics.auc import precision_at_k, mean_true_positive_value, mean_true_negative_value, \
+    mean_false_negative_value, mean_false_positive_value
 from ml.model.base_model import BaseModel
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -21,18 +22,14 @@ class BinaryModel(BaseModel):
     def instance_metrics(self):
         return [Precision(), Recall(), F1Score(num_classes=1, threshold=0.5, average='weighted'),
                 RecallAtPrecision(precision=0.99, name="r@p99"),
-                RecallAtPrecision(0.975, name="r@p975"),
-                RecallAtPrecision(0.95, name="r@p95"),
                 AUC(name="roc_auc"),
-                AUC(curve="PR", name="pr_auc"),
-                precision_at_k, mean_positive_value, mean_true_positive_value]
+                AUC(curve="PR", name="pr_auc")]
 
     def plot_metrics(self, model_dir, steps_per_epoch, with_validation=False):
         logging.info("Plotting metrics")
         training_log_df = pd.read_csv(model_dir + '/training_log.csv')
         training_log_df['batch_total'] = training_log_df['batch'] + (training_log_df['epoch'] * steps_per_epoch)
-        validation_log_df = training_log_df.dropna(subset = ['val_precision', 'val_recall', 'val_r@p99', 'val_r@p975',
-                                                             'val_r@p95', 'val_loss', 'val_binary_accuracy',
+        validation_log_df = training_log_df.dropna(subset = ['val_precision', 'val_recall', 'val_r@p99', 'val_loss', 'val_binary_accuracy',
                                                              'val_pr_auc', 'val_roc_auc'])
         fig, axs = plt.subplots(2, 2, figsize=(25, 7), constrained_layout=True)
         fig.suptitle(self.name + ' Model Metrics', fontsize=14)
