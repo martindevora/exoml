@@ -17,7 +17,7 @@ if not os.path.exists(local_path_q1q17):
     os.mkdir(local_path_q1q17 + '/lcs/')
 ete6_local_file = f"{local_path_ete6}injected_objects.csv"
 q1q17_local_file = f"{local_path_q1q17}injected_objects_tces.csv"
-pwd = 'tiofeo27.'
+pwd = 'fakepwd'
 #result = os.system(f"sshpass -p {pwd}. scp -o StrictHostKeyChecking=no mdevo@mdevorapajares.net:/data/scratch/ml/ete6/injected_objects.csv {ete6_local_file}")
 #result = os.system(f"sshpass -p {pwd}. scp -o StrictHostKeyChecking=no mdevo@mdevorapajares.net:/data/scratch/ml/q1_q17/injected_objects_tces.csv {q1q17_local_file}")
 df_ete6 = pd.read_csv(ete6_local_file)
