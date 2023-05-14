@@ -27,8 +27,8 @@ class ModelWeightsLogger:
                 max_layer = max_layer if np.max(w) < max_w else model.layers[layer_i]
                 min_w = min_w if np.min(w) > min_w else np.min(w)
                 max_w = max_w if np.max(w) < max_w else np.max(w)
-                logging.debug('Layer max weight is ' + str(np.nanmax(w)) + ' and min weight is ' + str(np.nanmin(w)))
-                logging.debug('Layer max bias is ' + str(np.nanmax(b)) + ' and min bias is ' + str(np.nanmin(b)))
+                # logging.debug('Layer max weight is ' + str(np.nanmax(w)) + ' and min weight is ' + str(np.nanmin(w)))
+                # logging.debug('Layer max bias is ' + str(np.nanmax(b)) + ' and min bias is ' + str(np.nanmin(b)))
                 if nan_weight_indexes_count > 0 or nan_bias_indexes_count > 0:
                     logging.warning('Layer ' + str(layer_i) + ' with name ' + model.layers[layer_i].name + ' has ' + str(nan_weight_indexes_count) +
                           ' nan weights and ' + str(nan_bias_indexes_count) + ' nan biases')
