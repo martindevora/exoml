@@ -26,7 +26,8 @@ df = pd.concat([df_ete6, df_q1q17])
 df = shuffle(df)
 df = df.sort_values(by=["object_id"], ascending=True)
 df = df.drop_duplicates(subset=["object_id"], keep='last')
-df = df.iloc[0:100]
+df = df.iloc[0:1000]
+df.to_csv(local_path + '/injected_objects_combined.csv')
 for index, row in df.iterrows():
     remotepath = 'ete6/lcs/' if 'TIC' in row['object_id'] else 'q1_q17/lcs/'
     local_path_target = f'{local_path_ete6}lcs/' if 'TIC' in row['object_id'] else f'{local_path_q1q17}lcs/'
