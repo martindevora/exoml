@@ -4,6 +4,7 @@ import tensorflow as tf
 import keras.backend as K
 from keras.callbacks import CSVLogger
 import numpy as np
+import tensorflow_addons as tfa
 
 
 class BatchAwareCsvLogger(CSVLogger):
@@ -42,15 +43,26 @@ class BatchAwareCsvLogger(CSVLogger):
         if not self.writer:
             class CustomDialect(csv.excel):
                 delimiter = self.sep
-            fieldnames = ['epoch', 'batch', 'lr'] + metric_fieldnames
+            lr_fieldnames = ['lr']
+            if isinstance(self.model.optimizer, tfa.optimizers.MultiOptimizer):
+                lr_fieldnames = lr_fieldnames + ['lr_last']
+            fieldnames = ['epoch', 'batch'] + lr_fieldnames +  metric_fieldnames
             self.writer = csv.DictWriter(
                 self.csv_file,
                 fieldnames=fieldnames,
                 dialect=CustomDialect)
             if self.append_header:
                 self.writer.writeheader()
-        learning_rate = K.eval(self.model.optimizer.lr)
-        row_dict = {'epoch': epoch, 'batch': batch, 'lr': learning_rate}
+        row_dict = {}
+        if isinstance(self.model.optimizer, tfa.optimizers.MultiOptimizer):
+            learning_rate = K.eval(K.eval(self.model.optimizer.optimizer_specs[0]['optimizer'].lr))
+            last_learning_rate = K.eval(K.eval(self.model.optimizer.optimizer_specs[-1]['optimizer'].lr))
+            row_dict['lr_last'] = last_learning_rate
+        else:
+            learning_rate = K.eval(self.model.optimizer.lr)
+        row_dict['epoch'] = epoch
+        row_dict['batch'] = batch
+        row_dict['lr'] = learning_rate
         for metric_key in metric_fieldnames:
             row_dict[metric_key] = handle_value(logs[metric_key][0]
                                                 if isinstance(logs[metric_key], (list, np.ndarray))
