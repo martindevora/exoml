@@ -8,6 +8,8 @@ import shutil
 from multiprocessing import Pool
 from random import randrange
 
+import re
+from pathlib import Path
 import ellc
 import pandas as pd
 import numpy as np
@@ -138,18 +140,44 @@ def create_injection_dataframe(injections_dir, lcs_dir):
                                 'Rsec/Rpri': 1e-7,
                                 'b': 0,
                                 'a/Rstar': 1e-7, 'duration(h)': duration,
-                                'depth_primary': 1e-7,
+                                'depth_primary': 1e-6,
                                 'depth_secondary': 0,
                                 'insolation': 0, 'Rstar_primary': 1e-7,
                                 'Rstar_secondary': 1e-7,
                                 'contact_amplitude': 0,
                                 'Mstar': star_mass,
-                                'radius(earth)': 1e-7}, ignore_index=True)
+                                'radius(earth)': 1}, ignore_index=True)
                 has_injected_object = True
+            # for match in Path("/data/scratch/ml/ete6/lcs/").glob(object_id + '_*_input_scalar_values.csv'):
+            #     period = float(re.findall("\d+\.\d+", str(match))[0])
+            #     min_lc_time = 1612.85 + 0.5
+            #     epoch = random_number_generator.uniform(min_lc_time, min_lc_time + period)
+            #     duration = t14(star_radius, star_mass, period)
+            #     while 2 * duration >= period:
+            #         duration = duration / 2
+            #     if 2 * duration < period:
+            #         duration = duration * 24
+            #         df = df.append({'object_id': object_id, 'type': 'none', 'period': period,
+            #                         'epoch': epoch,
+            #                         'Rsec/Rpri': 1e-7,
+            #                         'b': 0,
+            #                         'a/Rstar': 1e-7, 'duration(h)': duration,
+            #                         'depth_primary': 1e-6,
+            #                         'depth_secondary': 0,
+            #                         'insolation': 0, 'Rstar_primary': 1e-7,
+            #                         'Rstar_secondary': 1e-7,
+            #                         'contact_amplitude': 0,
+            #                         'Mstar': star_mass,
+            #                         'radius(earth)': 1}, ignore_index=True)
+            #         has_injected_object = True
+            #         break
+            #     else:
+            #         print("inloop")
+        print("Processed " + str(i) + " TICs.")
         if (i + 1) % log_count == 0:
             print("Processed " + str(i) + " TICs.")
             #df = df.sort_values(["TIC ID", "type"], ascending=True)
-            df.to_csv(injections_dir + '/injected_objects.csv')
+            #df.to_csv(injections_dir + '/injected_objects.csv')
         i = i + 1
     df = df.sort_values(["object_id", "type"], ascending=True)
     df.to_csv(injections_dir + '/injected_objects.csv')
