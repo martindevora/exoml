@@ -87,6 +87,8 @@ class HyperParams:
     dropout_rate: float = 0.1
     '''Maximum value for adaptive std dropout'''
     dropout_max_rate: float = 0.1
+    '''Dropout for convolutional layers'''
+    spatial_dropout_rate: float = 0.1
     '''Initial white noise standard deviation value'''
     white_noise_std: Optional[float] = 0.0
     '''Number of cross validation folds to be used for training'''
