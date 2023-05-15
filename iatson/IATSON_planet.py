@@ -79,22 +79,21 @@ class IATSON_planet(ImbalancedBinaryModel):
         flux_input_final = flux_input_mod
         flux_branch = flux_input_final
         #flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
-        #flux_branch = keras.layers.SpatialDropout1D(rate=self.hyperparams.dropout_rate)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=16, kernel_size=90, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
         flux_branch = keras.layers.MaxPooling1D(pool_size=10, strides=1)(flux_branch)
         #flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
-        #flux_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(flux_branch)
+        flux_branch = keras.layers.SpatialDropout1D(rate=self.hyperparams.spatial_dropout_rate)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=32, kernel_size=30, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
         flux_branch = keras.layers.MaxPooling1D(pool_size=4, strides=1)(flux_branch)
         #flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
-        #flux_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(flux_branch)
+        flux_branch = keras.layers.SpatialDropout1D(rate=self.hyperparams.spatial_dropout_rate)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=64, kernel_size=15, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
         flux_branch = keras.layers.MaxPooling1D(pool_size=3, strides=2)(flux_branch)
         #flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
-        #flux_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(flux_branch)
+        flux_branch = keras.layers.SpatialDropout1D(rate=self.hyperparams.spatial_dropout_rate)(flux_branch)
         flux_branch = keras.layers.Conv1D(filters=128, kernel_size=8, padding="same",
                                           activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
         flux_branch = keras.layers.MaxPooling1D(pool_size=2, strides=2)(flux_branch)
@@ -132,18 +131,19 @@ class IATSON_planet(ImbalancedBinaryModel):
         #focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_input_final)
         # (time, flux, detrended_flux1... detrended_flux5, flux_model, centroidx, centroidy, motionx, motiony, bck)
         # flux model by transit params and stellar params
-        #focus_flux_branch = keras.layers.SpatialDropout1D(rate=self.hyperparams.dropout_rate)(focus_flux_branch)
+        #focus_flux_branch = keras.layers.SpatialDropout1D(rate=self.hyperparams.spatial_dropout_rate)(focus_flux_branch)
         focus_flux_branch = keras.layers.Conv1D(filters=32, kernel_size=20, padding="same",
                                                 activation=LeakyReLU(leaky_relu_alpha), use_bias=True)(
             focus_flux_branch)
         focus_flux_branch = keras.layers.MaxPooling1D(pool_size=5, strides=1)(focus_flux_branch)
         #focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_branch)
-        #focus_flux_branch = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(focus_flux_branch)
+        focus_flux_branch = keras.layers.SpatialDropout1D(rate=self.hyperparams.spatial_dropout_rate)(focus_flux_branch)
         focus_flux_branch = keras.layers.Conv1D(filters=64, kernel_size=10, padding="same",
                                                 activation=LeakyReLU(leaky_relu_alpha), use_bias=True)(
             focus_flux_branch)
         #focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_branch)
         focus_flux_branch = keras.layers.MaxPooling1D(pool_size=3, strides=1)(focus_flux_branch)
+        focus_flux_branch = keras.layers.SpatialDropout1D(rate=self.hyperparams.spatial_dropout_rate)(focus_flux_branch)
         focus_flux_branch = keras.layers.Conv1D(filters=128, kernel_size=5, padding="same",
                                                 activation=LeakyReLU(leaky_relu_alpha), use_bias=True)(
             focus_flux_branch)
