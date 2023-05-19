@@ -10,4 +10,4 @@ class ImbalancedBinaryModel(BinaryModel):
         super().__init__(name, input_size, class_ids, type_to_label, hyperparams)
 
     def instance_loss_accuracy(self):
-        return binary_focal_loss, BinaryAccuracy()
+        return BinaryCrossentropy(), BinaryAccuracy()

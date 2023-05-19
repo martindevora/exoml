@@ -21,7 +21,7 @@ from ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
 from ml.callback.early_stopping import ExoMlEarlyStopping
 from ml.callback.get_weights import GetWeights
 from ml.callback.training_data_aware import ValidationDataAwareCallback, ModelDirDataAwareCallback
-from ml.learning_rate.schedulers import ExponentialRescaleDecay, LinearWithWarmupDecaySchedule
+from ml.learning_rate.schedulers import ExponentialRescaleDecay
 from ml.log.get_weights_logger import ModelWeightsLogger
 from ml.log.with_logging import WithLogging
 from keras.optimizers.schedules.learning_rate_schedule import LearningRateSchedule
@@ -328,7 +328,7 @@ class BaseModel(WithLogging):
         for labels in self.class_ids.values():
             class_len = len(dataset[dataset['type'].isin(labels)])
             logging.info("%s (%s %%) items of class %s", class_len, class_len / len(dataset) * 100, labels)
-        fold_indexes = np.range(dataset_len // 10, dataset_len, folds)
+        fold_indexes = [int(fold_index) for fold_index in np.linspace(dataset_len // 10, dataset_len, folds)]
         return dataset, fold_indexes
 
     def compute_class_weights(self, train_filenames):
@@ -498,12 +498,17 @@ class BaseModel(WithLogging):
                      ") (train_percent," + str(hyperparams.train_percent) +
                      ") (test_percent," + str(hyperparams.validation_percent) +
                      ") and CV Folds with indexes %s", fold_indexes)
+        # We don't use SparseCategoricalCrossentropy because our targets are one-hot encoded
+        loss, accuracy = self.instance_loss_accuracy()
+        model_weights_logger = ModelWeightsLogger()
+        metrics = [accuracy] + self.instance_metrics() + hyperparams.metrics
         for index, fold_index in enumerate(fold_indexes):
+            if index > 0:
+                self.load_model(output_dir + '/' + model_name + '_initial')
             logging.info("Preparing training for K-fold no %s", index)
-            previous_fold_index = fold_index if fold_index != fold_indexes[0] else 0
-            training_set = pd.concat(dataset.iloc[0:previous_fold_index], dataset.iloc[fold_index:])
+            previous_fold_index = fold_indexes[index - 1] if index > 0 else 0
+            training_set = pd.concat([dataset.iloc[0:previous_fold_index], dataset.iloc[fold_index:]])
             validation_set = dataset.iloc[previous_fold_index:fold_index]
-            logging.info("Preparing training for K-fold no %s", index)
             train_dataset_len = len(training_set)
             validation_dataset_len = len(validation_set)
             logging.info("Training set is of length %s (%s %%)", train_dataset_len,
@@ -526,18 +531,6 @@ class BaseModel(WithLogging):
             validation_set.to_csv(model_path + 'validation_dataset.csv')
             logging.info("Initializing optimizer with (initial_learning_rate," +
                          str(hyperparams.initial_learning_rate) + ")")
-            optimizer = tf.keras.optimizers.Adam(hyperparams.learning_rate_schedule
-                                                 if hyperparams.learning_rate_schedule is not None
-                                                 else hyperparams.initial_learning_rate,
-                                                 beta_1=0.9, beta_2=0.98, epsilon=1e-9,
-                                                 clipnorm=hyperparams.gradient_clip_norm,
-                                                 clipvalue=hyperparams.gradient_clip_value)
-            # We don't use SparseCategoricalCrossentropy because our targets are one-hot encoded
-            loss, accuracy = self.instance_loss_accuracy()
-            self.compile(optimizer, hyperparams.custom_loss if hyperparams.custom_loss is not None else loss,
-                         metrics=[accuracy] + self.instance_metrics() + hyperparams.metrics,
-                         run_eagerly=hyperparams.run_eagerly)
-            model_weights_logger = ModelWeightsLogger()
             train_filenames, validation_filenames, test_filenames = \
                 self.prepare_training_data(training_dir, model_path, hyperparams.batch_size, hyperparams.train_percent,
                                            hyperparams.validation_percent, hyperparams.training_set_limit,
@@ -547,6 +540,11 @@ class BaseModel(WithLogging):
             test_dataset_size = len(validation_filenames)
             steps_per_epoch = int(hyperparams.dataset_iterations_per_epoch * train_dataset_size // hyperparams.batch_size)
             total_steps = steps_per_epoch * hyperparams.epochs
+            optimizer = self.build_optimizer(hyperparams, steps_per_epoch)
+            self.compile(optimizer, hyperparams.custom_loss if hyperparams.custom_loss is not None else loss,
+                         metrics=metrics,
+                         run_eagerly=hyperparams.run_eagerly)
+            self.save(output_dir, model_name + '_initial')
             # if hyperparams.learning_rate_schedule is None:
             #     learning_rate_decay_steps = steps_per_epoch // 2
             #     learning_rate_decay_steps = learning_rate_decay_steps if learning_rate_decay_steps > steps_per_epoch \
@@ -612,7 +610,8 @@ class BaseModel(WithLogging):
                     else hyperparams.cores)
                 self.save(output_dir, model_name)
                 model_checkpoint = root_model_name.strip("/") + '_chk'
-                shutil.copytree(output_dir + model_checkpoint, output_dir + model_checkpoint + '_' + str(index))
+                shutil.copytree(output_dir + model_checkpoint, output_dir + model_checkpoint + '_' + str(index),
+                                dirs_exist_ok=True)
             else:
                 logging.warning("dry_run was activated and 'training' will not be launched")
 
@@ -636,7 +635,6 @@ class BaseModel(WithLogging):
 
     def load_model(self, dir, custom_objects={}):
         custom_objects['ExponentialRescaleDecay'] = ExponentialRescaleDecay
-        custom_objects['LinearWithWarmupDecaySchedule'] = LinearWithWarmupDecaySchedule
         custom_objects['WarmUpAndLinDecreaseCallback'] = WarmUpAndLinDecreaseCallback
         custom_objects['precision_at_k'] = precision_at_k
         custom_objects['mean_false_positive_value'] = mean_false_positive_value

@@ -17,10 +17,11 @@ class BinaryModel(BaseModel):
         super().__init__(name, input_size, class_ids, type_to_label, hyperparams)
 
     def instance_loss_accuracy(self):
-        return binary_focal_loss, BinaryAccuracy()
+        return BinaryCrossentropy(), BinaryAccuracy()
 
     def instance_metrics(self):
-        return [Precision(), Recall(), F1Score(num_classes=1, threshold=0.5, average='weighted'),
+        return [Precision(name="precision"), Recall(name="recall"),
+                F1Score(num_classes=1, threshold=0.5, average='weighted', name='f1_score'),
                 RecallAtPrecision(precision=0.99, name="r@p99"),
                 AUC(name="roc_auc"),
                 AUC(curve="PR", name="pr_auc")]
