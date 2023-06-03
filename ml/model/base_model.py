@@ -15,6 +15,7 @@ from abc import abstractmethod
 from keras.utils.vis_utils import plot_model
 from sklearn.utils import shuffle
 
+from ml.callback.checkpoint import ModelCheckpointCallback
 from ml.callback.learning_rate import WarmUpAndLinDecreaseCallback
 from ml.callback.basemodel_aware_callback import MetricsPlotCallback
 from ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
@@ -490,7 +491,7 @@ class BaseModel(WithLogging):
                                                  clipvalue=hyperparams.gradient_clip_value)
         return optimizer
 
-    def train_cv(self, training_dir, output_dir, hyperparams, folds=10):
+    def train_cv(self, training_dir, output_dir, hyperparams, folds=10, retry_rp99_threshold=0):
         root_model_name = self._get_model_dir()
         dataset, fold_indexes = self.prepare_training_data_cv(training_dir, folds)
         dataset_length = len(dataset)
@@ -503,48 +504,53 @@ class BaseModel(WithLogging):
         model_weights_logger = ModelWeightsLogger()
         metrics = [accuracy] + self.instance_metrics() + hyperparams.metrics
         for index, fold_index in enumerate(fold_indexes):
-            if index > 0:
-                self.load_model(output_dir + '/' + model_name + '_initial')
-            logging.info("Preparing training for K-fold no %s", index)
-            previous_fold_index = fold_indexes[index - 1] if index > 0 else 0
-            training_set = pd.concat([dataset.iloc[0:previous_fold_index], dataset.iloc[fold_index:]])
-            validation_set = dataset.iloc[previous_fold_index:fold_index]
-            train_dataset_len = len(training_set)
-            validation_dataset_len = len(validation_set)
-            logging.info("Training set is of length %s (%s %%)", train_dataset_len,
-                         train_dataset_len / dataset_length * 100)
-            logging.info("Validation set is of length %s (%s %%)", validation_dataset_len,
-                         validation_dataset_len / dataset_length * 100)
-            for labels in self.class_ids.values():
-                class_len = len(training_set[training_set['type'].isin(labels)])
-                logging.info("Training set contains %s (%s %%) items of class %s", class_len,
-                             class_len / train_dataset_len * 100, labels)
-            for labels in self.class_ids.values():
-                class_len = len(validation_set[validation_set['type'].isin(labels)])
-                logging.info("Validation set contains %s (%s %%) items of class %s", class_len,
-                             class_len / validation_dataset_len * 100, labels)
             model_name = root_model_name.strip("/") + f'_{index}/'
+            model_name_initial = root_model_name.strip("/") + f'_{index}_initial/'
             model_path = output_dir + '/' + model_name
             if not os.path.exists(model_path):
                 os.mkdir(model_path)
+            if index > 0 or retry_rp99_threshold > 0:
+                self.load_model(output_dir + '/' + model_name_initial)
+            logging.info("Preparing training for K-fold no %s", index)
+            if retry_rp99_threshold is None or retry_rp99_threshold <= 0:
+                previous_fold_index = fold_indexes[index - 1] if index > 0 else 0
+                training_set = pd.concat([dataset.iloc[0:previous_fold_index], dataset.iloc[fold_index:]])
+                validation_set = dataset.iloc[previous_fold_index:fold_index]
+            else:
+                training_set = pd.read_csv(model_path + '/train_dataset.csv')
+                validation_set = pd.read_csv(model_path + '/validation_dataset.csv')
+            train_dataset_size = len(training_set)
+            validation_dataset_size = len(validation_set)
+            logging.info("Training set is of length %s (%s %%)", train_dataset_size,
+                         train_dataset_size / dataset_length * 100)
+            logging.info("Validation set is of length %s (%s %%)", validation_dataset_size,
+                         validation_dataset_size / dataset_length * 100)
+            for labels in self.class_ids.values():
+                class_len = len(training_set[training_set['type'].isin(labels)])
+                logging.info("Training set contains %s (%s %%) items of class %s", class_len,
+                             class_len / train_dataset_size * 100, labels)
+            for labels in self.class_ids.values():
+                class_len = len(validation_set[validation_set['type'].isin(labels)])
+                logging.info("Validation set contains %s (%s %%) items of class %s", class_len,
+                             class_len / validation_dataset_size * 100, labels)
             training_set.to_csv(model_path + 'train_dataset.csv')
             validation_set.to_csv(model_path + 'validation_dataset.csv')
             logging.info("Initializing optimizer with (initial_learning_rate," +
                          str(hyperparams.initial_learning_rate) + ")")
-            train_filenames, validation_filenames, test_filenames = \
-                self.prepare_training_data(training_dir, model_path, hyperparams.batch_size, hyperparams.train_percent,
-                                           hyperparams.validation_percent, hyperparams.training_set_limit,
-                                           hyperparams.balance_class_id, hyperparams.balance_class_sampling)
-            # The optimizer is executed once for every batch, hence optimizer steps per epoch are
-            train_dataset_size = len(train_filenames)
-            test_dataset_size = len(validation_filenames)
+            # train_filenames, validation_filenames, test_filenames = \
+            #     self.prepare_training_data(training_dir, model_path, hyperparams.batch_size, hyperparams.train_percent,
+            #                                hyperparams.validation_percent, hyperparams.training_set_limit,
+            #                                hyperparams.balance_class_id, hyperparams.balance_class_sampling)
+            # # The optimizer is executed once for every batch, hence optimizer steps per epoch are
+            # train_dataset_size = len(train_filenames)
+            # test_dataset_size = len(validation_filenames)
             steps_per_epoch = int(hyperparams.dataset_iterations_per_epoch * train_dataset_size // hyperparams.batch_size)
             total_steps = steps_per_epoch * hyperparams.epochs
             optimizer = self.build_optimizer(hyperparams, steps_per_epoch)
             self.compile(optimizer, hyperparams.custom_loss if hyperparams.custom_loss is not None else loss,
                          metrics=metrics,
                          run_eagerly=hyperparams.run_eagerly)
-            self.save(output_dir, model_name + '_initial')
+            self.save(output_dir, model_name_initial)
             # if hyperparams.learning_rate_schedule is None:
             #     learning_rate_decay_steps = steps_per_epoch // 2
             #     learning_rate_decay_steps = learning_rate_decay_steps if learning_rate_decay_steps > steps_per_epoch \
@@ -567,15 +573,18 @@ class BaseModel(WithLogging):
                              ") (self.input_size," + str(self.input_size) +
                              ") (zero_epsilon," + str(hyperparams.zero_epsilon) +
                              ")")
-                training_batch_generator = self.instance_generator(train_filenames, training_dir, hyperparams.batch_size,
+                training_batch_generator = self.instance_generator(training_set, training_dir, hyperparams.batch_size,
                                                                    self.input_size, self.type_to_label, hyperparams.zero_epsilon)
-                validation_batch_generator = self.instance_generator(validation_filenames, training_dir, hyperparams.batch_size,
+                validation_batch_generator = self.instance_generator(validation_set, training_dir, hyperparams.batch_size,
                                                                      self.input_size, self.type_to_label, hyperparams.zero_epsilon)
                 for callback in hyperparams.callbacks:
                     if issubclass(callback.__class__, ModelDirDataAwareCallback):
                         callback.set_model_dir(model_name)
                     if issubclass(callback.__class__, ValidationDataAwareCallback):
                         callback.set_validation_data(validation_batch_generator)
+                    if isinstance(callback, ModelCheckpointCallback):
+                        logging.info(f"Switching callback path from {callback.original_path} to {model_path}")
+                        callback.original_path = model_path
                 callbacks = hyperparams.callbacks + [BatchAwareCsvLogger(model_name + '/training_log.csv', steps_per_epoch),
                                                                  #GetWeights(model_weights_logger),
                                                                  MetricsPlotCallback(self, model_name, steps_per_epoch)]
@@ -589,11 +598,11 @@ class BaseModel(WithLogging):
                         baseline=None,
                         restore_best_weights=False,
                     )]
-                model_validation_steps = int(test_dataset_size // hyperparams.batch_size)
+                model_validation_steps = int(validation_dataset_size // hyperparams.batch_size)
                 class_weights = hyperparams.class_loss_weights if hyperparams.class_loss_weights is not None \
                     else training_batch_generator.class_weights()
                 if isinstance(class_weights, str) and 'auto' == class_weights:
-                    class_weights = self.compute_class_weights(train_filenames)
+                    class_weights = self.compute_class_weights(training_set)
                 logging.info("Initializing training with (epochs," + str(hyperparams.epochs) +
                              ") (steps_per_epoch," + str(steps_per_epoch) +
                              ") (model_validation_steps," + str(model_validation_steps) +
