@@ -1,3 +1,4 @@
+import glob
 import logging
 import multiprocessing
 import os
@@ -373,6 +374,7 @@ def create_target_csv(create_target_input):
     file_planet_prefix = file_prefix + '_' + \
                          str(round(create_target_input.injected_files_df['period'], 2))
     pid = multiprocessing.current_process().pid
+    tpfs_dir = create_target_input.target_dir + 'tpfs/'
     try:
         logging.info("PID %s: Trying to get short cadence info for %s", pid, file_planet_prefix)
         file_name = file_planet_prefix + '_metrics_short.csv'
@@ -381,12 +383,17 @@ def create_target_csv(create_target_input):
                 mission_lightcurve_builder.build(MissionObjectInfo('all', mission_id, cadence='short'),
                                                  create_target_input.target_dir,
                                                  create_target_input.cache_dir)
+            if os.path.exists(tpfs_dir):
+                for f in glob.glob(tpfs_dir + f"*{mission_id}*.fits"):
+                    os.remove(f)
             prepare_lc_data(file_planet_prefix, mission_id, lcbuild_short.lc_data,
                             create_target_input.injected_files_df['duration(h)'] / 24,
                             create_target_input.injected_files_df['period'],
                             create_target_input.injected_files_df['epoch'],
                             lcbuild_short.star_info.ra, lcbuild_short.star_info.dec, lcbuild_short.star_info, False,
                             modes=create_target_input.mode)
+            for f in pathlib.Path(tpfs_dir).glob(f"*{file_id.split('_')[1]}*"):
+                os.remove(f)
     except Exception as e:
         logging.exception("PID %s: Failed short cadence for %s", pid, file_planet_prefix)
     try:
@@ -403,5 +410,7 @@ def create_target_csv(create_target_input):
                             create_target_input.injected_files_df['epoch'],
                             lcbuild_long.star_info.ra, lcbuild_long.star_info.dec, lcbuild_long.star_info, True,
                             modes=create_target_input.mode)
+            for f in pathlib.Path(tpfs_dir).glob(f"*{file_id.split('_')[1]}*"):
+                os.remove(f)
     except Exception as e:
         logging.exception("PID %s: Failed long cadence for %s", pid, file_planet_prefix)
