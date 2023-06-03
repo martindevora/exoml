@@ -591,13 +591,16 @@ class IATSON_planet(ImbalancedBinaryModel):
                          threshold, prediction_stats.tp, prediction_stats.fp, prediction_stats.fn, prediction_stats.accuracy,
                          prediction_stats.precision, prediction_stats.recall)
             logging.info("Prediction stats @ k top predictions: \n%s", prediction_stats.k_df.to_string())
-            logging.info("Mismatches: \n%s", prediction_stats.mismatches_df.to_string())
-            logging.info("Mismatches by types: \n%s", prediction_stats.mismatches_df
+            mistmatches_df = prediction_stats.predictions_df[prediction_stats.predictions_df['expected_class'] !=
+                                                             prediction_stats.predictions_df['predicted_class']]
+            logging.info("Mismatches: \n%s", mistmatches_df.to_string())
+            logging.info("Mismatches by types: \n%s", mistmatches_df
                          .groupby(by=['type', 'predicted_class'])['object_id'].count().to_string())
 
     def predict_test_set(self, training_dir, model_dir, batch_size=20, cores=os.cpu_count() - 1, test_set_limit=None,
-                         zero_epsilon=1e-7, plot_mismatches=False):
-        test_dataset = pd.read_csv(model_dir + '/test_dataset.csv')
+                         zero_epsilon=1e-7, plot_mismatches=False, test_dataset_filename='test_dataset.csv',
+                         thresholds=[0.5], logs=False):
+        test_dataset = pd.read_csv(model_dir + '/' + test_dataset_filename)
         if test_set_limit is not None:
             test_dataset = test_dataset.iloc[0:test_set_limit]
         expected_outputs = None
@@ -608,19 +611,69 @@ class IATSON_planet(ImbalancedBinaryModel):
         for i in np.arange(0, len(test_dataset) // batch_size + 1, 1):
             input, expected_output = testing_batch_generator.__getitem__(i)
             expected_outputs = np.concatenate((expected_outputs, expected_output)) if expected_outputs is not None else expected_output
-        for threshold in np.arange(0.5, 1, 0.01):
+        threshold_to_results = {}
+        for threshold in thresholds:
             max_prediction_indexes, max_prediction_values, prediction_stats = \
                 self.predict_batch(testing_batch_generator, expected_outputs, test_dataset, training_dir, plot_mismatches,
                                    batch_size, cores=cores, threshold=[threshold])
             prediction_stats = prediction_stats[0]
-            logging.info("Prediction stats for label %.0f and threshold %s: TP=%.0f, FP=%.0f, FN=%.0f, ACC=%.3f, PRE=%.3f, REC=%.3f", 0,
-                         threshold, prediction_stats.tp, prediction_stats.fp, prediction_stats.fn, prediction_stats.accuracy,
-                         prediction_stats.precision, prediction_stats.recall)
-            logging.info("Prediction stats @ k top predictions: \n%s", prediction_stats.k_df.to_string())
-            logging.info("Mismatches: \n%s", prediction_stats.mismatches_df.to_string())
-            logging.info("Mismatches by types: \n%s", prediction_stats.mismatches_df
-                         .groupby(by=['type', 'predicted_class'])['object_id'].count().to_string())
+            threshold_to_results[threshold] = prediction_stats
+            if logs:
+                logging.info("Prediction stats for label %.0f and threshold %s: TP=%.0f, FP=%.0f, FN=%.0f, ACC=%.3f, PRE=%.3f, REC=%.3f", 0,
+                             threshold, prediction_stats.tp, prediction_stats.fp, prediction_stats.fn, prediction_stats.accuracy,
+                             prediction_stats.precision, prediction_stats.recall)
+                logging.info("Prediction stats @ k top predictions: \n%s", prediction_stats.k_df.to_string())
+                mistmatches_df = prediction_stats.predictions_df[prediction_stats.predictions_df['expected_class'] !=
+                                                                 prediction_stats.predictions_df['predicted_class']]
+                logging.info("Mismatches: \n%s", mistmatches_df.to_string())
+                logging.info("Mismatches by types: \n%s", mistmatches_df
+                             .groupby(by=['type', 'predicted_class'])['object_id'].count().to_string())
+        return threshold_to_results
 
+    def predict_test_set_cv(self, training_dir, model_dir_prefix, batch_size=20, cores=os.cpu_count() - 1, test_set_limit=None,
+                         zero_epsilon=1e-7, plot_mismatches=False, folds=10, thresholds=np.arange(0.5, 1, 0.01),
+                            k_values=np.arange(100, 2200, 100)):
+        fold_thresholds_to_results = {}
+        prediction_dfs_thresholds = None
+        predictions_df = None
+        rp99s = np.zeros(len(folds))
+        threshold_p99s = np.zeros(len(folds))
+        for fold in np.arange(0, folds):
+            model_dir = f"{model_dir_prefix}_{fold}/"
+            self.load_model(model_dir)
+            fold_thresholds_to_results[fold] = self.predict_test_set(training_dir, model_dir, batch_size, cores,
+                                                    test_set_limit, zero_epsilon,
+                                                    plot_mismatches, test_dataset_filename='validation_dataset.csv',
+                                                    thresholds=thresholds, logs=False)
+            predictions_df = fold_thresholds_to_results[fold][thresholds[0]].predictions_df if predictions_df is None \
+                else pd.concat([predictions_df, fold_thresholds_to_results[fold][thresholds[0]].predictions_df])
+            for threshold, stats in fold_thresholds_to_results[fold].items():
+                if stats.precision > 99:
+                    rp99s[fold] = stats.recall
+                    threshold_p99s[fold] = threshold
+                    break
+        predictions_df.sort_values(by=['predicted_value'], inplace=True)
+        k_precisions = {}
+
+        for k in k_values:
+            k_df = predictions_df.iloc[:k]
+            k_tps = k_df.loc[k_df['expected_class'] == k_df['predicted_class']]
+            k_fps = k_df.loc[k_df['expected_class'] != k_df['predicted_class']]
+            k_precisions[k] = k_tps / (k_tps + k_fps)
+            logging.info("P@K%.0f = %.3f", k, k_precisions[k])
+        metric_average_stats = self.compute_cv_average_metrics(fold_thresholds_to_results,
+                                                               ['tp', 'fp', 'fn', 'precision', 'recall'])
+
+    def compute_cv_average_metrics(self, fold_thresholds_to_results, metric_names):
+        metric_fold_stats = {}
+        metric_average_stats = {}
+        for metric in metric_names:
+            for fold, thresholds_to_results in enumerate(fold_thresholds_to_results):
+                metric_val = getattr(thresholds_to_results[0.5][0], metric)
+                metric_fold_stats[metric][fold] = metric_val
+            metric_arr = [metric_val for metric_val in metric_fold_stats[metric].values()]
+            metric_average_stats[metric] = (np.nanmean(metric_arr), np.nanstd(metric_arr))
+        return metric_average_stats
 
     def test_metrics(self, expected_outputs, max_prediction_indexes, max_prediction_values, predictions,
                      dataset=None, training_dir=None, plot_mismatches=False):
@@ -671,7 +724,7 @@ class IATSON_planet(ImbalancedBinaryModel):
                 k_df = k_df.append(
                     {'k': k, 'precision': precision, 'recall': recall, 'accuracy': accuracy, 'tp': label_tp,
                      'fp': label_fp, 'fp': label_fp, 'fn': label_fn}, ignore_index=True)
-        mismatches_df = pd.DataFrame(columns=['object_id', 'type', 'expected_class', 'predicted_class',
+        predictions_df = pd.DataFrame(columns=['object_id', 'type', 'expected_class', 'predicted_class',
                                               'prediction_value'])
         if dataset is not None:
             found_classes = [0 if prediction  == -1 else 1 for prediction in max_prediction_values]
@@ -684,19 +737,31 @@ class IATSON_planet(ImbalancedBinaryModel):
                 expected_output = expected_outputs[i]
                 predicted_output = found_classes[i]
                 predicted_value = predictions[i][max_prediction_indexes[i]]
-                if expected_output != predicted_output:
-                    mismatches_df = mismatches_df.append({'object_id': object_id + '_' + str(round(period, 2)), "type": expected_tag,
-                                          "expected_class": expected_output, "predicted_class": predicted_output,
-                                          "prediction_value": predicted_value}, ignore_index=True)
-                    if plot_mismatches:
-                        logging.info("%s with label %s mismatched with value %s", id, expected_tag, predicted_value)
-                        IatsonPlanetModelGenerator(dataset[(dataset['object_id'] == object_id) & (dataset['period'] == period)],
-                                                                             training_dir, 1,
-                                                                             self.input_size,
-                                                                             self.type_to_label,
-                                                                             from_arrays=True,
-                                                                             shuffle_batch=False,
-                                                                             plot_inputs=True).__getitem__(0)
-        mismatches_df = mismatches_df.sort_values(by=['type', 'predicted_class'])
+                predictions_df = predictions_df.append({'object_id': object_id + '_' + str(round(period, 2)), "type": expected_tag,
+                                      "expected_class": expected_output, "predicted_class": predicted_output,
+                                      "prediction_value": predicted_value}, ignore_index=True)
+                if plot_mismatches:
+                    logging.info("%s with label %s mismatched with value %s", id, expected_tag, predicted_value)
+                    IatsonPlanetModelGenerator(dataset[(dataset['object_id'] == object_id) & (dataset['period'] == period)],
+                                                                         training_dir, 1,
+                                                                         self.input_size,
+                                                                         self.type_to_label,
+                                                                         from_arrays=True,
+                                                                         shuffle_batch=False,
+                                                                         plot_inputs=True).__getitem__(0)
+        predictions_df = predictions_df.sort_values(by=['type', 'predicted_class'])
         return CategoricalPredictionSetStats(label_tp, label_fp, label_fn, accuracy, precision, recall, k_df,
-                                             mismatches_df)
+                                             predictions_df)
+# 2526 (6.824076075210719 %) items of class ['planet_transit']
+# 2023-05-31 16:08:15 INFO     1857 (5.016749513723795 %) items of class ['planet']
+# 2023-05-31 16:08:15 INFO     3559 (9.614761184352712 %) items of class ['fp']
+# 2023-05-31 16:08:15 INFO     311 (0.8401772206613357 %) items of class ['fa']
+# 2023-05-31 16:08:15 INFO     804 (2.172033715150205 %) items of class ['tce']
+# 2023-05-31 16:08:15 INFO     2370 (6.402636697644263 %) items of class ['tce_secondary']
+# 2023-05-31 16:08:15 INFO     1029 (2.7798789712556733 %) items of class ['tce_centroids_offset']
+# 2023-05-31 16:08:15 INFO     3222 (8.7043440674303 %) items of class ['tce_source_offset']
+# 2023-05-31 16:08:15 INFO     6980 (18.856710611627403 %) items of class ['tce_og']
+# 2023-05-31 16:08:15 INFO     733 (1.9802247676680356 %) items of class ['tce_odd_even']
+# 2023-05-31 16:08:15 INFO     12631 (34.12308191052518 %) items of class ['none']
+# 2023-05-31 16:08:15 INFO     279 (0.7537281175707802 %) items of class ['EB']
+# 2023-05-31 16:08:15 INFO     715 (1.9315971471795979 %) items of class ['bckEB']
