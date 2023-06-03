@@ -1,5 +1,5 @@
 from keras.callbacks import Callback
-import threading, time
+import threading
 
 
 class MetricsPlotCallback(Callback):
