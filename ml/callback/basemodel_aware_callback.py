@@ -1,4 +1,5 @@
 from keras.callbacks import Callback
+import threading, time
 
 
 class MetricsPlotCallback(Callback):
@@ -10,4 +11,7 @@ class MetricsPlotCallback(Callback):
         self.steps_per_epoch = steps_per_epoch
 
     def on_epoch_end(self, epoch, logs=None):
-        self.base_model.plot_metrics(self.model_dir, self.steps_per_epoch, with_validation=True)
+        thread = threading.Thread(target=self.base_model.plot_metrics,
+                                  args=(self.model_dir, self.steps_per_epoch, True))
+        thread.start()
+        # self.base_model.plot_metrics()
