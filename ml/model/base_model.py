@@ -111,7 +111,7 @@ class CategoricalPredictionSetStats:
     precision: float
     recall: float
     k_df: Optional[pd.DataFrame] = None
-    mismatches_df: Optional[pd.DataFrame] = None
+    predictions_df: Optional[pd.DataFrame] = None
 
 
 class BaseModel(WithLogging):
@@ -406,7 +406,7 @@ class BaseModel(WithLogging):
                 if issubclass(callback.__class__, ValidationDataAwareCallback):
                     callback.set_validation_data(validation_batch_generator)
             hyperparams.callbacks = hyperparams.callbacks + [BatchAwareCsvLogger(model_path + '/training_log.csv', steps_per_epoch),
-                                                             GetWeights(model_weights_logger),
+                                                             #GetWeights(model_weights_logger),
                                                              MetricsPlotCallback(self, model_path, steps_per_epoch)]
             if hyperparams.early_stopping_patience > 0 and hyperparams.early_stopping_delta > 0:
                 hyperparams.callbacks = hyperparams.callbacks + [ExoMlEarlyStopping(
@@ -576,11 +576,11 @@ class BaseModel(WithLogging):
                         callback.set_model_dir(model_name)
                     if issubclass(callback.__class__, ValidationDataAwareCallback):
                         callback.set_validation_data(validation_batch_generator)
-                hyperparams.callbacks = hyperparams.callbacks + [BatchAwareCsvLogger(model_name + '/training_log.csv', steps_per_epoch),
-                                                                 GetWeights(model_weights_logger),
+                callbacks = hyperparams.callbacks + [BatchAwareCsvLogger(model_name + '/training_log.csv', steps_per_epoch),
+                                                                 #GetWeights(model_weights_logger),
                                                                  MetricsPlotCallback(self, model_name, steps_per_epoch)]
                 if hyperparams.early_stopping_patience > 0 and hyperparams.early_stopping_delta > 0:
-                    hyperparams.callbacks = hyperparams.callbacks + [ExoMlEarlyStopping(
+                    callbacks = callbacks + [ExoMlEarlyStopping(
                         monitor="val_loss",
                         min_delta=hyperparams.early_stopping_delta,
                         patience=hyperparams.early_stopping_patience,
@@ -605,7 +605,7 @@ class BaseModel(WithLogging):
                                epochs=hyperparams.epochs, verbose=1, class_weight=class_weights,
                                validation_data=validation_batch_generator,
                                validation_steps=model_validation_steps,
-                               callbacks=hyperparams.callbacks,
+                               callbacks=callbacks,
                                use_multiprocessing=hyperparams.cores > 0, workers=1 if hyperparams.cores <= 0
                     else hyperparams.cores)
                 self.save(output_dir, model_name)
