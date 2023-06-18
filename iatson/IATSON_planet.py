@@ -16,6 +16,7 @@ from keras import backend as K
 from iatson.iatson_planet_generator import IatsonPlanetModelGenerator
 from ml.layers.dropout import AdaptiveStdDropout
 from ml.layers.transformer_classifier import ClassToken, AddPositionEmbs, TransformerClassifier
+from ml.metrics.auc import ThresholdAtPrecision
 from ml.model.base_model import CategoricalPredictionSetStats
 from ml.model.imbalanced_binary_model import ImbalancedBinaryModel
 
@@ -545,8 +546,9 @@ class IATSON_planet(ImbalancedBinaryModel):
         injected_objects_df.reset_index(inplace=True, drop=True)
         return injected_objects_df
 
-    def instance_generator(self, dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon):
-        return IatsonPlanetModelGenerator(dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon)
+    def instance_generator(self, dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon, shuffle=True):
+        return IatsonPlanetModelGenerator(dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon,
+                                          shuffle_batch=shuffle)
 
     def predict(self, input):
         prediction = self.model(input, training=False)
@@ -631,13 +633,13 @@ class IATSON_planet(ImbalancedBinaryModel):
         return threshold_to_results
 
     def predict_test_set_cv(self, training_dir, model_dir_prefix, batch_size=20, cores=os.cpu_count() - 1, test_set_limit=None,
-                         zero_epsilon=1e-7, plot_mismatches=False, folds=10, thresholds=np.arange(0.5, 1, 0.01),
+                         zero_epsilon=1e-7, plot_mismatches=False, folds=10, thresholds=[0.5],
                             k_values=np.arange(100, 2200, 100)):
         fold_thresholds_to_results = {}
         prediction_dfs_thresholds = None
         predictions_df = None
-        rp99s = np.zeros(len(folds))
-        threshold_p99s = np.zeros(len(folds))
+        rp99s = np.zeros(folds)
+        threshold_p99s = np.zeros(folds)
         for fold in np.arange(0, folds):
             model_dir = f"{model_dir_prefix}_{fold}/"
             self.load_model(model_dir)
@@ -647,33 +649,96 @@ class IATSON_planet(ImbalancedBinaryModel):
                                                     thresholds=thresholds, logs=False)
             predictions_df = fold_thresholds_to_results[fold][thresholds[0]].predictions_df if predictions_df is None \
                 else pd.concat([predictions_df, fold_thresholds_to_results[fold][thresholds[0]].predictions_df])
-            for threshold, stats in fold_thresholds_to_results[fold].items():
-                if stats.precision > 99:
-                    rp99s[fold] = stats.recall
-                    threshold_p99s[fold] = threshold
-                    break
-        predictions_df.sort_values(by=['predicted_value'], inplace=True)
-        k_precisions = {}
+        predictions_df_q1q17 = predictions_df[predictions_df['object_id'].str.contains("KIC")]
+        predictions_df_ete6 = predictions_df[predictions_df['object_id'].str.contains("TIC")]
+        predictions_df = predictions_df.sort_values(by=['prediction_value'], ascending=False)
+        predictions_df_q1q17 = predictions_df_q1q17.sort_values(by=['prediction_value'], ascending=False)
+        predictions_df_ete6 = predictions_df_ete6.sort_values(by=['prediction_value'], ascending=False)
+        logging.info("----------------------------------COMPLETE SET METRICS ---------------------------------------")
+        self.compute_cv_average_metrics(fold_thresholds_to_results, ['tp', 'fp', 'fn', 'precision', 'recall'], True)
+        self.log_prediction_metrics(predictions_df, k_values, "K METRICS")
+        self.compute_rp_thresholds(fold_thresholds_to_results, log=True)
+        self.compute_rp_metrics(predictions_df, log=True)
+        logging.info("----------------------------------Q1Q17 SET METRICS ---------------------------------------")
+        self.log_prediction_metrics(predictions_df_q1q17, k_values, "K METRICS")
+        self.compute_rp_metrics(predictions_df_q1q17, log=True)
+        logging.info("----------------------------------Ete6 SET METRICS ---------------------------------------")
+        self.log_prediction_metrics(predictions_df_ete6, k_values, "K METRICS")
+        self.compute_rp_metrics(predictions_df_ete6, log=True)
 
-        for k in k_values:
-            k_df = predictions_df.iloc[:k]
-            k_tps = k_df.loc[k_df['expected_class'] == k_df['predicted_class']]
-            k_fps = k_df.loc[k_df['expected_class'] != k_df['predicted_class']]
-            k_precisions[k] = k_tps / (k_tps + k_fps)
-            logging.info("P@K%.0f = %.3f", k, k_precisions[k])
-        metric_average_stats = self.compute_cv_average_metrics(fold_thresholds_to_results,
-                                                               ['tp', 'fp', 'fn', 'precision', 'recall'])
+    def log_prediction_metrics(self, df, k_range, message):
+        logging.info(f"{message}")
+        df = df.sort_values(by=['prediction_value'], ascending=False)
+        for k in k_range:
+            k_df = df.iloc[:k]
+            k_tps = len(k_df.loc[(k_df['expected_class'] == k_df['predicted_class']) & (k_df['expected_class'] == 1)])
+            k_fps = len(k_df.loc[(k_df['expected_class'] != k_df['predicted_class']) & (k_df['expected_class'] == 0)])
+            k_precisions = k_tps / (k_tps + k_fps)
+            logging.info("P@K%.0f = %.3f", k, k_precisions)
+            logging.info("FPs@K%.0f = %.3f", k, k_fps)
+        k = len(df[df['expected_class'] == 1])
+        k_df = df.iloc[:k]
+        k_tps = len(k_df.loc[(k_df['expected_class'] == k_df['predicted_class']) & (k_df['expected_class'] == 1)])
+        k_fps = len(k_df.loc[(k_df['expected_class'] != k_df['predicted_class']) & (k_df['expected_class'] == 0)])
+        k_precisions = k_tps / (k_tps + k_fps)
+        logging.info("P@K%.0f = %.3f", k, k_precisions)
+        logging.info("FPs@K%.0f = %.3f", k, k_fps)
+        fns_df = df.loc[(df['expected_class'] != df['predicted_class']) & (df['expected_class'] == 1)]
+        fns_df = fns_df.sort_values(by=['prediction_value'], ascending=True)
+        logging.info("FNs DF: \n" + fns_df.to_string())
+        fps_df = df.loc[(df['expected_class'] != df['predicted_class']) & (df['expected_class'] == 0)]
+        fps_df = fps_df.sort_values(by=['prediction_value'], ascending=False)
+        logging.info("FPs DF: \n" + fps_df.to_string())
 
-    def compute_cv_average_metrics(self, fold_thresholds_to_results, metric_names):
+    def compute_cv_average_metrics(self, fold_thresholds_to_results, metric_names, log=False):
         metric_fold_stats = {}
         metric_average_stats = {}
         for metric in metric_names:
-            for fold, thresholds_to_results in enumerate(fold_thresholds_to_results):
-                metric_val = getattr(thresholds_to_results[0.5][0], metric)
+            for fold in fold_thresholds_to_results:
+                metric_val = getattr(fold_thresholds_to_results[fold][0.5], metric)
+                if metric not in metric_fold_stats:
+                    metric_fold_stats[metric] = {}
                 metric_fold_stats[metric][fold] = metric_val
             metric_arr = [metric_val for metric_val in metric_fold_stats[metric].values()]
             metric_average_stats[metric] = (np.nanmean(metric_arr), np.nanstd(metric_arr))
+        if log:
+            logging.info(f"Average statistics:\n {metric_average_stats}")
         return metric_average_stats
+
+    def compute_rp_thresholds(self, fold_thresholds_to_results, rp_value=0.99, thresholds=np.linspace(0, 1, 1000), log=False):
+        selected_thresholds = []
+        recalls = []
+        for fold in fold_thresholds_to_results:
+            threshold, recall = \
+                self.compute_rp_metrics(fold_thresholds_to_results[fold][0.5].predictions_df, rp_value, thresholds, log)
+            selected_thresholds = selected_thresholds + [threshold]
+            recalls = recalls + [recall]
+        logging.info(f"Average R@P{rp_value}: {np.nanmean(recalls)}")
+        logging.info(f"R@P{rp_value} Thresholds: {selected_thresholds}")
+        return selected_thresholds
+
+    def compute_rp_metrics(self, df, rp_value=0.99, thresholds=np.linspace(0, 1, 1000), log=False):
+        best_recall_threshold = 1
+        best_recall = 0
+        for threshold in thresholds:
+            tp = len(df[(df['prediction_value'] >= threshold) & (df['expected_class'] == 1)])
+            fp = len(df[(df['prediction_value'] >= threshold) & (df['expected_class'] == 0)])
+            fn = len(df[(df['prediction_value'] < threshold) & (df['expected_class'] == 1)])
+            precision = tp / (tp + fp + 1e-7)
+            recall = tp / (tp + fn + 1e-7)
+            if precision >= 0.99 and recall > best_recall:
+                best_recall_threshold = threshold
+                best_recall = recall
+        logging.info(f"Custom R@P{rp_value}: {best_recall}, {best_recall_threshold}")
+        metric = tf.keras.metrics.RecallAtPrecision(0.99, num_thresholds=1000)
+        metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
+        best_recall = metric.result().numpy()
+        metric = ThresholdAtPrecision(0.99, num_thresholds=1000)
+        metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
+        best_recall_threshold = metric.result().numpy()
+        logging.info(f"Keras R@P{rp_value}: {best_recall}, {best_recall_threshold}")
+
+        return best_recall_threshold, best_recall
 
     def test_metrics(self, expected_outputs, max_prediction_indexes, max_prediction_values, predictions,
                      dataset=None, training_dir=None, plot_mismatches=False):
@@ -721,9 +786,9 @@ class IATSON_planet(ImbalancedBinaryModel):
                 accuracy = (label_tp + label_tn) / len(expected_outputs_sort_k)
                 precision = label_tp / (label_tp + label_fp + 1e-7)
                 recall = label_tp / (label_tp + label_fn + 1e-7)
-                k_df = k_df.append(
-                    {'k': k, 'precision': precision, 'recall': recall, 'accuracy': accuracy, 'tp': label_tp,
-                     'fp': label_fp, 'fp': label_fp, 'fn': label_fn}, ignore_index=True)
+                k_df = pd.concat([k_df, pd.DataFrame.from_dict(
+                    {'k': [k], 'precision': [precision], 'recall': [recall], 'accuracy': [accuracy], 'tp': [label_tp],
+                     'fp': [label_fp], 'tn': [label_tn], 'fn': [label_fn]}, orient='columns')], ignore_index=True)
         predictions_df = pd.DataFrame(columns=['object_id', 'type', 'expected_class', 'predicted_class',
                                               'prediction_value'])
         if dataset is not None:
@@ -737,9 +802,11 @@ class IATSON_planet(ImbalancedBinaryModel):
                 expected_output = expected_outputs[i]
                 predicted_output = found_classes[i]
                 predicted_value = predictions[i][max_prediction_indexes[i]]
-                predictions_df = predictions_df.append({'object_id': object_id + '_' + str(round(period, 2)), "type": expected_tag,
-                                      "expected_class": expected_output, "predicted_class": predicted_output,
-                                      "prediction_value": predicted_value}, ignore_index=True)
+                predictions_df = pd.concat([predictions_df, pd.DataFrame.from_dict(
+                    {'object_id': [object_id + '_' + str(round(period, 2))], "type": [expected_tag],
+                     "expected_class": [expected_output], "predicted_class": [predicted_output],
+                     "prediction_value": [predicted_value]}, orient='columns')],
+                                           ignore_index=True)
                 if plot_mismatches:
                     logging.info("%s with label %s mismatched with value %s", id, expected_tag, predicted_value)
                     IatsonPlanetModelGenerator(dataset[(dataset['object_id'] == object_id) & (dataset['period'] == period)],
