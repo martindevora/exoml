@@ -23,6 +23,10 @@ class ModelCheckpointCallback(ModelCheckpoint):
     def copy_files(self):
         if os.path.exists(self.original_path + '/training_log.csv'):
             shutil.copyfile(self.original_path + '/training_log.csv', self.filepath + '/training_log.csv')
+        if os.path.exists(self.original_path + '/train_dataset.csv'):
+            shutil.copyfile(self.original_path + '/train_dataset.csv', self.filepath + '/train_dataset.csv')
+        if os.path.exists(self.original_path + '/validation_dataset.csv'):
+            shutil.copyfile(self.original_path + '/validation_dataset.csv', self.filepath + '/validation_dataset.csv')
         if os.path.exists(self.original_path + '/network.png'):
             shutil.copyfile(self.original_path + '/network.png', self.filepath + '/network.png')
         if os.path.exists(self.original_path + '/metrics.png'):
