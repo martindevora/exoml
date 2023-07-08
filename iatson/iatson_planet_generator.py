@@ -16,7 +16,7 @@ import pandas as pd
 class IatsonPlanetModelGenerator(Ete6ModelGenerator):
     def __init__(self, injected_objects_df, lcs_dir, batch_size, input_sizes, type_to_label, zero_epsilon=1e-7,
                  measurements_per_point=2, plot_inputs=False, fixed_target_id=None, store_arrays=False,
-                 from_arrays=True, shuffle_batch=True):
+                 from_arrays=True, shuffle_batch=True, validation_objects_df=None, mask_previous_signals=False):
         super().__init__(zero_epsilon, shuffle_batch=shuffle_batch)
         self.injected_objects_df = injected_objects_df
         self.kics_lcs_dir = lcs_dir + '/q1_q17/lcs/'
@@ -30,6 +30,8 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
         self.fixed_target_id = fixed_target_id
         self.store_arrays = store_arrays
         self.from_arrays = from_arrays
+        self.validation_objects_df = validation_objects_df
+        self.mask_previous_signals = mask_previous_signals
 
     def __len__(self):
         return (np.ceil(len(self.injected_objects_df) / float(self.batch_size))).astype(int)
@@ -76,7 +78,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                     (~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
                 current_array = current_array[current_array_mask]
                 if input_err_array is not None:
-                    axs[1][0].errorbar(time_array[current_array_mask], transposed_array[2], ls='none',
+                    axs[1][0].errorbar(time_array[current_array_mask], current_array, ls='none',
                                        yerr=transposed_err_array[2][current_array_mask], color="orange", alpha=0.5)
                 axs[1][0].scatter(time_array[current_array_mask], current_array)
             #axs[0][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
@@ -162,6 +164,55 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
             plt.show()
             plt.clf()
             plt.close()
+
+    def mask_other_signals(self, data_df, target_row, time_key):
+        other_signals_df = self.injected_objects_df[(self.injected_objects_df['object_id'] == target_row['object_id']) &
+                                                    (self.injected_objects_df['period'] != target_row['period'])]
+        if self.validation_objects_df is not None:
+            other_signals_val_df = self.validation_objects_df[(self.validation_objects_df['object_id'] == target_row['object_id']) &
+                                                              (self.validation_objects_df['period'] != target_row['period'])]
+            other_signals_df = pd.concat([other_signals_df, other_signals_val_df])
+        for index, other_signal_row in other_signals_df.iterrows():
+            mask_signal = True
+            if 'KIC' in target_row['object_id']:
+                other_koi_tce_plnt_num = 999
+                other_tce_plnt_num = 999
+                target_koi_tce_plnt_num = 999
+                target_tce_plnt_num = 999
+                if 'koi_tce_plnt_num_y' in other_signal_row and not np.isnan(other_signal_row['koi_tce_plnt_num_y']):
+                    other_koi_tce_plnt_num = other_signal_row['koi_tce_plnt_num_y']
+                elif 'koi_tce_plnt_num_x' in other_signal_row and not np.isnan(other_signal_row['koi_tce_plnt_num_x']):
+                    other_koi_tce_plnt_num = other_signal_row['koi_tce_plnt_num_x']
+                elif 'koi_tce_plnt_num' in other_signal_row and not np.isnan(other_signal_row['koi_tce_plnt_num']):
+                    other_koi_tce_plnt_num = other_signal_row['koi_tce_plnt_num']
+                if 'koi_tce_plnt_num_y' in target_row and not np.isnan(target_row['koi_tce_plnt_num_y']):
+                    target_koi_tce_plnt_num = target_row['koi_tce_plnt_num_y']
+                elif 'koi_tce_plnt_num_x' in target_row and not np.isnan(target_row['koi_tce_plnt_num_x']):
+                    target_koi_tce_plnt_num = target_row['koi_tce_plnt_num_x']
+                elif 'koi_tce_plnt_num' in target_row and not np.isnan(target_row['koi_tce_plnt_num']):
+                    target_koi_tce_plnt_num = target_row['koi_tce_plnt_num']
+                if 'tce_plnt_num_y' in other_signal_row and not np.isnan(other_signal_row['tce_plnt_num_y']):
+                    other_tce_plnt_num = other_signal_row['tce_plnt_num_y']
+                elif 'tce_plnt_num_x' in other_signal_row and not np.isnan(other_signal_row['tce_plnt_num_x']):
+                    other_tce_plnt_num = other_signal_row['tce_plnt_num_x']
+                elif 'tce_plnt_num' in other_signal_row and not np.isnan(other_signal_row['tce_plnt_num']):
+                    other_tce_plnt_num = other_signal_row['tce_plnt_num']
+                if 'tce_plnt_num_y' in target_row and not np.isnan(target_row['tce_plnt_num_y']):
+                    target_tce_plnt_num = target_row['tce_plnt_num_y']
+                elif 'tce_plnt_num_x' in target_row and not np.isnan(target_row['tce_plnt_num_x']):
+                    target_tce_plnt_num = target_row['tce_plnt_num_x']
+                elif 'tce_plnt_num' in target_row and not np.isnan(target_row['tce_plnt_num']):
+                    target_tce_plnt_num = target_row['tce_plnt_num']
+                mask_signal = (not np.isnan(target_koi_tce_plnt_num) and not np.isnan(other_koi_tce_plnt_num) and \
+                    target_koi_tce_plnt_num > other_koi_tce_plnt_num) or \
+                              (not (np.isnan(target_tce_plnt_num) & np.isnan(other_tce_plnt_num)) and \
+                    target_tce_plnt_num > other_tce_plnt_num)
+            if mask_signal:
+                mask = foldedleastsquares.transit_mask(data_df[time_key].to_numpy(), other_signal_row['period'],
+                                                       2 * other_signal_row['duration(h)'] / 24, other_signal_row['epoch'])
+                data_df = data_df[~mask]
+        return data_df
+
 
     def plot_single_data(self, lc_df, target_row):
         fig, axs = plt.subplots(1, 1, figsize=(8, 4), constrained_layout=True)
@@ -285,6 +336,10 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                     logging.warning("No curve for target " + file_prefix)
                     raise ValueError("No curve for target " + file_prefix)
                 lc_df = lc_df.sort_values(by=['#time'])
+                if self.mask_previous_signals:
+                    lc_df = self.mask_other_signals(lc_df, target_row, '#time')
+                    centroids_df = self.mask_other_signals(centroids_df, target_row, 'time')
+                    og_df = self.mask_other_signals(og_df, target_row, 'time')
                 centroids_df['time'] = self.fold(centroids_df['time'].to_numpy(), period, epoch + period / 2)
                 og_df['time'] = self.fold(og_df['time'].to_numpy(), period, epoch + period / 2)
                 centroids_df = centroids_df.sort_values(by=['time'])
@@ -341,6 +396,12 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 target_dist = np.sqrt((offset_ra - ra) ** 2 + (offset_dec - dec) ** 2)
                 offset_err = offset_err if offset_err > 0 else target_dist * 2
                 offset_err = offset_err if offset_err < 1 else 1 - self.zero_epsilon
+
+
+                # offset_err = offset_err if offset_err > 0 else target_dist * 2
+                # offset_err = offset_err / (target_dist * 2)
+                # offset_err = 1 - self.zero_epsilon if offset_err >= 1 else offset_err
+
                 good_transits_count_norm = good_transits_count / 20
                 good_transits_count_norm = good_transits_count_norm if good_transits_count_norm < 1 else 1 - self.zero_epsilon
                 good_transits_ratio = good_transits_count / transits_count if transits_count > 0 else self.zero_epsilon
@@ -349,10 +410,11 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 planet_radius = planet_radius if planet_radius < 1 else 1 - self.zero_epsilon
                 depth = target_row['depth_primary'] / 1e6
                 depth = depth if depth < 1 else 1 - self.zero_epsilon
-                scalar_values[i] = np.transpose([[period / 1200, duration / 15, depth,
+                scalar_values[i] = np.transpose([[period / 1200 if period < 1200 else 1, duration / 15, depth,
                                                   planet_radius, good_transits_count_norm,
                                                   good_transits_ratio,
-                                                  target_dist, offset_err]])
+                                                  target_dist if not np.isnan(target_dist) else self.zero_epsilon,
+                                                  offset_err]])
                 #['ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k'])
                 neighbours_array = star_neighbours_df.to_numpy().flatten()
                 star_neighbours_array[i] = np.transpose([neighbours_array if len(neighbours_array) == 9 * 15 \
