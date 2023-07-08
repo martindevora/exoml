@@ -1,21 +1,22 @@
 import logging
 import os
-from functools import reduce
+import pickle
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import keras
 import tensorflow as tf
-from keras.activations import sigmoid
-from keras.layers import LeakyReLU, Activation
+from keras.layers import LeakyReLU
 from keras.utils import losses_utils
-from keras.utils.generic_utils import to_list
-from sklearn.utils import shuffle
-from keras import backend as K
+from sklearn.isotonic import IsotonicRegression
 
+from sklearn.linear_model import LogisticRegression
 from iatson.iatson_planet_generator import IatsonPlanetModelGenerator
+from iatson.watson_planet_generator import WatsonPlanetModelGenerator
+from ml.calibration.calibrator import PlattCalibrator
 from ml.layers.dropout import AdaptiveStdDropout
-from ml.layers.transformer_classifier import ClassToken, AddPositionEmbs, TransformerClassifier
+from ml.layers.transformer_classifier import TransformerClassifier
 from ml.metrics.auc import ThresholdAtPrecision
 from ml.model.base_model import CategoricalPredictionSetStats
 from ml.model.imbalanced_binary_model import ImbalancedBinaryModel
@@ -23,7 +24,7 @@ from ml.model.imbalanced_binary_model import ImbalancedBinaryModel
 
 class IATSON_planet(ImbalancedBinaryModel):
     def __init__(self, class_ids, class_names, type_to_label, hyperparams, channels=2, name='IATSON_planet',
-                 mode="all") -> None:
+                 mode=['q1q17', 'ete6', 'with_tce_candidates', 'no_val', 'with_radius']) -> None:
         super().__init__(name,
                          [11, 9 * 15, 300, 75, 75, 75, 75, 75, 75],
                          class_ids,
@@ -150,8 +151,8 @@ class IATSON_planet(ImbalancedBinaryModel):
             focus_flux_branch)
         #focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_branch)
         focus_flux_branch = keras.layers.MaxPooling1D(pool_size=3, strides=1)(focus_flux_branch)
+        focus_flux_branch = keras.layers.Flatten()(focus_flux_branch)
         if additional_inputs is not None:
-            focus_flux_branch = keras.layers.Flatten()(focus_flux_branch)
             focus_flux_branch = keras.layers.Concatenate(axis=1)([focus_flux_branch, keras.layers.Flatten()(additional_inputs)])
         focus_flux_branch = keras.layers.Dense(64, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                                activation=LeakyReLU(leaky_relu_alpha))(focus_flux_branch)
@@ -183,8 +184,8 @@ class IATSON_planet(ImbalancedBinaryModel):
         flux_branch = TransformerClassifier(transformer_input_size=transformer_input_size, patch_size=kernel_size,
                               num_heads=transformer_heads, mlp_dim=transformer_output_size, hyperparams=self.hyperparams,
                               num_blocks=transformer_blocks, classes=classes)(focus_flux_input_final)
+        flux_branch = keras.layers.Flatten()(flux_branch)
         if additional_inputs is not None:
-            flux_branch = keras.layers.Flatten()(flux_branch)
             flux_branch = keras.layers.Concatenate(axis=1)([flux_branch, keras.layers.Flatten()(additional_inputs)])
         flux_branch = keras.layers.Dense(64, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                                activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
@@ -384,6 +385,8 @@ class IATSON_planet(ImbalancedBinaryModel):
         leaky_relu_alpha = 0.01
         transit_params_input = keras.Input(shape=(6, 1), name="transit_params")
         offset_params_input = keras.Input(shape=(2, 1), name="offset_params")
+        # transit_params_input = None
+        # offset_params_input = None
         stellar_model_input = keras.Input(shape=(3, 1), name="stellar_model")
         stellar_model_branch = stellar_model_input
         # (TEFF, lum, 4 magnitudes, distance, radius, mass) * 15 stars
@@ -451,7 +454,12 @@ class IATSON_planet(ImbalancedBinaryModel):
         # inputs = [stellar_model_input, stellar_neighbours_input] + \
         #                  flux_model_branch.inputs + focus_flux_model_branch.inputs + \
         #                  centroids_inputs + og_inputs
-        inputs = [transit_params_input, offset_params_input, stellar_model_input] + \
+        inputs = []
+        if transit_params_input is not None:
+            inputs = inputs + [transit_params_input]
+        if offset_params_input is not None:
+            inputs = inputs + [offset_params_input]
+        inputs = inputs + [stellar_model_input] + \
                  flux_model_branch.inputs + [focus_flux_model_input] + \
                  [centroids_input, og_input]
         return inputs, final_branch
@@ -532,16 +540,27 @@ class IATSON_planet(ImbalancedBinaryModel):
 
     def load_training_set(self, **kwargs):
         training_dir = kwargs.get('training_dir')
-        injected_objects_df_q1_q17 = pd.read_csv(training_dir + "/q1_q17/injected_objects_tces.csv", index_col=None)
+        injected_objects_df_q1_q17_tces = pd.read_csv(training_dir + "/q1_q17/classified_tces.csv", index_col=None)
         injected_objects_df_ete6 = pd.read_csv(training_dir + "/ete6/injected_objects.csv", index_col=None)
-        #injected_objects_df = injected_objects_df_q1_q17
-        df = []
-        if self.mode == "q1q17":
-            df = [injected_objects_df_q1_q17]
-        elif self.mode == 'ete6':
-            df = [injected_objects_df_ete6]
+        q1q17_df = injected_objects_df_q1_q17_tces
+        if "q1q17" in self.mode and "no_val" in self.mode:
+            q1q17_df.loc[q1q17_df['disc_refname'].str.contains('Valizadegan', na=False), ['type']] = 'candidate'
+            q1q17_df.loc[q1q17_df['disc_refname'].str.contains('Armstrong et al. 2021', na=False), ['type']] = 'candidate'
+        include_categories = ['fp', 'fa', 'planet', 'planet_transit', 'tce', 'tce_og', 'tce_secondary',
+                              'tce_source_offset', 'tce_centroids_offset', 'tce_odd_even', 'EB', 'bckEB']
+        if 'with_tce_candidates' in self.mode:
+            include_categories = include_categories + ['tce_candidate']
+        if 'with_candidates' in self.mode:
+            include_categories = include_categories + ['candidate']
+        if 'ete6' in self.mode and 'q1q17' in self.mode:
+            df = pd.concat([injected_objects_df_ete6, q1q17_df])
+        elif 'ete6' in self.mode:
+            df = injected_objects_df_ete6
         else:
-            df = [injected_objects_df_ete6, injected_objects_df_q1_q17]
+            df = q1q17_df
+        if 'with_radius' in self.mode:
+            df = df[~df['radius(earth)'].isna()]
+        df = df[df['type'].isin(include_categories)]
         injected_objects_df = pd.concat(df)
         injected_objects_df.reset_index(inplace=True, drop=True)
         return injected_objects_df
@@ -550,9 +569,9 @@ class IATSON_planet(ImbalancedBinaryModel):
         return IatsonPlanetModelGenerator(dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon,
                                           shuffle_batch=shuffle)
 
-    def predict(self, input):
+    def predict(self, input, threshold=[0.5]):
         prediction = self.model(input, training=False)
-        return self.predict_threshold([prediction])
+        return self.predict_threshold([prediction], threshold=threshold)
 
     def predict_batch(self, inputs, expected_outputs=None, dataset=None, training_dir=None, plot_mismatches=False,
                       batch_size=20, cores=os.cpu_count() - 1, threshold=[0.5]):
@@ -575,36 +594,42 @@ class IATSON_planet(ImbalancedBinaryModel):
         return max_prediction_indexes, max_prediction_values
 
     def predict_df(self, df, training_dir, batch_size=20, cores=os.cpu_count() - 1, zero_epsilon=1e-7,
-                   thresholds=[0.5], plot_mismatches=False):
+                   thresholds=[0.5], plot_mismatches=False, log=False, validation_df=None):
         expected_outputs = None
         testing_batch_generator = IatsonPlanetModelGenerator(df, training_dir, batch_size,
                                                              self.input_size,
                                                              self.type_to_label, zero_epsilon, from_arrays=True,
-                                                             shuffle_batch=False)
+                                                             shuffle_batch=False, validation_objects_df=validation_df)
         for i in np.arange(0, len(df) // batch_size + 1, 1):
             input, expected_output = testing_batch_generator.__getitem__(i)
             expected_outputs = np.concatenate((expected_outputs, expected_output)) if expected_outputs is not None else expected_output
+        prediction_stats_for_thresholds = {}
+        max_prediction_indexes, max_prediction_values, prediction_stats = \
+            self.predict_batch(testing_batch_generator, expected_outputs, df, training_dir, plot_mismatches,
+                               batch_size, cores=cores, threshold=[0.5])
         for threshold in thresholds:
-            max_prediction_indexes, max_prediction_values, prediction_stats = \
-                self.predict_batch(testing_batch_generator, expected_outputs, df, training_dir, plot_mismatches,
-                                   batch_size, cores=cores, threshold=[threshold])
-            prediction_stats = prediction_stats[0]
-            logging.info("Prediction stats for label %.0f and threshold %s: TP=%.0f, FP=%.0f, FN=%.0f, ACC=%.3f, PRE=%.3f, REC=%.3f", 0,
-                         threshold, prediction_stats.tp, prediction_stats.fp, prediction_stats.fn, prediction_stats.accuracy,
-                         prediction_stats.precision, prediction_stats.recall)
-            logging.info("Prediction stats @ k top predictions: \n%s", prediction_stats.k_df.to_string())
-            mistmatches_df = prediction_stats.predictions_df[prediction_stats.predictions_df['expected_class'] !=
-                                                             prediction_stats.predictions_df['predicted_class']]
-            logging.info("Mismatches: \n%s", mistmatches_df.to_string())
-            logging.info("Mismatches by types: \n%s", mistmatches_df
-                         .groupby(by=['type', 'predicted_class'])['object_id'].count().to_string())
+            prediction_stats_for_thresholds[threshold] = prediction_stats
+            if log:
+                prediction_stats = prediction_stats[0]
+                logging.info("Prediction stats for label %.0f and threshold %s: TP=%.0f, FP=%.0f, FN=%.0f, ACC=%.3f, PRE=%.3f, REC=%.3f", 0,
+                             threshold, prediction_stats.tp, prediction_stats.fp, prediction_stats.fn, prediction_stats.accuracy,
+                             prediction_stats.precision, prediction_stats.recall)
+                logging.info("Prediction stats @ k top predictions: \n%s", prediction_stats.k_df.to_string())
+                mistmatches_df = prediction_stats.predictions_df[prediction_stats.predictions_df['expected_class'] !=
+                                                                 prediction_stats.predictions_df['predicted_class']]
+                logging.info("Mismatches: \n%s", mistmatches_df.to_string())
+                logging.info("Mismatches by types: \n%s", mistmatches_df
+                             .groupby(by=['type', 'predicted_class'])['object_id'].count().to_string())
+        return prediction_stats_for_thresholds
 
     def predict_test_set(self, training_dir, model_dir, batch_size=20, cores=os.cpu_count() - 1, test_set_limit=None,
                          zero_epsilon=1e-7, plot_mismatches=False, test_dataset_filename='test_dataset.csv',
-                         thresholds=[0.5], logs=False):
+                         thresholds=[0.5], logs=False, additional_test_df=None):
         test_dataset = pd.read_csv(model_dir + '/' + test_dataset_filename)
         if test_set_limit is not None:
             test_dataset = test_dataset.iloc[0:test_set_limit]
+        if additional_test_df is not None:
+            test_dataset = pd.concat([test_dataset, additional_test_df])
         expected_outputs = None
         testing_batch_generator = IatsonPlanetModelGenerator(test_dataset, training_dir, batch_size,
                                                              self.input_size,
@@ -632,43 +657,109 @@ class IATSON_planet(ImbalancedBinaryModel):
                              .groupby(by=['type', 'predicted_class'])['object_id'].count().to_string())
         return threshold_to_results
 
-    def predict_test_set_cv(self, training_dir, model_dir_prefix, batch_size=20, cores=os.cpu_count() - 1, test_set_limit=None,
-                         zero_epsilon=1e-7, plot_mismatches=False, folds=10, thresholds=[0.5],
-                            k_values=np.arange(100, 2200, 100)):
+    def predict_test_set_cv(self, training_dir, model_dir_prefix, batch_size=20, cores=os.cpu_count() - 1,
+                            test_set_limit=None,
+                            zero_epsilon=1e-7, plot_mismatches=False, folds=10, thresholds=[0.5, 0.99],
+                            k_values=np.arange(100, 2200, 100),
+                            additional_test_set_filename=None, calibration_method=None,
+                            calibrator_output=None):
         fold_thresholds_to_results = {}
         prediction_dfs_thresholds = None
         predictions_df = None
         rp99s = np.zeros(folds)
         threshold_p99s = np.zeros(folds)
-        for fold in np.arange(0, folds):
+        fold_indexes = None
+        if additional_test_set_filename is not None:
+            additional_test_df = pd.read_csv(additional_test_set_filename)
+            additional_test_df = additional_test_df[additional_test_df['object_id'] == 'KIC 4380558']
+            additional_dataset_len = len(additional_test_df)
+            fold_indexes = [int(fold_index) for fold_index in np.linspace(additional_dataset_len // folds, additional_dataset_len, folds)]
+        additional_test_fold_df = None
+        for index, fold in enumerate(np.arange(0, folds)):
             model_dir = f"{model_dir_prefix}_{fold}/"
             self.load_model(model_dir)
+            if fold_indexes is not None:
+                previous_fold_index = fold_indexes[index - 1] if index > 0 else 0
+                additional_test_fold_df = additional_test_df.iloc[previous_fold_index:fold_indexes[index]]
             fold_thresholds_to_results[fold] = self.predict_test_set(training_dir, model_dir, batch_size, cores,
-                                                    test_set_limit, zero_epsilon,
-                                                    plot_mismatches, test_dataset_filename='validation_dataset.csv',
-                                                    thresholds=thresholds, logs=False)
+                                                                     test_set_limit, zero_epsilon,
+                                                                     plot_mismatches,
+                                                                     test_dataset_filename='validation_dataset.csv',
+                                                                     thresholds=thresholds, logs=False,
+                                                                     additional_test_df=additional_test_fold_df)
+            for fold_threshold_to_results in fold_thresholds_to_results[fold].values():
+                fold_threshold_to_results.predictions_df['fold'] = fold
             predictions_df = fold_thresholds_to_results[fold][thresholds[0]].predictions_df if predictions_df is None \
                 else pd.concat([predictions_df, fold_thresholds_to_results[fold][thresholds[0]].predictions_df])
+        predictions_df = predictions_df.sort_values(by=['prediction_value'], ascending=False)
+        predictions_df, _ = self.calibrate(predictions_df, calibration_method, calibrator_dir=calibrator_output)
         predictions_df_q1q17 = predictions_df[predictions_df['object_id'].str.contains("KIC")]
         predictions_df_ete6 = predictions_df[predictions_df['object_id'].str.contains("TIC")]
-        predictions_df = predictions_df.sort_values(by=['prediction_value'], ascending=False)
         predictions_df_q1q17 = predictions_df_q1q17.sort_values(by=['prediction_value'], ascending=False)
         predictions_df_ete6 = predictions_df_ete6.sort_values(by=['prediction_value'], ascending=False)
         logging.info("----------------------------------COMPLETE SET METRICS ---------------------------------------")
-        self.compute_cv_average_metrics(fold_thresholds_to_results, ['tp', 'fp', 'fn', 'precision', 'recall'], True)
+        self.compute_cv_average_metrics(fold_thresholds_to_results,
+                                        ['tp', 'fp', 'fn', 'accuracy', 'precision', 'recall'], thresholds, True)
+        self.compute_metrics(predictions_df, log=True)
         self.log_prediction_metrics(predictions_df, k_values, "K METRICS")
         self.compute_rp_thresholds(fold_thresholds_to_results, log=True)
         self.compute_rp_metrics(predictions_df, log=True)
         logging.info("----------------------------------Q1Q17 SET METRICS ---------------------------------------")
+        self.compute_metrics(predictions_df_q1q17, log=True)
         self.log_prediction_metrics(predictions_df_q1q17, k_values, "K METRICS")
         self.compute_rp_metrics(predictions_df_q1q17, log=True)
         logging.info("----------------------------------Ete6 SET METRICS ---------------------------------------")
+        self.compute_metrics(predictions_df_ete6, log=True)
         self.log_prediction_metrics(predictions_df_ete6, k_values, "K METRICS")
         self.compute_rp_metrics(predictions_df_ete6, log=True)
 
+    def predict_df_cv(self, training_dir, model_dir_prefix, df, batch_size=20, cores=os.cpu_count() - 1, test_set_limit=None,
+                         zero_epsilon=1e-7, plot_mismatches=False, folds=10, thresholds=[0.5],
+                         k_values=np.arange(100, 2200, 100), validation_df=None):
+        prediction_stats_for_folds_thresholds = {}
+        for fold in np.arange(0, folds):
+            model_dir = f"{model_dir_prefix}_{fold}/"
+            self.load_model(model_dir)
+            prediction_stats_for_folds_thresholds[fold] = \
+                self.predict_df(df, training_dir, batch_size, cores, zero_epsilon=zero_epsilon,
+                                plot_mismatches=plot_mismatches, thresholds=thresholds, log=False,
+                                validation_df=validation_df)
+        average_predictions_df_thresholds = {}
+        for threshold in thresholds:
+            for fold in np.arange(0, folds):
+                prediction_stats_for_folds_thresholds[fold][threshold][0].predictions_df = \
+                    prediction_stats_for_folds_thresholds[fold][threshold][0].predictions_df.sort_values(by=['object_id'], ascending=True)
+            average_predictions_df = pd.DataFrame(columns=['object_id', 'type', 'expected_class', 'predicted_class',
+                                                           'prediction_value', 'prediction_value_std'])
+            for index, prediction_row in prediction_stats_for_folds_thresholds[0][threshold][0].predictions_df.iterrows():
+                prediction_values = []
+                for fold in np.arange(0, folds):
+                    prediction_values = prediction_values + \
+                        [prediction_stats_for_folds_thresholds[fold][threshold][0].predictions_df.loc[prediction_stats_for_folds_thresholds[fold][threshold][0].predictions_df['object_id'] == prediction_row['object_id']]['prediction_value']]
+                avg_prediction_value = np.nanmean(prediction_values)
+                std_prediction_value = np.nanstd(prediction_values)
+                average_predictions_df = pd.concat([average_predictions_df, pd.DataFrame.from_dict(
+                    {'object_id': [prediction_row['object_id']],
+                     'type': [prediction_row['type']],
+                     'expected_class': [prediction_row['expected_class']],
+                     'predicted_class': [1 if avg_prediction_value > threshold else 0],
+                     'prediction_value': [avg_prediction_value],
+                     'prediction_value_std': [std_prediction_value]},
+                    orient='columns')], ignore_index=True)
+            average_predictions_df_thresholds[threshold] = average_predictions_df
+            #logging.info(f"Predictions for threshold {threshold}: \n" + average_predictions_df.to_string())
+            self.compute_metrics(average_predictions_df_thresholds[threshold], [threshold], log=True)
+            tces_positive_df = average_predictions_df.loc[(average_predictions_df['type'] == 'tce_candidate') &
+                                       (average_predictions_df['prediction_value'] > threshold)]
+            logging.info(f"TCEs predicted as positive: \n" + tces_positive_df.sort_values(by=['prediction_value'], ascending=True).to_string())
+            candidates_positive_df = average_predictions_df.loc[(average_predictions_df['type'] == 'candidate') &
+                                       (average_predictions_df['prediction_value'] > threshold)]
+            logging.info(f"Candidates predicted as positive: \n" + candidates_positive_df.sort_values(by=['prediction_value'], ascending=True).to_string())
+        return average_predictions_df_thresholds
+
     def log_prediction_metrics(self, df, k_range, message):
         logging.info(f"{message}")
-        df = df.sort_values(by=['prediction_value'], ascending=False)
+        df_calibrated = df.sort_values(by=['prediction_value'], ascending=False)
         for k in k_range:
             k_df = df.iloc[:k]
             k_tps = len(k_df.loc[(k_df['expected_class'] == k_df['predicted_class']) & (k_df['expected_class'] == 1)])
@@ -683,62 +774,100 @@ class IATSON_planet(ImbalancedBinaryModel):
         k_precisions = k_tps / (k_tps + k_fps)
         logging.info("P@K%.0f = %.3f", k, k_precisions)
         logging.info("FPs@K%.0f = %.3f", k, k_fps)
-        fns_df = df.loc[(df['expected_class'] != df['predicted_class']) & (df['expected_class'] == 1)]
+        fns_df = df.loc[(df['expected_class'] != df['predicted_class']) &
+                                   (df['expected_class'] == 1)]
         fns_df = fns_df.sort_values(by=['prediction_value'], ascending=True)
         logging.info("FNs DF: \n" + fns_df.to_string())
-        fps_df = df.loc[(df['expected_class'] != df['predicted_class']) & (df['expected_class'] == 0)]
+        fps_df = df.loc[(df['expected_class'] != df['predicted_class']) &
+                                   (df['expected_class'] == 0)]
         fps_df = fps_df.sort_values(by=['prediction_value'], ascending=False)
         logging.info("FPs DF: \n" + fps_df.to_string())
 
-    def compute_cv_average_metrics(self, fold_thresholds_to_results, metric_names, log=False):
+    def compute_cv_average_metrics(self, fold_thresholds_to_results, metric_names, thresholds=[0.5], log=False):
         metric_fold_stats = {}
         metric_average_stats = {}
-        for metric in metric_names:
-            for fold in fold_thresholds_to_results:
-                metric_val = getattr(fold_thresholds_to_results[fold][0.5], metric)
-                if metric not in metric_fold_stats:
-                    metric_fold_stats[metric] = {}
-                metric_fold_stats[metric][fold] = metric_val
-            metric_arr = [metric_val for metric_val in metric_fold_stats[metric].values()]
-            metric_average_stats[metric] = (np.nanmean(metric_arr), np.nanstd(metric_arr))
-        if log:
-            logging.info(f"Average statistics:\n {metric_average_stats}")
+        for threshold in thresholds:
+            metric_fold_stats[threshold] = {}
+            metric_average_stats[threshold] = {}
+            for metric in metric_names:
+                for fold in fold_thresholds_to_results:
+                    metric_val = getattr(fold_thresholds_to_results[fold][threshold], metric)
+                    if metric not in metric_fold_stats:
+                        metric_fold_stats[threshold][metric] = {}
+                    metric_fold_stats[threshold][metric][fold] = metric_val
+                metric_arr = [metric_val for metric_val in metric_fold_stats[threshold][metric].values()]
+                metric_average_stats[threshold][metric] = (np.nanmean(metric_arr), np.nanstd(metric_arr))
+            if log:
+                logging.info(f"Average statistics for threshold {threshold}:\n {metric_average_stats}")
         return metric_average_stats
 
-    def compute_rp_thresholds(self, fold_thresholds_to_results, rp_value=0.99, thresholds=np.linspace(0, 1, 1000), log=False):
+    def compute_rp_thresholds(self, fold_thresholds_to_results, rp_values=[0.95, 0.975, 0.99], thresholds=1000,
+                              log=False):
         selected_thresholds = []
-        recalls = []
+        all_recalls = []
         for fold in fold_thresholds_to_results:
-            threshold, recall = \
-                self.compute_rp_metrics(fold_thresholds_to_results[fold][0.5].predictions_df, rp_value, thresholds, log)
-            selected_thresholds = selected_thresholds + [threshold]
-            recalls = recalls + [recall]
-        logging.info(f"Average R@P{rp_value}: {np.nanmean(recalls)}")
-        logging.info(f"R@P{rp_value} Thresholds: {selected_thresholds}")
-        return selected_thresholds
+            logging.info(f"R@P metrics for fold no {fold}")
+            selected_threshold, recalls = \
+                self.compute_rp_metrics(fold_thresholds_to_results[fold][0.5].predictions_df, rp_values, thresholds, log)
+            selected_threshold = np.array(selected_threshold).flatten()
+            selected_thresholds = selected_thresholds + [selected_threshold]
+            all_recalls = all_recalls + [recalls]
+        all_recalls = np.transpose(all_recalls)
+        selected_thresholds = np.transpose(selected_thresholds)
+        for index, rp_value in enumerate(rp_values):
+            logging.info(f"Average R@P{rp_value}: {np.nanmean(all_recalls[index, :])} +- "
+                         f"{np.nanstd(all_recalls[index, :])}")
+            logging.info(f"R@P{rp_value} Thresholds: {selected_thresholds[index]}")
+        return all_recalls, selected_thresholds
 
-    def compute_rp_metrics(self, df, rp_value=0.99, thresholds=np.linspace(0, 1, 1000), log=False):
-        best_recall_threshold = 1
-        best_recall = 0
+    def compute_rp_metrics(self, df, rp_values=[0.95, 0.975, 0.99], thresholds=1000, log=False):
+        best_recall_thresholds = []
+        best_recalls = []
+        for rp_value in rp_values:
+            metric = tf.keras.metrics.RecallAtPrecision(rp_value, num_thresholds=thresholds)
+            metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
+            best_recalls = best_recalls + [metric.result().numpy()]
+            metric = ThresholdAtPrecision(rp_value, num_thresholds=thresholds)
+            metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
+            best_recall_thresholds = best_recall_thresholds + [metric.result().numpy()]
+            logging.info(f"Keras R@P{rp_value}: {best_recalls[-1]}, {best_recall_thresholds[-1]}")
+        return best_recall_thresholds, best_recalls
+
+    def compute_metrics(self, df, thresholds=[0.5, 0.99], log=False):
+        precisions = {}
+        recalls = {}
+        accuracies = {}
+        tps = {}
+        fps = {}
+        tns = {}
+        fns = {}
         for threshold in thresholds:
-            tp = len(df[(df['prediction_value'] >= threshold) & (df['expected_class'] == 1)])
-            fp = len(df[(df['prediction_value'] >= threshold) & (df['expected_class'] == 0)])
-            fn = len(df[(df['prediction_value'] < threshold) & (df['expected_class'] == 1)])
-            precision = tp / (tp + fp + 1e-7)
-            recall = tp / (tp + fn + 1e-7)
-            if precision >= 0.99 and recall > best_recall:
-                best_recall_threshold = threshold
-                best_recall = recall
-        logging.info(f"Custom R@P{rp_value}: {best_recall}, {best_recall_threshold}")
-        metric = tf.keras.metrics.RecallAtPrecision(0.99, num_thresholds=1000)
-        metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
-        best_recall = metric.result().numpy()
-        metric = ThresholdAtPrecision(0.99, num_thresholds=1000)
-        metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
-        best_recall_threshold = metric.result().numpy()
-        logging.info(f"Keras R@P{rp_value}: {best_recall}, {best_recall_threshold}")
-
-        return best_recall_threshold, best_recall
+            metric = tf.keras.metrics.TruePositives(thresholds=threshold)
+            metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
+            tps[threshold] = metric.result().numpy()
+            metric = tf.keras.metrics.FalsePositives(thresholds=threshold)
+            metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
+            fps[threshold] = metric.result().numpy()
+            metric = tf.keras.metrics.TrueNegatives(thresholds=threshold)
+            metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
+            tns[threshold] = metric.result().numpy()
+            metric = tf.keras.metrics.FalseNegatives(thresholds=threshold)
+            metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
+            fns[threshold] = metric.result().numpy()
+            metric = tf.keras.metrics.Precision(thresholds=threshold)
+            metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
+            precisions[threshold] = metric.result().numpy()
+            metric = tf.keras.metrics.Recall(thresholds=threshold)
+            metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
+            recalls[threshold] = metric.result().numpy()
+            metric = tf.keras.metrics.BinaryAccuracy(threshold=threshold)
+            metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
+            accuracies[threshold] = metric.result().numpy()
+            if log:
+                logging.info(f"Metrics: tps={tps}, fps={fps}, tns={tns}, fns={fns},"
+                             f"precision={precisions[threshold]}, recall={recalls[threshold]}, "
+                             f"accuracy={accuracies[threshold]}")
+        return tps, fps, tns, fns, precisions, recalls, accuracies
 
     def test_metrics(self, expected_outputs, max_prediction_indexes, max_prediction_values, predictions,
                      dataset=None, training_dir=None, plot_mismatches=False):
@@ -792,7 +921,7 @@ class IATSON_planet(ImbalancedBinaryModel):
         predictions_df = pd.DataFrame(columns=['object_id', 'type', 'expected_class', 'predicted_class',
                                               'prediction_value'])
         if dataset is not None:
-            found_classes = [0 if prediction  == -1 else 1 for prediction in max_prediction_values]
+            found_classes = [0 if prediction == -1 else 1 for prediction in max_prediction_values]
             dataset = dataset.reset_index(drop=True)
             for i, row in dataset.iterrows():
                 object_id = row['object_id']
@@ -816,9 +945,147 @@ class IATSON_planet(ImbalancedBinaryModel):
                                                                          from_arrays=True,
                                                                          shuffle_batch=False,
                                                                          plot_inputs=True).__getitem__(0)
-        predictions_df = predictions_df.sort_values(by=['type', 'predicted_class'])
+        # predictions_df = predictions_df.sort_values(by=['prediction_value'], ascending=True)
         return CategoricalPredictionSetStats(label_tp, label_fp, label_fn, accuracy, precision, recall, k_df,
                                              predictions_df)
+
+    def predit_watson(self, target_id, period, duration, epoch, depth, watson_dir, star_filename, lc_filename,
+                      cores=os.cpu_count() - 1):
+        df = pd.DataFrame(columns=['object_id', 'period', 'duration(h)', 'depth', 'radius(earth)'])
+        testing_batch_generator = WatsonPlanetModelGenerator(df, watson_dir, star_filename,
+                                                             lc_filename, 1,
+                                                             self.input_size, 1e-6)
+        return self.predict(testing_batch_generator)
+
+    def calibration_metrics(self, training_dir, predictions_df, batch_size=20, cores=os.cpu_count() - 1,
+                            thresholds=[0.5], log=False):
+        for threshold in thresholds:
+            prediction_values = predictions_df['prediction_value'].to_numpy()
+            expected_classes = predictions_df['expected_class'].to_numpy()
+            self.plot_reliability_diagrams(predictions_df, title="Uncalibrated")
+            platt = PlattCalibrator(log_odds=True)
+            platt.fit(np.float64(prediction_values), np.float64(expected_classes))
+            calibrated = platt.predict(prediction_values)
+            calibrated_pred_df = predictions_df.copy()
+            calibrated_pred_df['prediction_value'] = calibrated
+            self.plot_reliability_diagrams(calibrated_pred_df, title="Platt Calibration")
+            clf = LogisticRegression(random_state=0).fit(predictions_df[['prediction_value']],
+                                                         predictions_df['expected_class'].to_numpy())
+            calibrated = clf.predict_proba(predictions_df[['prediction_value']])
+            calibrated_pred_df = predictions_df.copy()
+            calibrated_pred_df['prediction_value'] = calibrated[:, 1]
+            self.plot_reliability_diagrams(calibrated_pred_df, title="Logistic Calibration")
+            clf = IsotonicRegression()
+            clf = clf.fit(predictions_df[['prediction_value']],
+                                                         predictions_df['expected_class'].to_numpy())
+            calibrated = clf.predict(prediction_values)
+            calibrated_pred_df = predictions_df.copy()
+            calibrated_pred_df['prediction_value'] = calibrated
+            self.plot_reliability_diagrams(calibrated_pred_df, title="Isotonic Calibration")
+            #diagram.plot(calibrated, ground_truth)  # visualize miscalibration of calibrated
+            #calibrated_ece = ece.measure(calibrated, predictions_df['expected_class'].to_numpy())
+
+    def calibrate(self, predictions_df, method=None, calibrator_dir=None):
+        prediction_values = predictions_df['prediction_value'].to_numpy()
+        expected_classes = predictions_df['expected_class'].to_numpy()
+        calibrator = None
+        results_df = predictions_df
+        if method == 'logistic':
+            logging.info("Calibrating with logistic regression")
+            calibrator = LogisticRegression(random_state=0).fit(predictions_df[['prediction_value']],
+                                                         predictions_df['expected_class'].to_numpy())
+            calibrated = calibrator.predict_proba(predictions_df[['prediction_value']])
+            results_df = predictions_df.copy()
+            results_df['prediction_value'] = calibrated[:, 1]
+        elif method == 'platt':
+            logging.info("Calibrating with Platt Scaling")
+            calibrator = PlattCalibrator(log_odds=True)
+            calibrator.fit(np.float64(prediction_values), np.float64(expected_classes))
+            calibrated = calibrator.predict(prediction_values)
+            results_df = predictions_df.copy()
+            results_df['prediction_value'] = calibrated
+        elif method == 'isotonic':
+            logging.info("Calibrating with isotonic regression")
+            calibrator = IsotonicRegression()
+            calibrator = calibrator.fit(predictions_df[['prediction_value']],
+                          predictions_df['expected_class'].to_numpy())
+            calibrated = calibrator.predict(prediction_values)
+            results_df = predictions_df.copy()
+            results_df['prediction_value'] = calibrated
+        if calibrator is not None and calibrator_dir is not None:
+            try:
+                with open(f'{calibrator_dir}/{self.name}_cal_{method}.pkl', 'wb') as fid:
+                    pickle.dump(calibrator, fid)
+            except Exception as e:
+                logging.exception("Failed calibrator storage")
+        return results_df, calibrator
+
+    def plot_reliability_diagrams(self, predictions_df, title="", n_bins=10):
+        import netcal.metrics
+        ece = netcal.metrics.ECE(n_bins)
+        mce = netcal.metrics.MCE(n_bins)
+        predictions = predictions_df['prediction_value'].to_numpy()
+        expected_classes = predictions_df['expected_class'].to_numpy()
+        calibrated_ece = ece.measure(predictions, expected_classes)
+        calibrated_mce = mce.measure(predictions, expected_classes)
+        logging.info(f"{title} calibration metrics: ECE={calibrated_ece}, MCE={calibrated_mce}")
+        #_, values = pd.qcut(predictions_df['prediction_value'], q=10, retbins=True)
+        values = [0, 0.01, 0.05, 0.1, 0.2, 0.4, 0.7, 0.8, 0.9, 0.93, 0.96, 0.98, 0.99, 0.995, 1]
+        self.plot_reliability_diagram(values, predictions_df, title=title)
+        values = [0.9, 0.92, 0.94, 0.95, 0.96, 0.975, 0.985, 0.99, 0.9925, 0.995, 0.9975, 1]
+        self.plot_reliability_diagram(values, predictions_df, title=title)
+        values = [0, 0.0025, 0.005, 0.0075, 0.01, 0.015, 0.025, 0.04, 0.05, 0.06, 0.08, 0.1]
+        self.plot_reliability_diagram(values, predictions_df, title=title)
+
+    def plot_reliability_diagram(self, values, predictions_df, title=""):
+        mpvs = []  # mean predicted values
+        fops = []  # fraction of positives
+        noss = []  # number of samples
+        for index, value in enumerate(values[0:-1]):
+            subset_pred_df = predictions_df.loc[(predictions_df['prediction_value'] > value) & (
+                    predictions_df['prediction_value'] <= values[index + 1])]
+            fop = len(subset_pred_df[subset_pred_df['expected_class'] == 1]) / (len(subset_pred_df) + 1e-7)
+            mpv = subset_pred_df['prediction_value'].mean()
+            nos = len(subset_pred_df)
+            mpvs = mpvs + [mpv]
+            fops = fops + [fop]
+            noss = noss + [nos]
+            logging.info(
+                f"Values [{value}, {values[index + 1]}] and MPV {mpv} and FOP {fop} and NOS {nos}")
+        fig, axs = plt.subplots(2, 1, figsize=(20, 20))
+        axs[0].set_title(f"{title} Reliability Diagram from [{np.nanmin(values)} to {np.nanmax(values)}]", size=40)
+        axs[0].scatter(mpvs, fops, color='red', marker='.', s=1000)
+        axs[0].plot([np.nanmin(values), np.nanmax(values)], [np.nanmin(values), np.nanmax(values)], '--')
+        axs[0].set_xlabel("Mean Predicted Values", size=30)
+        axs[0].set_ylabel("Fraction Of Positives", size=30)
+        axs[0].xaxis.set_tick_params(labelsize=30)
+        axs[0].yaxis.set_tick_params(labelsize=30)
+        axs[1].plot(np.concatenate([np.repeat(mpvs, 2)[1:], [mpvs[-1]]]), np.repeat(noss, 2))
+        axs[1].fill_between(np.concatenate([np.repeat(mpvs, 2)[1:], [mpvs[-1]]]), 0, np.repeat(noss, 2))
+        axs[1].set_xlabel("Mean Predicted Values", size=30)
+        axs[1].set_ylabel("Number Of Samples", size=30)
+        axs[1].set_yscale('log', base=10)
+        axs[1].xaxis.set_tick_params(labelsize=30)
+        axs[1].yaxis.set_tick_params(labelsize=30)
+        plt.show()
+
+    def calibration_metrics_cv(self, training_dir, model_prefix, batch_size=20, cores=os.cpu_count() - 1,
+                        thresholds=[0.5], folds=10, log=True):
+        predictions_df = None
+        for fold in np.arange(0, folds):
+            model_dir = model_prefix + f'_{fold}'
+            self.load_model(model_dir)
+            calibration_df = pd.read_csv(f'{model_dir}/validation_dataset.csv')
+            prediction_stats_for_thresholds = self.predict_df(calibration_df, training_dir, batch_size, cores,
+                                                              thresholds=thresholds)
+            prediction_stats = prediction_stats_for_thresholds[thresholds[0]][0]
+            fold_predictions_df = prediction_stats.predictions_df
+            predictions_df = fold_predictions_df if predictions_df is None else \
+                pd.concat([predictions_df, fold_predictions_df])
+        logging.info(f"Calibration metrics for CV")
+        self.calibration_metrics(training_dir, predictions_df, batch_size=batch_size,
+                                 cores=cores, thresholds=thresholds, log=log)
+
 # 2526 (6.824076075210719 %) items of class ['planet_transit']
 # 2023-05-31 16:08:15 INFO     1857 (5.016749513723795 %) items of class ['planet']
 # 2023-05-31 16:08:15 INFO     3559 (9.614761184352712 %) items of class ['fp']
