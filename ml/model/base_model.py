@@ -330,7 +330,7 @@ class BaseModel(WithLogging):
         for labels in self.class_ids.values():
             class_len = len(dataset[dataset['type'].isin(labels)])
             logging.info("%s (%s %%) items of class %s", class_len, class_len / len(dataset) * 100, labels)
-        fold_indexes = [int(fold_index) for fold_index in np.linspace(dataset_len // 10, dataset_len, folds)]
+        fold_indexes = [int(fold_index) for fold_index in np.linspace(dataset_len // folds, dataset_len, folds)]
         return dataset, fold_indexes
 
     def compute_class_weights(self, train_filenames):
