@@ -2,27 +2,42 @@ import glob
 import logging
 import multiprocessing
 import os
+import sys
 import pathlib
 import re
 from itertools import chain
 from multiprocessing import Pool
 
+import lcbuilder.constants
+import triceratops.triceratops as tr
 import astropy.units as u
 import foldedleastsquares
 import lightkurve
 import numpy as np
 import wotan
 import pandas as pd
+from lcbuilder import constants
 from astropy.coordinates import SkyCoord
 from astropy.wcs import WCS
-from astroquery.mast import Catalogs
+from astroquery.mast import Catalogs, TesscutClass
 from lcbuilder.helper import LcbuilderHelper
 from lcbuilder.lcbuilder_class import LcBuilder
 from lcbuilder.objectinfo.MissionObjectInfo import MissionObjectInfo
 from lcbuilder.objectinfo.preparer.MissionLightcurveBuilder import MissionLightcurveBuilder
+from lcbuilder.photometry.aperture_extractor import ApertureExtractor
 from lcbuilder.star.HabitabilityCalculator import HabitabilityCalculator
+from lightkurve import TessLightCurve, KeplerLightCurve
 from watson.watson import Watson
 
+formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+logger = logging.getLogger()
+while len(logger.handlers) > 0:
+    logger.handlers.pop()
+logger.setLevel(logging.INFO)
+handler = logging.StreamHandler(sys.stdout)
+handler.setLevel(logging.INFO)
+handler.setFormatter(formatter)
+logger.addHandler(handler)
 
 def detrend(time_array, flux_array, detrend_window, time_threshold=0.0001, smooth=True, smooth_window_len=11,
             window='blackman'):
@@ -309,8 +324,8 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
             source_offset_bls_dec_err = 0
         offset_ra = np.mean([source_offset_bls_ra, source_offset_diffimg_ra])
         offset_dec = np.mean([source_offset_bls_dec, source_offset_diffimg_dec])
-        offset_ra_err = np.sqrt(source_offset_bls_ra_err ** 2 + source_offset_diffimg_ra_err ** 2)
-        offset_dec_err = np.sqrt(source_offset_bls_dec_err ** 2 + source_offset_diffimg_dec_err ** 2)
+        offset_ra_err = 1/2 * np.sqrt(source_offset_bls_ra_err ** 2 + source_offset_diffimg_ra_err ** 2)
+        offset_dec_err = 1/2 * np.sqrt(source_offset_bls_dec_err ** 2 + source_offset_diffimg_dec_err ** 2)
         offsets_df = pd.DataFrame(columns=['name', 'ra', 'dec', 'ra_err', 'dec_err'])
         offsets_df = offsets_df.append({'name': 'diff_img', 'ra': source_offset_diffimg_ra, 'dec': source_offset_diffimg_dec,
                            'ra_err': source_offset_diffimg_ra_err, 'dec_err': source_offset_diffimg_dec_err}, ignore_index=True)
@@ -380,7 +395,7 @@ def create_target_csv(create_target_input):
         file_name = file_planet_prefix + '_metrics_short.csv'
         if create_target_input.force or not os.path.exists(file_name):
             lcbuild_short = \
-                mission_lightcurve_builder.build(MissionObjectInfo('all', mission_id, cadence='short'),
+                mission_lightcurve_builder.build(MissionObjectInfo('all', mission_id, cadence='short', high_rms_enabled=False),
                                                  create_target_input.target_dir,
                                                  create_target_input.cache_dir)
             if os.path.exists(tpfs_dir):
@@ -394,6 +409,7 @@ def create_target_csv(create_target_input):
                             modes=create_target_input.mode)
             for f in pathlib.Path(tpfs_dir).glob(f"*{file_id.split('_')[1]}*"):
                 os.remove(f)
+        logging.info("PID %s: Finished to get short cadence info for %s", pid, file_planet_prefix)
     except Exception as e:
         logging.exception("PID %s: Failed short cadence for %s", pid, file_planet_prefix)
     try:
@@ -401,7 +417,7 @@ def create_target_csv(create_target_input):
         file_name = file_planet_prefix + '_metrics_long.csv'
         if create_target_input.force or not os.path.exists(file_name):
             lcbuild_long = \
-                mission_lightcurve_builder.build(MissionObjectInfo('all', mission_id, cadence='long'),
+                mission_lightcurve_builder.build(MissionObjectInfo('all', mission_id, cadence='long', high_rms_enabled=False),
                                                      create_target_input.target_dir,
                                                      create_target_input.cache_dir)
             prepare_lc_data(file_planet_prefix, mission_id, lcbuild_long.lc_data,
@@ -412,5 +428,111 @@ def create_target_csv(create_target_input):
                             modes=create_target_input.mode)
             for f in pathlib.Path(tpfs_dir).glob(f"*{file_id.split('_')[1]}*"):
                 os.remove(f)
+        logging.info("PID %s: Finished to get long cadence info for %s", pid, file_planet_prefix)
     except Exception as e:
         logging.exception("PID %s: Failed long cadence for %s", pid, file_planet_prefix)
+
+def create_triceratops_prob(create_target_input):
+    object_id = create_target_input.id
+    file_id = object_id.replace(' ', '_')
+    file_prefix = create_target_input.target_dir + file_id
+    file_planet_prefix = file_prefix + '_' + \
+                         str(round(create_target_input.injected_files_df['period'], 2))
+    logging.exception(f"Trying triceratops for target {file_planet_prefix}")
+    triceratops_file = file_planet_prefix + '_triceratops.csv'
+    if os.path.exists(triceratops_file) and not create_target_input.force:
+        return
+    try:
+        period = create_target_input.injected_files_df['period']
+        duration = create_target_input.injected_files_df['duration(h)']
+        epoch = create_target_input.injected_files_df['epoch']
+        depth = create_target_input.injected_files_df['depth'] / 1e6
+        mission, mission_prefix, id_int = LcBuilder().parse_object_info(object_id)
+        apertures = {}
+        lc_short_filename = str(file_prefix) + '_lc_short.csv'
+        lc_long_filename = str(file_prefix) + '_lc_long.csv'
+        if create_target_input.tpf_files is None:
+            if os.path.exists(lc_short_filename):
+                tpfs = lightkurve.search_targetpixelfile(object_id, exptime="short", author=lcbuilder.constants.KEPLER_AUTHOR).download_all()
+            elif os.path.exists(lc_long_filename):
+                tpfs = lightkurve.search_targetpixelfile(object_id, exptime="long", author=lcbuilder.constants.KEPLER_AUTHOR).download_all()
+        else:
+            tpfs = []
+            for file in create_target_input.tpf_files:
+                tpfs.append(lightkurve.TessTargetPixelFile(file, ignore_missing_simple=True))
+        sectors = []
+        for tpf in tpfs:
+            if mission_prefix == constants.MISSION_ID_KEPLER:
+                sector = tpf.quarter
+            elif mission_prefix == constants.MISSION_ID_TESS:
+                sector = tpf.sector
+            if mission_prefix == constants.MISSION_ID_KEPLER_2:
+                sector = tpf.campaign
+            sectors = sectors + [sector]
+            apertures[sector] = ApertureExtractor.from_boolean_mask(tpf.pipeline_mask, tpf.column, tpf.row)
+        sectors = np.array(sectors)
+        logging.info(f"Will execute validation for sectors: {sectors}")
+        lc_df = None
+        if os.path.exists(lc_short_filename):
+            lc_df = pd.read_csv(lc_short_filename, header=0)
+        if os.path.exists(lc_long_filename):
+            if lc_df is None:
+                lc_df = pd.read_csv(lc_long_filename, header=0)
+            else:
+                lc_df = pd.concat([lc_df, pd.read_csv(lc_long_filename, header=0)])
+        lc_df['time_folded'] = foldedleastsquares.core.fold(lc_df['#time'].to_numpy(), period, epoch + period / 2)
+        range = 5
+        bins = 200
+        lc_df = lc_df.sort_values(by=['time_folded'], ascending=True)
+        half_duration_phase = duration / 2 / period
+        folded_plot_range = half_duration_phase * range
+        folded_plot_range = folded_plot_range if folded_plot_range < 0.5 else 0.5
+        lc_df = lc_df.loc[(lc_df['time_folded'] > 0.5 - folded_plot_range) &
+                          (lc_df['time_folded'] < 0.5 + folded_plot_range)]
+        bin_centers, bin_means, bin_width, bin_stds = \
+            LcbuilderHelper.bin(lc_df['time_folded'].to_numpy(), lc_df['flux'].to_numpy(), bins,
+                                values_err=lc_df['flux_err'].to_numpy())
+        bin_centers = (bin_centers - 0.5) * period
+        sigma = np.nanmean(bin_stds)
+        logging.info("Flux err (ppm) = %s", sigma * 1000000)
+        logging.info("Acquiring triceratops target")
+        target = tr.target(ID=id_int, mission=mission, sectors=sectors)
+        # TODO allow user input apertures
+        logging.info("Reading apertures from directory")
+        logging.info("Calculating validation closest stars depths")
+        target.calc_depths(depth, apertures)
+        logging.info("Preparing validation processes inputs")
+        target.calc_probs(time=bin_centers, flux_0=bin_means, flux_err_0=sigma, P_orb=float(period),
+                          contrast_curve_file=None, parallel=True)
+        target.probs.to_csv(triceratops_file, index=False)
+    except Exception as e:
+        logging.exception(f"Failed triceratops for target {file_planet_prefix}")
+
+    #input.target.probs
+    # scenario  prob
+    # group by scenario with sum of probs
+    # FPP
+    # NFPP
+    # TP
+    # EB
+    # EBx2P
+    # PTP
+    # PEB
+    # PEBx2P
+    # STP
+    # SEB
+    # SEBx2P
+    # DTP
+    # DEB
+    # DEBx2P
+    # BTP
+    # BEB
+    # BEBx2P
+    # NTP other stars
+    # NEB other stars
+    # NEBx2P other stars
+
+    # input.target.plot_fits(save=True, fname=input.save_dir + "/scenario_" + str(input.run) + "_fits",
+    #                        time=input.time, flux_0=input.flux, flux_err_0=input.sigma)
+    # return input.target.FPP, input.target.NFPP, fpp2, fpp3, input.target.probs, input.target.star_num, \
+    #     input.target.u1, input.target.u2, input.target.fluxratio_EB, input.target.fluxratio_comp
