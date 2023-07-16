@@ -12,6 +12,8 @@ from keras.utils import losses_utils
 from sklearn.isotonic import IsotonicRegression
 
 from sklearn.linear_model import LogisticRegression
+from sklearn.utils import shuffle
+
 from iatson.iatson_planet_generator import IatsonPlanetModelGenerator
 from iatson.watson_planet_generator import WatsonPlanetModelGenerator
 from ml.calibration.calibrator import PlattCalibrator
@@ -569,9 +571,30 @@ class IATSON_planet(ImbalancedBinaryModel):
         return IatsonPlanetModelGenerator(dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon,
                                           shuffle_batch=shuffle)
 
-    def predict(self, input, threshold=[0.5]):
-        prediction = self.model(input, training=False)
-        return self.predict_threshold([prediction], threshold=threshold)
+    def predict(self, input, calibrator_path=None):
+        calibrator = self.load_calibrator(calibrator_path)
+        prediction = self.model.predict(input)
+        prediction_cal = prediction
+        if calibrator:
+            prediction_cal = calibrator.predict(prediction)
+        return prediction, prediction_cal
+
+    def predict_cv(self, input, models_dir, calibrator_path=None):
+        models = os.listdir(models_dir)
+        predictions = []
+        predictions_cal = []
+        calibrator = self.load_calibrator(calibrator_path)
+        for model in models:
+            if '_chk_' in model:
+                self.load_model(f'{models_dir}/{model}')
+                prediction, _ = self.predict(input)
+                input.plot_inputs = False
+                prediction_cal = prediction
+                if calibrator:
+                    prediction_cal = calibrator.predict(prediction)
+                predictions_cal = predictions_cal + np.array(prediction_cal).flatten().tolist()
+                predictions = predictions + np.array(prediction).flatten().tolist()
+        return predictions, predictions_cal
 
     def predict_batch(self, inputs, expected_outputs=None, dataset=None, training_dir=None, plot_mismatches=False,
                       batch_size=20, cores=os.cpu_count() - 1, threshold=[0.5]):
@@ -594,11 +617,11 @@ class IATSON_planet(ImbalancedBinaryModel):
         return max_prediction_indexes, max_prediction_values
 
     def predict_df(self, df, training_dir, batch_size=20, cores=os.cpu_count() - 1, zero_epsilon=1e-7,
-                   thresholds=[0.5], plot_mismatches=False, log=False, validation_df=None):
+                   thresholds=[0.5], plot_mismatches=False, log=False, validation_df=None, from_arrays=False):
         expected_outputs = None
         testing_batch_generator = IatsonPlanetModelGenerator(df, training_dir, batch_size,
                                                              self.input_size,
-                                                             self.type_to_label, zero_epsilon, from_arrays=True,
+                                                             self.type_to_label, zero_epsilon, from_arrays=from_arrays,
                                                              shuffle_batch=False, validation_objects_df=validation_df)
         for i in np.arange(0, len(df) // batch_size + 1, 1):
             input, expected_output = testing_batch_generator.__getitem__(i)
@@ -713,17 +736,26 @@ class IATSON_planet(ImbalancedBinaryModel):
         self.log_prediction_metrics(predictions_df_ete6, k_values, "K METRICS")
         self.compute_rp_metrics(predictions_df_ete6, log=True)
 
+    def load_calibrator(self, calibrator_path):
+        if calibrator_path is None:
+            return None
+        logging.info(f"Loading calibrator from path {calibrator_path}")
+        with open(calibrator_path, 'rb') as fid:
+            return pickle.load(fid)
+
     def predict_df_cv(self, training_dir, model_dir_prefix, df, batch_size=20, cores=os.cpu_count() - 1, test_set_limit=None,
-                         zero_epsilon=1e-7, plot_mismatches=False, folds=10, thresholds=[0.5],
-                         k_values=np.arange(100, 2200, 100), validation_df=None):
+                      zero_epsilon=1e-7, plot_mismatches=False, folds=10, thresholds=[0.5],
+                      k_values=np.arange(100, 2200, 100), validation_df=None, from_arrays=False,
+                      calibrator_path=None):
         prediction_stats_for_folds_thresholds = {}
+        calibrator = self.load_calibrator(calibrator_path)
         for fold in np.arange(0, folds):
             model_dir = f"{model_dir_prefix}_{fold}/"
             self.load_model(model_dir)
             prediction_stats_for_folds_thresholds[fold] = \
                 self.predict_df(df, training_dir, batch_size, cores, zero_epsilon=zero_epsilon,
                                 plot_mismatches=plot_mismatches, thresholds=thresholds, log=False,
-                                validation_df=validation_df)
+                                validation_df=validation_df, from_arrays=from_arrays)
         average_predictions_df_thresholds = {}
         for threshold in thresholds:
             for fold in np.arange(0, folds):
@@ -734,8 +766,10 @@ class IATSON_planet(ImbalancedBinaryModel):
             for index, prediction_row in prediction_stats_for_folds_thresholds[0][threshold][0].predictions_df.iterrows():
                 prediction_values = []
                 for fold in np.arange(0, folds):
-                    prediction_values = prediction_values + \
-                        [prediction_stats_for_folds_thresholds[fold][threshold][0].predictions_df.loc[prediction_stats_for_folds_thresholds[fold][threshold][0].predictions_df['object_id'] == prediction_row['object_id']]['prediction_value']]
+                    prediction_for_object = prediction_stats_for_folds_thresholds[fold][threshold][0].predictions_df.loc[prediction_stats_for_folds_thresholds[fold][threshold][0].predictions_df['object_id'] == prediction_row['object_id']]['prediction_value']
+                    prediction_for_object = calibrator.predict([prediction_for_object]).tolist() if calibrator is not None \
+                        else [prediction_for_object]
+                    prediction_values = prediction_values + prediction_for_object
                 avg_prediction_value = np.nanmean(prediction_values)
                 std_prediction_value = np.nanstd(prediction_values)
                 average_predictions_df = pd.concat([average_predictions_df, pd.DataFrame.from_dict(
@@ -949,41 +983,55 @@ class IATSON_planet(ImbalancedBinaryModel):
         return CategoricalPredictionSetStats(label_tp, label_fp, label_fn, accuracy, precision, recall, k_df,
                                              predictions_df)
 
-    def predit_watson(self, target_id, period, duration, epoch, depth, watson_dir, star_filename, lc_filename,
-                      cores=os.cpu_count() - 1):
-        df = pd.DataFrame(columns=['object_id', 'period', 'duration(h)', 'depth', 'radius(earth)'])
+    def predict_watson(self, target_id, period, duration, epoch, depth_ppt, watson_dir, star_filename, lc_filename,
+                      plot_inputs=False, cv_dir=None, calibrator_path=None):
+        df = pd.DataFrame(columns=['object_id', 'period', 'duration(h)', 'depth_primary', 'radius(earth)', 'type'])
+        star_df = pd.read_csv(star_filename)
+        df = pd.concat([df, pd.DataFrame.from_dict(
+            {'object_id': target_id,
+             'period': [period],
+             'duration(h)': [duration],
+             'epoch': [epoch],
+             'depth_primary': [depth_ppt],
+             'radius(earth)': [(depth_ppt * 1000 * ((star_df.iloc[0]['radius'] ** 2) ** (1/2)))]},
+            orient='columns')], ignore_index=True)
         testing_batch_generator = WatsonPlanetModelGenerator(df, watson_dir, star_filename,
                                                              lc_filename, 1,
-                                                             self.input_size, 1e-6)
-        return self.predict(testing_batch_generator)
+                                                             self.input_size, 1e-6, plot_inputs=plot_inputs)
+        if cv_dir:
+            return self.predict_cv(testing_batch_generator, cv_dir, calibrator_path=calibrator_path)
+        else:
+            return self.predict(testing_batch_generator, calibrator_path=calibrator_path)
 
-    def calibration_metrics(self, training_dir, predictions_df, batch_size=20, cores=os.cpu_count() - 1,
-                            thresholds=[0.5], log=False):
-        for threshold in thresholds:
-            prediction_values = predictions_df['prediction_value'].to_numpy()
-            expected_classes = predictions_df['expected_class'].to_numpy()
-            self.plot_reliability_diagrams(predictions_df, title="Uncalibrated")
-            platt = PlattCalibrator(log_odds=True)
-            platt.fit(np.float64(prediction_values), np.float64(expected_classes))
-            calibrated = platt.predict(prediction_values)
-            calibrated_pred_df = predictions_df.copy()
-            calibrated_pred_df['prediction_value'] = calibrated
-            self.plot_reliability_diagrams(calibrated_pred_df, title="Platt Calibration")
-            clf = LogisticRegression(random_state=0).fit(predictions_df[['prediction_value']],
-                                                         predictions_df['expected_class'].to_numpy())
-            calibrated = clf.predict_proba(predictions_df[['prediction_value']])
-            calibrated_pred_df = predictions_df.copy()
-            calibrated_pred_df['prediction_value'] = calibrated[:, 1]
-            self.plot_reliability_diagrams(calibrated_pred_df, title="Logistic Calibration")
-            clf = IsotonicRegression()
-            clf = clf.fit(predictions_df[['prediction_value']],
-                                                         predictions_df['expected_class'].to_numpy())
-            calibrated = clf.predict(prediction_values)
-            calibrated_pred_df = predictions_df.copy()
-            calibrated_pred_df['prediction_value'] = calibrated
-            self.plot_reliability_diagrams(calibrated_pred_df, title="Isotonic Calibration")
-            #diagram.plot(calibrated, ground_truth)  # visualize miscalibration of calibrated
-            #calibrated_ece = ece.measure(calibrated, predictions_df['expected_class'].to_numpy())
+    def calibration_metrics(self, predictions_df, validation_set_percent=0.2):
+        predictions_df_shuffled = shuffle(predictions_df)
+        predictions_val_df = predictions_df_shuffled[int(len(predictions_df_shuffled) * (1 - validation_set_percent)):]
+        predictions_train_df = predictions_df_shuffled[0:-int(len(predictions_df_shuffled) * validation_set_percent)]
+        prediction_train_values = predictions_train_df['prediction_value'].to_numpy()
+        expected_train_classes = predictions_train_df['expected_class'].to_numpy()
+        prediction_val_values = predictions_val_df['prediction_value'].to_numpy()
+        self.plot_reliability_diagrams(predictions_train_df, predictions_val_df, title="Uncalibrated")
+        platt = PlattCalibrator(log_odds=True)
+        platt.fit(np.float64(prediction_train_values), np.float64(expected_train_classes))
+        calibrated_train = platt.predict(prediction_train_values)
+        calibrated_val = platt.predict(prediction_val_values)
+        calibrated_pred_train_df = predictions_train_df.copy()
+        calibrated_pred_train_df['prediction_value'] = calibrated_train
+        calibrated_pred_val_df = predictions_val_df.copy()
+        calibrated_pred_val_df['prediction_value'] = calibrated_val
+        self.plot_reliability_diagrams(calibrated_pred_train_df, calibrated_pred_val_df, title="Platt Calibration")
+        clf = IsotonicRegression()
+        clf = clf.fit(predictions_train_df[['prediction_value']],
+                      predictions_train_df['expected_class'].to_numpy())
+        calibrated_train = clf.predict(prediction_train_values)
+        calibrated_val = clf.predict(predictions_val_df['prediction_value'].to_numpy())
+        calibrated_pred_train_df = predictions_train_df.copy()
+        calibrated_pred_train_df['prediction_value'] = calibrated_train
+        calibrated_pred_val_df = predictions_val_df.copy()
+        calibrated_pred_val_df['prediction_value'] = calibrated_val
+        self.plot_reliability_diagrams(calibrated_pred_train_df, calibrated_pred_val_df, title="Isotonic Calibration")
+        #diagram.plot(calibrated, ground_truth)  # visualize miscalibration of calibrated
+        #calibrated_ece = ece.measure(calibrated, predictions_df['expected_class'].to_numpy())
 
     def calibrate(self, predictions_df, method=None, calibrator_dir=None):
         prediction_values = predictions_df['prediction_value'].to_numpy()
@@ -1020,48 +1068,69 @@ class IATSON_planet(ImbalancedBinaryModel):
                 logging.exception("Failed calibrator storage")
         return results_df, calibrator
 
-    def plot_reliability_diagrams(self, predictions_df, title="", n_bins=10):
+    def plot_reliability_diagrams(self, predictions_train_df, predictions_val_df, title="", n_bins=10):
         import netcal.metrics
         ece = netcal.metrics.ECE(n_bins)
         mce = netcal.metrics.MCE(n_bins)
-        predictions = predictions_df['prediction_value'].to_numpy()
-        expected_classes = predictions_df['expected_class'].to_numpy()
-        calibrated_ece = ece.measure(predictions, expected_classes)
-        calibrated_mce = mce.measure(predictions, expected_classes)
-        logging.info(f"{title} calibration metrics: ECE={calibrated_ece}, MCE={calibrated_mce}")
+        predictions_train = predictions_train_df['prediction_value'].to_numpy()
+        expected_classes_train = predictions_train_df['expected_class'].to_numpy()
+        predictions_val = predictions_val_df['prediction_value'].to_numpy()
+        expected_classes_val = predictions_val_df['expected_class'].to_numpy()
+        calibrated_train_ece = ece.measure(predictions_train, expected_classes_train)
+        calibrated_train_mce = mce.measure(predictions_train, expected_classes_train)
+        calibrated_val_ece = ece.measure(predictions_val, expected_classes_val)
+        calibrated_val_mce = mce.measure(predictions_val, expected_classes_val)
+        logging.info(f"{title} train calibration metrics: ECE={calibrated_train_ece}, MCE={calibrated_train_mce}")
+        logging.info(f"{title} validation calibration metrics: ECE={calibrated_val_ece}, MCE={calibrated_val_mce}")
         #_, values = pd.qcut(predictions_df['prediction_value'], q=10, retbins=True)
         values = [0, 0.01, 0.05, 0.1, 0.2, 0.4, 0.7, 0.8, 0.9, 0.93, 0.96, 0.98, 0.99, 0.995, 1]
-        self.plot_reliability_diagram(values, predictions_df, title=title)
+        self.plot_reliability_diagram(values, predictions_train_df, predictions_val_df, title=title)
         values = [0.9, 0.92, 0.94, 0.95, 0.96, 0.975, 0.985, 0.99, 0.9925, 0.995, 0.9975, 1]
-        self.plot_reliability_diagram(values, predictions_df, title=title)
+        self.plot_reliability_diagram(values, predictions_train_df, predictions_val_df, title=title)
         values = [0, 0.0025, 0.005, 0.0075, 0.01, 0.015, 0.025, 0.04, 0.05, 0.06, 0.08, 0.1]
-        self.plot_reliability_diagram(values, predictions_df, title=title)
+        self.plot_reliability_diagram(values, predictions_train_df, predictions_val_df, title=title)
 
-    def plot_reliability_diagram(self, values, predictions_df, title=""):
-        mpvs = []  # mean predicted values
-        fops = []  # fraction of positives
-        noss = []  # number of samples
+    def plot_reliability_diagram(self, values, predictions_train_df, predictions_val_df, title=""):
+        mpvs_train = []  # mean predicted values
+        fops_train = []  # fraction of positives
+        noss_train = []  # number of samples
+        mpvs_val = []  # mean predicted values
+        fops_val = []  # fraction of positives
+        noss_val = []  # number of samples
         for index, value in enumerate(values[0:-1]):
-            subset_pred_df = predictions_df.loc[(predictions_df['prediction_value'] > value) & (
-                    predictions_df['prediction_value'] <= values[index + 1])]
-            fop = len(subset_pred_df[subset_pred_df['expected_class'] == 1]) / (len(subset_pred_df) + 1e-7)
-            mpv = subset_pred_df['prediction_value'].mean()
-            nos = len(subset_pred_df)
-            mpvs = mpvs + [mpv]
-            fops = fops + [fop]
-            noss = noss + [nos]
-            logging.info(
-                f"Values [{value}, {values[index + 1]}] and MPV {mpv} and FOP {fop} and NOS {nos}")
+            subset_pred_train_df = predictions_train_df.loc[(predictions_train_df['prediction_value'] > value) & (
+                    predictions_train_df['prediction_value'] <= values[index + 1])]
+            fop = len(subset_pred_train_df[subset_pred_train_df['expected_class'] == 1]) / (
+                        len(subset_pred_train_df) + 1e-7)
+            mpv = subset_pred_train_df['prediction_value'].mean()
+            nos = len(subset_pred_train_df)
+            mpvs_train = mpvs_train + [mpv]
+            fops_train = fops_train + [fop]
+            noss_train = noss_train + [nos]
+            logging.info(f"Train Values [{value}, {values[index + 1]}] and MPV {mpv} and FOP {fop} and NOS {nos}")
+            subset_pred_val_df = predictions_val_df.loc[(predictions_val_df['prediction_value'] > value) & (
+                    predictions_val_df['prediction_value'] <= values[index + 1])]
+            fop = len(subset_pred_val_df[subset_pred_val_df['expected_class'] == 1]) / (
+                        len(subset_pred_val_df) + 1e-7)
+            mpv = subset_pred_val_df['prediction_value'].mean()
+            nos = len(subset_pred_val_df)
+            mpvs_val = mpvs_val + [mpv]
+            fops_val = fops_val + [fop]
+            noss_val = noss_val + [nos]
+            logging.info(f"Validation Values [{value}, {values[index + 1]}] and MPV {mpv} and FOP {fop} and NOS {nos}")
         fig, axs = plt.subplots(2, 1, figsize=(20, 20))
         axs[0].set_title(f"{title} Reliability Diagram from [{np.nanmin(values)} to {np.nanmax(values)}]", size=40)
-        axs[0].scatter(mpvs, fops, color='red', marker='.', s=1000)
+        axs[0].scatter(mpvs_train, fops_train, color='red', marker='.', s=1000)
+        axs[0].scatter(mpvs_val, fops_val, color='green', marker='.', s=1000)
         axs[0].plot([np.nanmin(values), np.nanmax(values)], [np.nanmin(values), np.nanmax(values)], '--')
         axs[0].set_xlabel("Mean Predicted Values", size=30)
         axs[0].set_ylabel("Fraction Of Positives", size=30)
         axs[0].xaxis.set_tick_params(labelsize=30)
         axs[0].yaxis.set_tick_params(labelsize=30)
-        axs[1].plot(np.concatenate([np.repeat(mpvs, 2)[1:], [mpvs[-1]]]), np.repeat(noss, 2))
-        axs[1].fill_between(np.concatenate([np.repeat(mpvs, 2)[1:], [mpvs[-1]]]), 0, np.repeat(noss, 2))
+        axs[1].plot(np.concatenate([np.repeat(mpvs_train, 2)[1:], [mpvs_train[-1]]]), np.repeat(noss_train, 2), color='red')
+        axs[1].fill_between(np.concatenate([np.repeat(mpvs_train, 2)[1:], [mpvs_train[-1]]]), 0, np.repeat(noss_train, 2), color='red')
+        axs[1].plot(np.concatenate([np.repeat(mpvs_val, 2)[1:], [mpvs_val[-1]]]), np.repeat(noss_val, 2), color='green')
+        axs[1].fill_between(np.concatenate([np.repeat(mpvs_val, 2)[1:], [mpvs_val[-1]]]), 0, np.repeat(noss_val, 2), color='green')
         axs[1].set_xlabel("Mean Predicted Values", size=30)
         axs[1].set_ylabel("Number Of Samples", size=30)
         axs[1].set_yscale('log', base=10)
@@ -1083,8 +1152,7 @@ class IATSON_planet(ImbalancedBinaryModel):
             predictions_df = fold_predictions_df if predictions_df is None else \
                 pd.concat([predictions_df, fold_predictions_df])
         logging.info(f"Calibration metrics for CV")
-        self.calibration_metrics(training_dir, predictions_df, batch_size=batch_size,
-                                 cores=cores, thresholds=thresholds, log=log)
+        self.calibration_metrics(predictions_df)
 
 # 2526 (6.824076075210719 %) items of class ['planet_transit']
 # 2023-05-31 16:08:15 INFO     1857 (5.016749513723795 %) items of class ['planet']
