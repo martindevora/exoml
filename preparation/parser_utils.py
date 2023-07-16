@@ -29,15 +29,6 @@ from lcbuilder.star.HabitabilityCalculator import HabitabilityCalculator
 from lightkurve import TessLightCurve, KeplerLightCurve
 from watson.watson import Watson
 
-formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-logger = logging.getLogger()
-while len(logger.handlers) > 0:
-    logger.handlers.pop()
-logger.setLevel(logging.INFO)
-handler = logging.StreamHandler(sys.stdout)
-handler.setLevel(logging.INFO)
-handler.setFormatter(formatter)
-logger.addHandler(handler)
 
 def detrend(time_array, flux_array, detrend_window, time_threshold=0.0001, smooth=True, smooth_window_len=11,
             window='blackman'):
@@ -326,6 +317,10 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
         offset_dec = np.mean([source_offset_bls_dec, source_offset_diffimg_dec])
         offset_ra_err = 1/2 * np.sqrt(source_offset_bls_ra_err ** 2 + source_offset_diffimg_ra_err ** 2)
         offset_dec_err = 1/2 * np.sqrt(source_offset_bls_dec_err ** 2 + source_offset_diffimg_dec_err ** 2)
+        if np.isnan(offset_ra_err) or offset_ra_err == 0.0:
+            offset_ra_err = np.nanstd([source_offset_bls_ra, source_offset_diffimg_ra])
+        if np.isnan(offset_dec_err) or offset_dec_err == 0.0:
+            offset_dec_err = np.nanstd([source_offset_bls_dec, source_offset_diffimg_dec])
         offsets_df = pd.DataFrame(columns=['name', 'ra', 'dec', 'ra_err', 'dec_err'])
         offsets_df = offsets_df.append({'name': 'diff_img', 'ra': source_offset_diffimg_ra, 'dec': source_offset_diffimg_dec,
                            'ra_err': source_offset_diffimg_ra_err, 'dec_err': source_offset_diffimg_dec_err}, ignore_index=True)
