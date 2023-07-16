@@ -3,8 +3,7 @@ from multiprocessing import Pool
 import pandas as pd
 import numpy as np
 
-from preparation.parser_utils import CreateTargetInput, create_target_csv
-
+from preparation.parser_utils import CreateTargetInput, create_target_csv, create_triceratops_prob
 
 def create_targets_df(tces_dir):
     # Merge TCEs DF and cumulative DF ignoring everything not from Kepler or K2
@@ -14,9 +13,11 @@ def create_targets_df(tces_dir):
     # test_df = test_df[test_df['type'].isin(['fp', 'planet', 'planet_transit', 'tce'])]
     # test_df.to_csv(tces_dir + '/injected_objects_tces.csv')
     cfps_df = pd.read_csv(tces_dir + '/fpwg_2023.04.25_10.26.55.csv', comment='#')
-    kois_df = pd.read_csv(tces_dir + '/cumulative_2022.09.13_14.24.29.csv', comment='#')
-    tces_df = pd.read_csv(tces_dir + '/q1_q17_dr25_tce_2023.04.30_15.55.30.csv', comment='#')
-    disc_df = pd.read_csv(tces_dir + '/PSCompPars_2022.09.13_13.37.12.csv', comment='#')
+    kois_df = pd.read_csv(tces_dir + '/cumulative_2023.06.30_13.09.52.csv', comment='#')
+                          #usecols=['rowid','kepid','kepoi_name','kepler_name','koi_disposition','koi_vet_stat','koi_vet_date','koi_pdisposition','koi_score','koi_fpflag_nt','koi_fpflag_ss','koi_fpflag_co','koi_fpflag_ec','koi_disp_prov','koi_comment','koi_period','koi_time0bk','koi_time0','koi_eccen','koi_longp','koi_impact','koi_duration','koi_ingress','koi_depth','koi_ror','koi_srho','koi_fittype','koi_prad','koi_sma','koi_incl','koi_teq','koi_insol','koi_dor','koi_limbdark_mod','koi_ldm_coeff4','koi_ldm_coeff3','koi_ldm_coeff2','koi_ldm_coeff1','koi_parm_prov','koi_max_sngle_ev','koi_max_mult_ev','koi_model_snr','koi_count','koi_num_transits','koi_tce_plnt_num','koi_tce_delivname','koi_quarters','koi_bin_oedp_sig','koi_trans_mod','koi_model_dof','koi_model_chisq','koi_datalink_dvr','koi_datalink_dvs','koi_steff','koi_slogg','koi_smet','koi_srad','koi_smass','koi_sage','koi_sparprov','ra','dec','koi_kepmag','koi_gmag','koi_rmag','koi_imag','koi_zmag','koi_jmag','koi_hmag','koi_kmag','koi_fwm_stat_sig','koi_fwm_sra','koi_fwm_sdec','koi_fwm_srao','koi_fwm_sdeco','koi_fwm_prao','koi_fwm_pdeco','koi_dicco_mra','koi_dicco_mdec','koi_dicco_msky','koi_dikco_mra','koi_dikco_mdec','koi_dikco_msky'])
+    tces_df = pd.read_csv(tces_dir + '/q1_q17_dr25_tce_2023.07.03_23.17.12.csv', comment='#')
+    disc_df = pd.read_csv(tces_dir + '/PSCompPars_2023.06.30_07.30.12.csv', comment='#')
+                          #usecols=['pl_name','hostname','tic_id','sy_snum','sy_pnum','discoverymethod','disc_year','disc_facility','rv_flag','tran_flag','pl_controv_flag','pl_orbper','pl_orbsmax','pl_rade','pl_radj','pl_bmasse','pl_bmassj','pl_bmassprov','pl_orbeccen','pl_insol','pl_eqt','ttv_flag','st_spectype','st_teff','st_rad','st_mass','st_met','st_metratio','st_logg','rastr','ra','decstr','dec','sy_dist','sy_vmag','sy_jmag','sy_hmag','sy_kmag','sy_gaiamag','sy_tmag','sy_kepmag','st_nphot','st_nrvc', 'disc_refname'])
     tces_df = tces_df[tces_df['tce_rogue_flag'] == 0]
     tces_df['cent_so'] = (tces_df['tce_fwm_srao'] ** 2 + tces_df['tce_fwm_sdeco'] ** 2) ** 0.5
     tces_df['cent_so_err'] = (((tces_df['tce_fwm_srao'] / np.sqrt(tces_df['tce_fwm_srao'] ** 2 + tces_df['tce_fwm_sdeco'] ** 2)) * tces_df['tce_fwm_srao_err']) ** 2 + \
@@ -82,6 +83,7 @@ def create_targets_df(tces_dir):
     disc_df.loc[(disc_df['kepoi_name'].isna()) &
                       (disc_df['type'] == 'tce') &
                       (disc_df['tce_model_snr'] > 3.5), 'type'] = 'tce_candidate'
+    #t[t['boot_fap'] > t['boot_mesmean']]
     last_target = ''
     last_period = 0.5
     last_index = -1
@@ -114,14 +116,27 @@ def create_targets_df(tces_dir):
     # Remove latest KIC from the catalogue
     result_df.drop(result_df[result_df['object_id'] == 'KIC 100001645'].index, inplace=True)
     result_df.to_csv(tces_dir + '/classified_tces.csv')
+    results_df_no_validated = result_df.copy()
+    results_df_no_validated.loc[results_df_no_validated['disc_refname'].str.contains('Valizadegan', na=False), ['type']] = 'candidate'
+    results_df_no_validated.loc[results_df_no_validated['disc_refname'].str.contains('Armstrong et al. 2021', na=False), ['type']] = 'candidate'
+    results_df_no_validated.to_csv(tces_dir + '/classified_tces_no_val.csv')
     #disc_df[disc_df['object_id'] == 'KIC 7377200'].iloc[0]['epoch']
+    tce_candidate_df = result_df[result_df['type'].isin(['tce_candidate'])]
+    tce_candidate_df.to_csv(tces_dir + '/injected_objects_tce_candidates.csv')
+    candidate_df = result_df[result_df['type'].isin(['candidate', 'tce_candidate'])]
+    candidate_df.to_csv(tces_dir + '/injected_objects_candidates.csv')
+    candidate_df_no_val = results_df_no_validated[results_df_no_validated['type'].isin(['candidate', 'tce_candidate'])]
+    candidate_df_no_val.to_csv(tces_dir + '/injected_objects_candidates_no_val.csv')
     result_df = result_df[result_df['type'].isin(['fp', 'fa', 'planet', 'planet_transit', 'tce', 'tce_og',
                                                   'tce_secondary', 'tce_source_offset', 'tce_centroids_offset',
                                                   'tce_odd_even'])]
     result_df = result_df[~result_df['radius(earth)'].isna()]
-    #TODO this next statement is to prevent confirmed planets not matching any tce nor koi
-    #result_df = result_df[~result_df['object_id'].str.contains('<NA')]
     result_df.to_csv(tces_dir + '/injected_objects_tces.csv')
+    results_df_no_validated = results_df_no_validated[results_df_no_validated['type'].isin(['fp', 'fa', 'planet', 'planet_transit', 'tce', 'tce_og',
+                                                  'tce_secondary', 'tce_source_offset', 'tce_centroids_offset',
+                                                  'tce_odd_even'])]
+    results_df_no_validated = results_df_no_validated[~results_df_no_validated['radius(earth)'].isna()]
+    results_df_no_validated.to_csv(tces_dir + '/injected_objects_tces_no_val.csv')
 
 
 def create_targets_multi_df(tces_dir):
@@ -132,9 +147,9 @@ def create_targets_multi_df(tces_dir):
     # test_df = test_df[test_df['type'].isin(['fp', 'planet', 'planet_transit', 'tce'])]
     # test_df.to_csv(tces_dir + '/injected_objects_tces.csv')
     cfps_df = pd.read_csv(tces_dir + '/fpwg_2023.04.25_10.26.55.csv', comment='#')
-    kois_df = pd.read_csv(tces_dir + '/cumulative_2022.09.13_14.24.29.csv', comment='#')
-    tces_df = pd.read_csv(tces_dir + '/q1_q17_dr25_tce_2023.04.30_15.55.30.csv', comment='#')
-    disc_df = pd.read_csv(tces_dir + '/PSCompPars_2022.09.13_13.37.12.csv', comment='#')
+    kois_df = pd.read_csv(tces_dir + '/cumulative_2023.06.30_13.09.52.csv', comment='#')
+    tces_df = pd.read_csv(tces_dir + '/q1_q17_dr25_tce_2023.07.03_23.17.12.csv', comment='#')
+    disc_df = pd.read_csv(tces_dir + '/PSCompPars_2023.06.30_07.30.12.csv', comment='#')
     tces_df = tces_df[tces_df['tce_rogue_flag'] == 0]
     tces_df['cent_so'] = (tces_df['tce_fwm_srao'] ** 2 + tces_df['tce_fwm_sdeco'] ** 2) ** 0.5
     tces_df['cent_so_err'] = (((tces_df['tce_fwm_srao'] / np.sqrt(tces_df['tce_fwm_srao'] ** 2 + tces_df['tce_fwm_sdeco'] ** 2)) * tces_df['tce_fwm_srao_err']) ** 2 + \
@@ -202,6 +217,10 @@ def create_targets_multi_df(tces_dir):
     disc_df.loc[(disc_df['kepoi_name'].isna()) & (disc_df['tce_hap_stat'] > disc_df['tce_cap_stat']), 'multitype'] = \
         disc_df.loc[(disc_df['kepoi_name'].isna()) & (disc_df['tce_hap_stat'] > disc_df['tce_cap_stat']), 'multitype'] + ',tce_og'
     disc_df.loc[(disc_df['kepoi_name'].isna()) & (disc_df['type'] == 'tce') & (disc_df['tce_model_snr'] > 3.5), 'type'] = 'tce_candidate'
+    disc_df.loc[disc_df['disc_refname'].str.contains('Valizadegan', na=False), ['multitype']] = \
+        disc_df.loc[disc_df['disc_refname'].str.contains('Valizadegan', na=False), ['multitype']] + ',planet_validated'
+    disc_df.loc[disc_df['disc_refname'].str.contains('Armstrong et al. 2021', na=False), ['multitype']] = \
+        disc_df.loc[disc_df['disc_refname'].str.contains('Armstrong et al. 2021', na=False), ['multitype']] + ',planet_validated'
     disc_df.loc[((disc_df['multitype'] == '') | (disc_df['multitype'].isna()) | (disc_df['multitype'] == 'nan')), 'multitype'] = disc_df.loc[((disc_df['multitype'] == '') | (disc_df['multitype'].isna()) | (disc_df['multitype'] == 'nan')), 'type']
     last_target = ''
     last_period = 0.5
@@ -251,11 +270,28 @@ def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_cou
     tces_df = tces_df.sort_values(by=["kepid"], ascending=True)
     #tces_df = tces_df.drop_duplicates(subset=["kepid"], keep='last')
     tces_df = tces_df.sample(frac=1).reset_index(drop=True)
+    inputs = []
+    if ids is not None:
+        tces_df = tces_df[tces_df['object_id'].isin(ids)]
+    print("Total number of targets is " + str(len(tces_df)))
+    for index, tce_row in tces_df.iterrows():
+        inputs = inputs + [CreateTargetInput('KIC', tce_row['object_id'], None, target_dir, None, tce_row, cache_dir, force=force, mode=mode)]
+    with Pool(processes=cores, maxtasksperchild=1) as pool:
+        pool.map(create_target_csv, inputs, chunksize=1)
+
+def create_triceratops_probs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_count() - 1, force=False, ids=None):
+    tces_df = pd.read_csv(csv, comment='#')
+    tces_df = tces_df.sort_values(by=["kepid"], ascending=True)
+    # tces_df = tces_df.drop_duplicates(subset=["kepid"], keep='last')
+    #tces_df = tces_df.sample(frac=1).reset_index(drop=True)
+    if not force and 'tric_tp_total' in tces_df.columns:
+        tces_df = tces_df.loc[tces_df['tric_tp_total'].isna()]
     print("Total number of targets is " + str(len(tces_df)))
     inputs = []
     if ids is not None:
         tces_df = tces_df[tces_df['object_id'].isin(ids)]
     for index, tce_row in tces_df.iterrows():
-        inputs = inputs + [CreateTargetInput('KIC', tce_row['object_id'], None, target_dir, None, tce_row, cache_dir, force=force, mode=mode)]
+        inputs = inputs + [
+            CreateTargetInput('KIC', tce_row['object_id'], None, target_dir, None, tce_row, cache_dir, force=force)]
     with Pool(processes=cores, maxtasksperchild=1) as pool:
-        pool.map(create_target_csv, inputs, chunksize=1)
+        pool.map(create_triceratops_prob, inputs, chunksize=1)
