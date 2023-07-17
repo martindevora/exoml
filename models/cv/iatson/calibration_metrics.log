@@ -1,26 +1,26 @@
-/home/mdevo/pycharm_exoml_venv/bin/python /home/mdevo/.pycharm_helpers/pydev/pydevd.py --multiprocess --qt-support=auto --client localhost --port 43735 --file /home/mdevo/exoml_pycharm/iatson_planet_tces_launch.py
+/home/mdevo/pycharm_exoml_venv/bin/python /home/mdevo/.pycharm_helpers/pydev/pydevd.py --multiprocess --qt-support=auto --client localhost --port 46523 --file /home/mdevo/exoml_pycharm/iatson_planet_tces_launch.py
 Connected to pydev debugger (build 223.8617.48)
-2023-07-08 12:24:35.487221: I tensorflow/core/platform/cpu_feature_guard.cc:193] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX2 FMA
-To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
-2023-07-08 12:24:37.628364: W tensorflow/compiler/xla/stream_executor/platform/default/dso_loader.cc:64] Could not load dynamic library 'libnvinfer_plugin.so.7'; dlerror: libnvinfer_plugin.so.7: cannot open shared object file: No such file or directory
-2023-07-08 12:24:37.628397: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Cannot dlopen some TensorRT libraries. If you would like to use Nvidia GPU with TensorRT, please make sure the missing libraries mentioned above are installed properly.
 /home/mdevo/pycharm_exoml_venv/lib/python3.8/site-packages/lightkurve/config/__init__.py:119: UserWarning: The default Lightkurve cache directory, used by download(), etc., has been moved to /home/mdevo/.lightkurve/cache. Please move all the files in the legacy directory /home/mdevo/.lightkurve-cache to the new location and remove the legacy directory. Refer to https://docs.lightkurve.org/reference/config.html#default-cache-directory-migration for more information.
   warnings.warn(
-2023-07-08 12:24:55.124353: E tensorflow/compiler/xla/stream_executor/cuda/cuda_driver.cc:267] failed call to cuInit: CUDA_ERROR_NO_DEVICE: no CUDA-capable device is detected
-2023-07-08 12:24:55.124396: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:169] retrieving CUDA diagnostic information for host: Tiki.Tiki.com
-2023-07-08 12:24:55.124407: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:176] hostname: Tiki.Tiki.com
-2023-07-08 12:24:55.124466: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:200] libcuda reported version is: 525.125.6
-2023-07-08 12:24:55.124497: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:204] kernel reported version is: 525.105.17
-2023-07-08 12:24:55.124506: E tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:313] kernel version 525.105.17 does not match DSO version 525.125.6 -- cannot find working devices in this configuration
-2023-07-08 12:24:55.124847: I tensorflow/core/platform/cpu_feature_guard.cc:193] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX2 FMA
+2023-07-12 09:53:19.486893: I tensorflow/core/platform/cpu_feature_guard.cc:193] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX2 FMA
 To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
-2023-07-08 12:24:55 WARNING  From /home/mdevo/pycharm_exoml_venv/lib/python3.8/site-packages/tensorflow/python/autograph/pyct/static_analysis/liveness.py:83: Analyzer.lamba_check (from tensorflow.python.autograph.pyct.static_analysis.liveness) is deprecated and will be removed after 2023-09-23.
-Instructions for updating:
-Lambda fuctions will be no more assumed to be used in the statement where they are used, or at least in the same block. https://github.com/tensorflow/tensorflow/issues/56089
+2023-07-12 09:53:21.742950: W tensorflow/compiler/xla/stream_executor/platform/default/dso_loader.cc:64] Could not load dynamic library 'libnvinfer_plugin.so.7'; dlerror: libnvinfer_plugin.so.7: cannot open shared object file: No such file or directory
+2023-07-12 09:53:21.742980: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Cannot dlopen some TensorRT libraries. If you would like to use Nvidia GPU with TensorRT, please make sure the missing libraries mentioned above are installed properly.
+2023-07-12 09:53:27.345223: E tensorflow/compiler/xla/stream_executor/cuda/cuda_driver.cc:267] failed call to cuInit: CUDA_ERROR_NO_DEVICE: no CUDA-capable device is detected
+2023-07-12 09:53:27.345281: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:169] retrieving CUDA diagnostic information for host: Tiki.Tiki.com
+2023-07-12 09:53:27.345295: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:176] hostname: Tiki.Tiki.com
+2023-07-12 09:53:27.345414: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:200] libcuda reported version is: 525.125.6
+2023-07-12 09:53:27.345456: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:204] kernel reported version is: 525.105.17
+2023-07-12 09:53:27.345474: E tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:313] kernel version 525.105.17 does not match DSO version 525.125.6 -- cannot find working devices in this configuration
+2023-07-12 09:53:27.345949: I tensorflow/core/platform/cpu_feature_guard.cc:193] This TensorFlow binary is optimized with oneAPI Deep Neural Network Library (oneDNN) to use the following CPU instructions in performance-critical operations:  AVX2 FMA
+To enable them in other operations, rebuild TensorFlow with the appropriate compiler flags.
 WARNING:tensorflow:From /home/mdevo/pycharm_exoml_venv/lib/python3.8/site-packages/tensorflow/python/autograph/pyct/static_analysis/liveness.py:83: Analyzer.lamba_check (from tensorflow.python.autograph.pyct.static_analysis.liveness) is deprecated and will be removed after 2023-09-23.
 Instructions for updating:
 Lambda fuctions will be no more assumed to be used in the statement where they are used, or at least in the same block. https://github.com/tensorflow/tensorflow/issues/56089
-2023-07-08 12:24:58 INFO     Creating model plot and summary
+2023-07-12 09:53:28 WARNING  From /home/mdevo/pycharm_exoml_venv/lib/python3.8/site-packages/tensorflow/python/autograph/pyct/static_analysis/liveness.py:83: Analyzer.lamba_check (from tensorflow.python.autograph.pyct.static_analysis.liveness) is deprecated and will be removed after 2023-09-23.
+Instructions for updating:
+Lambda fuctions will be no more assumed to be used in the statement where they are used, or at least in the same block. https://github.com/tensorflow/tensorflow/issues/56089
+2023-07-12 09:53:30 INFO     Creating model plot and summary
 Model: "IATSON_planet"
 __________________________________________________________________________________________________
  Layer (type)                   Output Shape         Param #     Connected to
@@ -354,176 +354,328 @@ Total params: 8,808,984
 Trainable params: 8,808,984
 Non-trainable params: 0
 __________________________________________________________________________________________________
-2023-07-08 12:25:00 INFO     Min weights: -0.4087587 from layer logits
-2023-07-08 12:25:00 INFO     Max weights: 1.0 from layer layer_normalization_6
-2023-07-08 12:25:00 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_0
-19/19 [==============================] - 15s 419ms/step
-2023-07-08 12:26:38 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_1
-19/19 [==============================] - 16s 542ms/step
-2023-07-08 12:28:15 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_2
-19/19 [==============================] - 13s 439ms/step
-2023-07-08 12:29:51 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_3
-19/19 [==============================] - 14s 279ms/step
-2023-07-08 12:31:25 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_4
-19/19 [==============================] - 15s 439ms/step
-2023-07-08 12:33:03 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_5
-19/19 [==============================] - 16s 566ms/step
-2023-07-08 12:34:42 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_6
-19/19 [==============================] - 16s 492ms/step
-2023-07-08 12:36:20 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_7
-19/19 [==============================] - 16s 569ms/step
-2023-07-08 12:38:00 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_8
-19/19 [==============================] - 12s 370ms/step
-2023-07-08 12:39:36 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_9
-19/19 [==============================] - 16s 573ms/step
-2023-07-08 12:41:13 INFO     Calibration metrics for CV
-2023-07-08 12:41:16 INFO     Uncalibrated calibration metrics: ECE=0.0026266408229054764, MCE=0.4160761466393104
-2023-07-08 12:41:16 INFO     Values [0, 0.01] and MPV 0.0013694156659767032 and FOP 0.000995057879196673 and NOS 30149
-2023-07-08 12:41:16 INFO     Values [0.01, 0.05] and MPV 0.019242161884903908 and FOP 0.01905829596305727 and NOS 1784
-2023-07-08 12:41:16 INFO     Values [0.05, 0.1] and MPV 0.07091414928436279 and FOP 0.045454545435762585 and NOS 242
-2023-07-08 12:41:16 INFO     Values [0.1, 0.2] and MPV 0.14137162268161774 and FOP 0.06403940883544856 and NOS 203
-2023-07-08 12:41:16 INFO     Values [0.2, 0.4] and MPV 0.2773396074771881 and FOP 0.07826086949716446 and NOS 115
-2023-07-08 12:41:16 INFO     Values [0.4, 0.7] and MPV 0.5460039377212524 and FOP 0.2765957443866003 and NOS 94
-2023-07-08 12:41:16 INFO     Values [0.7, 0.8] and MPV 0.752673864364624 and FOP 0.6666666646464646 and NOS 33
-2023-07-08 12:41:16 INFO     Values [0.8, 0.9] and MPV 0.85652095079422 and FOP 0.7530864188233501 and NOS 81
-2023-07-08 12:41:16 INFO     Values [0.9, 0.93] and MPV 0.9154918193817139 and FOP 0.935483867950052 and NOS 31
-2023-07-08 12:41:16 INFO     Values [0.93, 0.96] and MPV 0.946425199508667 and FOP 0.9310344811533888 and NOS 58
-2023-07-08 12:41:16 INFO     Values [0.96, 0.98] and MPV 0.9705811738967896 and FOP 0.966101694096524 and NOS 118
-2023-07-08 12:41:16 INFO     Values [0.98, 0.99] and MPV 0.9867492914199829 and FOP 0.9838274929962728 and NOS 371
-2023-07-08 12:41:16 INFO     Values [0.99, 0.995] and MPV 0.9929922223091125 and FOP 0.9970958372703682 and NOS 1033
-2023-07-08 12:41:16 INFO     Values [0.995, 1] and MPV 0.9976961612701416 and FOP 0.9984550018926823 and NOS 2589
-2023-07-08 12:41:30 INFO     Values [0.9, 0.92] and MPV 0.9088224768638611 and FOP 0.9444444391975308 and NOS 18
-2023-07-08 12:41:30 INFO     Values [0.92, 0.94] and MPV 0.9299163222312927 and FOP 0.8888888855967078 and NOS 27
-2023-07-08 12:41:30 INFO     Values [0.94, 0.95] and MPV 0.9449957013130188 and FOP 0.952380947845805 and NOS 21
-2023-07-08 12:41:30 INFO     Values [0.95, 0.96] and MPV 0.9548454284667969 and FOP 0.9565217349716446 and NOS 23
-2023-07-08 12:41:30 INFO     Values [0.96, 0.975] and MPV 0.9681767225265503 and FOP 0.9655172402695205 and NOS 87
-2023-07-08 12:41:30 INFO     Values [0.975, 0.985] and MPV 0.9817007184028625 and FOP 0.984126983345931 and NOS 126
-2023-07-08 12:41:30 INFO     Values [0.985, 0.99] and MPV 0.987995982170105 and FOP 0.9818840576152593 and NOS 276
-2023-07-08 12:41:30 INFO     Values [0.99, 0.9925] and MPV 0.9913719296455383 and FOP 0.9943820221925893 and NOS 356
-2023-07-08 12:41:30 INFO     Values [0.9925, 0.995] and MPV 0.993844211101532 and FOP 0.9985228949780617 and NOS 677
-2023-07-08 12:41:30 INFO     Values [0.995, 0.9975] and MPV 0.9963477253913879 and FOP 0.9965004373581364 and NOS 1143
-2023-07-08 12:41:30 INFO     Values [0.9975, 1] and MPV 0.9987621307373047 and FOP 0.9999999999308437 and NOS 1446
-2023-07-08 12:41:36 INFO     Values [0, 0.0025] and MPV 0.0004450318810995668 and FOP 0.00033188135241513425 and NOS 24105
-2023-07-08 12:41:36 INFO     Values [0.0025, 0.005] and MPV 0.0036334593314677477 and FOP 0.0020278099651788004 and NOS 3452
-2023-07-08 12:41:36 INFO     Values [0.005, 0.0075] and MPV 0.006115084979683161 and FOP 0.00698080279191502 and NOS 1719
-2023-07-08 12:41:36 INFO     Values [0.0075, 0.01] and MPV 0.00859620701521635 and FOP 0.003436426116444854 and NOS 873
-2023-07-08 12:41:36 INFO     Values [0.01, 0.015] and MPV 0.012128698639571667 and FOP 0.013301088269250172 and NOS 827
-2023-07-08 12:41:36 INFO     Values [0.015, 0.025] and MPV 0.019112400710582733 and FOP 0.02094240837330848 and NOS 573
-2023-07-08 12:41:36 INFO     Values [0.025, 0.04] and MPV 0.03159494698047638 and FOP 0.027586206887039236 and NOS 290
-2023-07-08 12:41:36 INFO     Values [0.04, 0.05] and MPV 0.04450684413313866 and FOP 0.031914893583069266 and NOS 94
-2023-07-08 12:41:36 INFO     Values [0.05, 0.06] and MPV 0.054739754647016525 and FOP 0.014084507022416188 and NOS 71
-2023-07-08 12:41:36 INFO     Values [0.06, 0.08] and MPV 0.06938987225294113 and FOP 0.057142857088435375 and NOS 105
-2023-07-08 12:41:36 INFO     Values [0.08, 0.1] and MPV 0.09073885530233383 and FOP 0.06060606051423325 and NOS 66
+2023-07-12 09:53:32 INFO     Min weights: -0.53453755 from layer logits
+2023-07-12 09:53:32 INFO     Max weights: 1.0 from layer layer_normalization_6
+2023-07-12 09:53:32 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_0
+19/19 [==============================] - 13s 317ms/step
+2023-07-12 09:55:04 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_1
+19/19 [==============================] - 17s 596ms/step
+2023-07-12 09:56:38 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_2
+19/19 [==============================] - 15s 490ms/step
+2023-07-12 09:58:14 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_3
+19/19 [==============================] - 16s 490ms/step
+2023-07-12 09:59:51 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_4
+19/19 [==============================] - 16s 547ms/step
+2023-07-12 10:01:26 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_5
+19/19 [==============================] - 16s 564ms/step
+2023-07-12 10:03:03 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_6
+19/19 [==============================] - 11s 356ms/step
+2023-07-12 10:04:37 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_7
+19/19 [==============================] - 15s 435ms/step
+2023-07-12 10:06:11 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_8
+19/19 [==============================] - 16s 516ms/step
+2023-07-12 10:07:47 INFO     Loading model from /home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk_9
+19/19 [==============================] - 16s 500ms/step
+2023-07-12 10:09:27 INFO     Calibration metrics for CV
+2023-07-12 10:09:29 INFO     Uncalibrated train calibration metrics: ECE=0.0025034959689779978, MCE=0.4323931085435968
+2023-07-12 10:09:29 INFO     Uncalibrated validation calibration metrics: ECE=0.003184508231124614, MCE=0.4340568855404854
+2023-07-12 10:09:38 INFO     Train Values [0, 0.01] and MPV 0.0013760195579379797 and FOP 0.0010359259105745828 and NOS 24133
+2023-07-12 10:09:38 INFO     Validation Values [0, 0.01] and MPV 0.00134271162096411 and FOP 0.0008309788931223039 and NOS 6017
+2023-07-12 10:09:38 INFO     Train Values [0.01, 0.05] and MPV 0.01929231733083725 and FOP 0.020804438278723685 and NOS 1442
+2023-07-12 10:09:38 INFO     Validation Values [0.01, 0.05] and MPV 0.01903069019317627 and FOP 0.011695906429328681 and NOS 342
+2023-07-12 10:09:38 INFO     Train Values [0.05, 0.1] and MPV 0.07096043974161148 and FOP 0.045685279164626766 and NOS 197
+2023-07-12 10:09:38 INFO     Validation Values [0.05, 0.1] and MPV 0.07071148604154587 and FOP 0.04444444434567901 and NOS 45
+2023-07-12 10:09:38 INFO     Train Values [0.1, 0.2] and MPV 0.1429649293422699 and FOP 0.04999999996875 and NOS 160
+2023-07-12 10:09:38 INFO     Validation Values [0.1, 0.2] and MPV 0.13544303178787231 and FOP 0.11627906949702542 and NOS 43
+2023-07-12 10:09:38 INFO     Train Values [0.2, 0.4] and MPV 0.2720320224761963 and FOP 0.08988764034844086 and NOS 89
+2023-07-12 10:09:38 INFO     Validation Values [0.2, 0.4] and MPV 0.2955080568790436 and FOP 0.03846153831360947 and NOS 26
+2023-07-12 10:09:38 INFO     Train Values [0.4, 0.7] and MPV 0.5436545014381409 and FOP 0.27999999962666666 and NOS 75
+2023-07-12 10:09:38 INFO     Validation Values [0.4, 0.7] and MPV 0.5552783012390137 and FOP 0.26315789335180056 and NOS 19
+2023-07-12 10:09:38 INFO     Train Values [0.7, 0.8] and MPV 0.7529072761535645 and FOP 0.6428571405612244 and NOS 28
+2023-07-12 10:09:38 INFO     Validation Values [0.7, 0.8] and MPV 0.7513668537139893 and FOP 0.7999999840000003 and NOS 5
+2023-07-12 10:09:38 INFO     Train Values [0.8, 0.9] and MPV 0.8551026582717896 and FOP 0.7384615373254438 and NOS 65
+2023-07-12 10:09:38 INFO     Validation Values [0.8, 0.9] and MPV 0.8622827529907227 and FOP 0.812499994921875 and NOS 16
+2023-07-12 10:09:38 INFO     Train Values [0.9, 0.93] and MPV 0.9158793091773987 and FOP 0.9166666628472222 and NOS 24
+2023-07-12 10:09:38 INFO     Validation Values [0.9, 0.93] and MPV 0.9141631126403809 and FOP 0.9999999857142858 and NOS 7
+2023-07-12 10:09:38 INFO     Train Values [0.93, 0.96] and MPV 0.9461633563041687 and FOP 0.9183673450645564 and NOS 49
+2023-07-12 10:09:38 INFO     Validation Values [0.93, 0.96] and MPV 0.9478505253791809 and FOP 0.9999999888888891 and NOS 9
+2023-07-12 10:09:38 INFO     Train Values [0.96, 0.98] and MPV 0.9708772897720337 and FOP 0.9659090898114671 and NOS 88
+2023-07-12 10:09:38 INFO     Validation Values [0.96, 0.98] and MPV 0.9697123765945435 and FOP 0.9666666634444444 and NOS 30
+2023-07-12 10:09:38 INFO     Train Values [0.98, 0.99] and MPV 0.9866993427276611 and FOP 0.9828178690780693 and NOS 291
+2023-07-12 10:09:38 INFO     Validation Values [0.98, 0.99] and MPV 0.9869304895401001 and FOP 0.9874999987656251 and NOS 80
+2023-07-12 10:09:38 INFO     Train Values [0.99, 0.995] and MPV 0.9930042624473572 and FOP 0.9975961537262505 and NOS 832
+2023-07-12 10:09:38 INFO     Validation Values [0.99, 0.995] and MPV 0.9929420948028564 and FOP 0.9950248751268533 and NOS 201
+2023-07-12 10:09:38 INFO     Train Values [0.995, 1] and MPV 0.9977056980133057 and FOP 0.9980459208110383 and NOS 2047
+2023-07-12 10:09:38 INFO     Validation Values [0.995, 1] and MPV 0.9976602792739868 and FOP 0.9999999998154983 and NOS 542
+2023-07-12 10:09:46 INFO     Train Values [0.9, 0.92] and MPV 0.9095718264579773 and FOP 0.9285714219387756 and NOS 14
+2023-07-12 10:09:46 INFO     Validation Values [0.9, 0.92] and MPV 0.90619957447052 and FOP 0.9999999750000006 and NOS 4
+2023-07-12 10:09:46 INFO     Train Values [0.92, 0.94] and MPV 0.9303972721099854 and FOP 0.8636363597107438 and NOS 22
+2023-07-12 10:09:46 INFO     Validation Values [0.92, 0.94] and MPV 0.9278003573417664 and FOP 0.9999999800000003 and NOS 5
+2023-07-12 10:09:46 INFO     Train Values [0.94, 0.95] and MPV 0.9452229738235474 and FOP 0.9473684160664819 and NOS 19
+2023-07-12 10:09:46 INFO     Validation Values [0.94, 0.95] and MPV 0.9428386688232422 and FOP 0.9999999500000026 and NOS 2
+2023-07-12 10:09:46 INFO     Train Values [0.95, 0.96] and MPV 0.9545071721076965 and FOP 0.9444444391975308 and NOS 18
+2023-07-12 10:09:46 INFO     Validation Values [0.95, 0.96] and MPV 0.9560638666152954 and FOP 0.9999999800000003 and NOS 5
+2023-07-12 10:09:46 INFO     Train Values [0.96, 0.975] and MPV 0.968586266040802 and FOP 0.9692307677396451 and NOS 65
+2023-07-12 10:09:46 INFO     Validation Values [0.96, 0.975] and MPV 0.966966450214386 and FOP 0.9545454502066115 and NOS 22
+2023-07-12 10:09:46 INFO     Train Values [0.975, 0.985] and MPV 0.9817339777946472 and FOP 0.9795918357351104 and NOS 98
+2023-07-12 10:09:46 INFO     Validation Values [0.975, 0.985] and MPV 0.9815844297409058 and FOP 0.9999999964285714 and NOS 28
+2023-07-12 10:09:46 INFO     Train Values [0.985, 0.99] and MPV 0.9879570007324219 and FOP 0.981481481027092 and NOS 216
+2023-07-12 10:09:46 INFO     Validation Values [0.985, 0.99] and MPV 0.9881362915039062 and FOP 0.9833333316944445 and NOS 60
+2023-07-12 10:09:46 INFO     Train Values [0.99, 0.9925] and MPV 0.9913800954818726 and FOP 0.9929824557919359 and NOS 285
+2023-07-12 10:09:46 INFO     Validation Values [0.99, 0.9925] and MPV 0.9913391470909119 and FOP 0.9999999985915494 and NOS 71
+2023-07-12 10:09:46 INFO     Train Values [0.9925, 0.995] and MPV 0.9938505291938782 and FOP 0.9999999998171847 and NOS 547
+2023-07-12 10:09:46 INFO     Validation Values [0.9925, 0.995] and MPV 0.9938178658485413 and FOP 0.9923076915443787 and NOS 130
+2023-07-12 10:09:46 INFO     Train Values [0.995, 0.9975] and MPV 0.9963525533676147 and FOP 0.9955849888525845 and NOS 906
+2023-07-12 10:09:46 INFO     Validation Values [0.995, 0.9975] and MPV 0.9963288903236389 and FOP 0.9999999995780591 and NOS 237
+2023-07-12 10:09:46 INFO     Train Values [0.9975, 1] and MPV 0.9987801313400269 and FOP 0.9999999999123576 and NOS 1141
+2023-07-12 10:09:46 INFO     Validation Values [0.9975, 1] and MPV 0.9986948370933533 and FOP 0.999999999672131 and NOS 305
+2023-07-12 10:09:52 INFO     Train Values [0, 0.0025] and MPV 0.0004410291730891913 and FOP 0.0003116397444537909 and NOS 19253
+2023-07-12 10:09:52 INFO     Validation Values [0, 0.0025] and MPV 0.0004608317685779184 and FOP 0.00041211621676463805 and NOS 4853
+2023-07-12 10:09:52 INFO     Train Values [0.0025, 0.005] and MPV 0.0036400279495865107 and FOP 0.0017953321363807782 and NOS 2785
+2023-07-12 10:09:52 INFO     Validation Values [0.0025, 0.005] and MPV 0.00360603304579854 and FOP 0.002998500749175637 and NOS 667
+2023-07-12 10:09:52 INFO     Train Values [0.005, 0.0075] and MPV 0.006124754901975393 and FOP 0.00863309352455877 and NOS 1390
+2023-07-12 10:09:52 INFO     Validation Values [0.005, 0.0075] and MPV 0.006074232514947653 and FOP 0.0 and NOS 329
+2023-07-12 10:09:52 INFO     Train Values [0.0075, 0.01] and MPV 0.00860348530113697 and FOP 0.0028368794322217194 and NOS 705
+2023-07-12 10:09:52 INFO     Validation Values [0.0075, 0.01] and MPV 0.008565668947994709 and FOP 0.005952380948837869 and NOS 168
+2023-07-12 10:09:52 INFO     Train Values [0.01, 0.015] and MPV 0.012146295979619026 and FOP 0.013412816689506288 and NOS 671
+2023-07-12 10:09:52 INFO     Validation Values [0.01, 0.015] and MPV 0.012053003534674644 and FOP 0.012820512812294543 and NOS 156
+2023-07-12 10:09:52 INFO     Train Values [0.015, 0.025] and MPV 0.019154436886310577 and FOP 0.024175824170510805 and NOS 455
+2023-07-12 10:09:52 INFO     Validation Values [0.015, 0.025] and MPV 0.018950317054986954 and FOP 0.008474576264004597 and NOS 118
+2023-07-12 10:09:52 INFO     Train Values [0.025, 0.04] and MPV 0.031506504863500595 and FOP 0.02916666665451389 and NOS 240
+2023-07-12 10:09:52 INFO     Validation Values [0.025, 0.04] and MPV 0.032019466161727905 and FOP 0.01999999996 and NOS 50
+2023-07-12 10:09:52 INFO     Train Values [0.04, 0.05] and MPV 0.0446385033428669 and FOP 0.03947368415858726 and NOS 76
+2023-07-12 10:09:52 INFO     Validation Values [0.04, 0.05] and MPV 0.04395094886422157 and FOP 0.0 and NOS 18
+2023-07-12 10:09:52 INFO     Train Values [0.05, 0.06] and MPV 0.05496111512184143 and FOP 0.017857142825255103 and NOS 56
+2023-07-12 10:09:52 INFO     Validation Values [0.05, 0.06] and MPV 0.05391332879662514 and FOP 0.0 and NOS 15
+2023-07-12 10:09:52 INFO     Train Values [0.06, 0.08] and MPV 0.06932870298624039 and FOP 0.05681818175361571 and NOS 88
+2023-07-12 10:09:52 INFO     Validation Values [0.06, 0.08] and MPV 0.0697065219283104 and FOP 0.058823529065743944 and NOS 17
+2023-07-12 10:09:52 INFO     Train Values [0.08, 0.1] and MPV 0.09057468920946121 and FOP 0.056603773478106086 and NOS 53
+2023-07-12 10:09:52 INFO     Validation Values [0.08, 0.1] and MPV 0.0914081484079361 and FOP 0.07692307633136096 and NOS 13
 /data/scratch_hard/exoml_pycharm/ml/calibration/calibrator.py:125: RuntimeWarning: divide by zero encountered in divide
   y_prob = np.log(y_prob / (1 - y_prob))
-2023-07-08 12:41:42 INFO     Platt Calibration calibration metrics: ECE=0.002054408901322462, MCE=0.30993924195207195
-2023-07-08 12:41:42 INFO     Values [0, 0.01] and MPV 0.001086390119573121 and FOP 0.0013164654508049177 and NOS 31144
-2023-07-08 12:41:42 INFO     Values [0.01, 0.05] and MPV 0.020181113605068284 and FOP 0.027384324832163895 and NOS 1059
-2023-07-08 12:41:42 INFO     Values [0.05, 0.1] and MPV 0.07178086542549789 and FOP 0.0684931506536561 and NOS 219
-2023-07-08 12:41:42 INFO     Values [0.1, 0.2] and MPV 0.13764406178160496 and FOP 0.0514705881974481 and NOS 136
-2023-07-08 12:41:42 INFO     Values [0.2, 0.4] and MPV 0.28941351551416955 and FOP 0.11363636350723141 and NOS 88
-2023-07-08 12:41:42 INFO     Values [0.4, 0.7] and MPV 0.544439099410141 and FOP 0.48275862013476023 and NOS 87
-2023-07-08 12:41:42 INFO     Values [0.7, 0.8] and MPV 0.76389472888641 and FOP 0.6909090896528925 and NOS 55
-2023-07-08 12:41:42 INFO     Values [0.8, 0.9] and MPV 0.8544248334499134 and FOP 0.9117647045415226 and NOS 68
-2023-07-08 12:41:42 INFO     Values [0.9, 0.93] and MPV 0.9166145328035941 and FOP 0.9285714263605442 and NOS 42
-2023-07-08 12:41:42 INFO     Values [0.93, 0.96] and MPV 0.9476824424824938 and FOP 0.9473684200554017 and NOS 95
-2023-07-08 12:41:42 INFO     Values [0.96, 0.98] and MPV 0.9739678546680424 and FOP 0.9795081963198737 and NOS 244
-2023-07-08 12:41:42 INFO     Values [0.98, 0.99] and MPV 0.9863772707264585 and FOP 0.9954389964657424 and NOS 877
-2023-07-08 12:41:42 INFO     Values [0.99, 0.995] and MPV 0.9927596894098968 and FOP 0.9966101694070668 and NOS 1180
-2023-07-08 12:41:42 INFO     Values [0.995, 1] and MPV 0.9975140943783913 and FOP 0.9999999999419279 and NOS 1722
-2023-07-08 12:41:49 INFO     Values [0.9, 0.92] and MPV 0.910993219904094 and FOP 0.8846153812130177 and NOS 26
-2023-07-08 12:41:49 INFO     Values [0.92, 0.94] and MPV 0.9323834357968461 and FOP 0.949999997625 and NOS 40
-2023-07-08 12:41:49 INFO     Values [0.94, 0.95] and MPV 0.944643809246834 and FOP 0.95999999616 and NOS 25
-2023-07-08 12:41:49 INFO     Values [0.95, 0.96] and MPV 0.9550083920225372 and FOP 0.9565217370510397 and NOS 46
-2023-07-08 12:41:49 INFO     Values [0.96, 0.975] and MPV 0.96969095737046 and FOP 0.9911504416007518 and NOS 113
-2023-07-08 12:41:49 INFO     Values [0.975, 0.985] and MPV 0.9812204692477992 and FOP 0.9874055413129961 and NOS 397
-2023-07-08 12:41:49 INFO     Values [0.985, 0.99] and MPV 0.9878582954040395 and FOP 0.9950900162037496 and NOS 611
-2023-07-08 12:41:49 INFO     Values [0.99, 0.9925] and MPV 0.9913194015588249 and FOP 0.9999999997971601 and NOS 493
-2023-07-08 12:41:49 INFO     Values [0.9925, 0.995] and MPV 0.993793258420928 and FOP 0.9941775835525215 and NOS 687
-2023-07-08 12:41:49 INFO     Values [0.995, 0.9975] and MPV 0.9962576765036074 and FOP 0.9999999998820756 and NOS 848
-2023-07-08 12:41:49 INFO     Values [0.9975, 1] and MPV 0.9987331359777237 and FOP 0.9999999998855835 and NOS 874
-2023-07-08 12:41:55 INFO     Values [0, 0.0025] and MPV 0.00043122566600481296 and FOP 0.00045561546054956483 and NOS 26338
-2023-07-08 12:41:55 INFO     Values [0.0025, 0.005] and MPV 0.003528349141416721 and FOP 0.004746835442887758 and NOS 3160
-2023-07-08 12:41:55 INFO     Values [0.005, 0.0075] and MPV 0.006074463167551521 and FOP 0.00530035335642223 and NOS 1132
-2023-07-08 12:41:55 INFO     Values [0.0075, 0.01] and MPV 0.008659604475107701 and FOP 0.015564202331602297 and NOS 514
-2023-07-08 12:41:55 INFO     Values [0.01, 0.015] and MPV 0.01220985098179983 and FOP 0.0238611713614184 and NOS 461
-2023-07-08 12:41:55 INFO     Values [0.015, 0.025] and MPV 0.01925645918049835 and FOP 0.02727272726446281 and NOS 330
-2023-07-08 12:41:55 INFO     Values [0.025, 0.04] and MPV 0.03171701427549229 and FOP 0.025125628128077573 and NOS 199
-2023-07-08 12:41:55 INFO     Values [0.04, 0.05] and MPV 0.04459044398217638 and FOP 0.05797101440873766 and NOS 69
-2023-07-08 12:41:55 INFO     Values [0.05, 0.06] and MPV 0.054325218233398045 and FOP 0.05454545444628099 and NOS 55
-2023-07-08 12:41:55 INFO     Values [0.06, 0.08] and MPV 0.0698931858288129 and FOP 0.07999999992000001 and NOS 100
-2023-07-08 12:41:55 INFO     Values [0.08, 0.1] and MPV 0.08973131160102892 and FOP 0.062499999902343756 and NOS 64
-2023-07-08 12:42:01 INFO     Logistic Calibration calibration metrics: ECE=0.0010715700340415421, MCE=0.6669248924517968
-2023-07-08 12:42:01 INFO     Values [0, 0.01] and MPV 0.0026768955333206657 and FOP 0.002593713332913624 and NOS 32386
-2023-07-08 12:42:01 INFO     Values [0.01, 0.05] and MPV 0.020090860359705552 and FOP 0.04519774008745891 and NOS 177
-2023-07-08 12:42:01 INFO     Values [0.05, 0.1] and MPV 0.06758380907277732 and FOP 0.10714285676020407 and NOS 28
-2023-07-08 12:42:01 INFO     Values [0.1, 0.2] and MPV 0.13943369375477613 and FOP 0.1612903220603538 and NOS 31
-2023-07-08 12:42:01 INFO     Values [0.2, 0.4] and MPV 0.29906817459356383 and FOP 0.21428571352040815 and NOS 28
-2023-07-08 12:42:01 INFO     Values [0.4, 0.7] and MPV 0.5252108321614793 and FOP 0.399999999 and NOS 40
-2023-07-08 12:42:01 INFO     Values [0.7, 0.8] and MPV 0.7438479693748737 and FOP 0.07692307633136096 and NOS 13
-2023-07-08 12:42:01 INFO     Values [0.8, 0.9] and MPV 0.8545082985829972 and FOP 0.7241379285374554 and NOS 29
-2023-07-08 12:42:01 INFO     Values [0.9, 0.93] and MPV 0.9170859030617341 and FOP 0.5882352906574394 and NOS 17
-2023-07-08 12:42:01 INFO     Values [0.93, 0.96] and MPV 0.9475447033590112 and FOP 0.7735849042007832 and NOS 53
-2023-07-08 12:42:01 INFO     Values [0.96, 0.98] and MPV 0.9730375856117178 and FOP 0.913043477268431 and NOS 92
-2023-07-08 12:42:01 INFO     Values [0.98, 0.99] and MPV 0.9867475182831628 and FOP 0.9956331877487716 and NOS 4122
-2023-07-08 12:42:01 INFO     Values [0.99, 0.995] and MPV nan and FOP 0.0 and NOS 0
-2023-07-08 12:42:01 INFO     Values [0.995, 1] and MPV nan and FOP 0.0 and NOS 0
-2023-07-08 12:42:07 INFO     Values [0.9, 0.92] and MPV 0.91234733521404 and FOP 0.5454545404958678 and NOS 11
-2023-07-08 12:42:07 INFO     Values [0.92, 0.94] and MPV 0.9300380812973754 and FOP 0.5714285673469388 and NOS 14
-2023-07-08 12:42:07 INFO     Values [0.94, 0.95] and MPV 0.9459241232603232 and FOP 0.83999999664 and NOS 25
-2023-07-08 12:42:07 INFO     Values [0.95, 0.96] and MPV 0.9552936361525649 and FOP 0.7999999959999999 and NOS 20
-2023-07-08 12:42:07 INFO     Values [0.96, 0.975] and MPV 0.9684784376352168 and FOP 0.8958333314670138 and NOS 48
-2023-07-08 12:42:07 INFO     Values [0.975, 0.985] and MPV 0.9821198010126149 and FOP 0.9607843132545175 and NOS 204
-2023-07-08 12:42:07 INFO     Values [0.985, 0.99] and MPV 0.986888774312572 and FOP 0.996718828849149 and NOS 3962
-2023-07-08 12:42:07 INFO     Values [0.99, 0.9925] and MPV nan and FOP 0.0 and NOS 0
-2023-07-08 12:42:07 INFO     Values [0.9925, 0.995] and MPV nan and FOP 0.0 and NOS 0
-2023-07-08 12:42:07 INFO     Values [0.995, 0.9975] and MPV nan and FOP 0.0 and NOS 0
-2023-07-08 12:42:07 INFO     Values [0.9975, 1] and MPV nan and FOP 0.0 and NOS 0
-2023-07-08 12:42:13 INFO     Values [0, 0.0025] and MPV nan and FOP 0.0 and NOS 0
-2023-07-08 12:42:13 INFO     Values [0.0025, 0.005] and MPV 0.0026456725794322205 and FOP 0.0021458560099451227 and NOS 32155
-2023-07-08 12:42:13 INFO     Values [0.005, 0.0075] and MPV 0.006111941261678347 and FOP 0.05405405401753105 and NOS 148
-2023-07-08 12:42:13 INFO     Values [0.0075, 0.01] and MPV 0.008647827033152247 and FOP 0.08433734929597911 and NOS 83
-2023-07-08 12:42:13 INFO     Values [0.01, 0.015] and MPV 0.012130807921654921 and FOP 0.030769230721893494 and NOS 65
-2023-07-08 12:42:13 INFO     Values [0.015, 0.025] and MPV 0.019323967451285826 and FOP 0.057142857061224496 and NOS 70
-2023-07-08 12:42:13 INFO     Values [0.025, 0.04] and MPV 0.030582025182165115 and FOP 0.05882352923875432 and NOS 34
-2023-07-08 12:42:13 INFO     Values [0.04, 0.05] and MPV 0.04688914887208638 and FOP 0.0 and NOS 8
-2023-07-08 12:42:13 INFO     Values [0.05, 0.06] and MPV 0.053884456237422315 and FOP 0.09999999900000002 and NOS 10
-2023-07-08 12:42:13 INFO     Values [0.06, 0.08] and MPV 0.07004068295975054 and FOP 0.07692307633136096 and NOS 13
-2023-07-08 12:42:13 INFO     Values [0.08, 0.1] and MPV 0.08859464263735706 and FOP 0.19999999600000007 and NOS 5
-2023-07-08 12:42:20 INFO     Isotonic Calibration calibration metrics: ECE=1.221324603762044e-07, MCE=1.376655264203122e-07
-2023-07-08 12:42:20 INFO     Values [0, 0.01] and MPV 0.0010734564857557416 and FOP 0.001073310349310241 and NOS 30746
-2023-07-08 12:42:20 INFO     Values [0.01, 0.05] and MPV 0.02274394780397415 and FOP 0.022743947173679828 and NOS 1363
-2023-07-08 12:42:20 INFO     Values [0.05, 0.1] and MPV 0.06496062874794006 and FOP 0.06496062990847232 and NOS 508
-2023-07-08 12:42:20 INFO     Values [0.1, 0.2] and MPV 0.17241379618644714 and FOP 0.17241379250891795 and NOS 29
-2023-07-08 12:42:20 INFO     Values [0.2, 0.4] and MPV 0.36206889152526855 and FOP 0.3620689648929845 and NOS 58
-2023-07-08 12:42:20 INFO     Values [0.4, 0.7] and MPV 0.6545456051826477 and FOP 0.6545454533553718 and NOS 55
-2023-07-08 12:42:20 INFO     Values [0.7, 0.8] and MPV 0.7741933465003967 and FOP 0.7741935458896982 and NOS 31
-2023-07-08 12:42:20 INFO     Values [0.8, 0.9] and MPV 0.875 and FOP 0.8749999963541666 and NOS 24
-2023-07-08 12:42:20 INFO     Values [0.9, 0.93] and MPV 0.9056603312492371 and FOP 0.9056603756496974 and NOS 53
-2023-07-08 12:42:20 INFO     Values [0.93, 0.96] and MPV 0.9558823704719543 and FOP 0.9558823515354672 and NOS 68
-2023-07-08 12:42:20 INFO     Values [0.96, 0.98] and MPV 0.9746376872062683 and FOP 0.9746376808062907 and NOS 276
-2023-07-08 12:42:20 INFO     Values [0.98, 0.99] and MPV nan and FOP 0.0 and NOS 0
-2023-07-08 12:42:20 INFO     Values [0.99, 0.995] and MPV 0.9940212965011597 and FOP 0.9940209266077698 and NOS 669
-2023-07-08 12:42:20 INFO     Values [0.995, 1] and MPV 0.9987227916717529 and FOP 0.9987228607599387 and NOS 3132
-2023-07-08 12:42:26 INFO     Values [0.9, 0.92] and MPV 0.9056603312492371 and FOP 0.9056603756496974 and NOS 53
-2023-07-08 12:42:26 INFO     Values [0.92, 0.94] and MPV nan and FOP 0.0 and NOS 0
-2023-07-08 12:42:26 INFO     Values [0.94, 0.95] and MPV nan and FOP 0.0 and NOS 0
-2023-07-08 12:42:26 INFO     Values [0.95, 0.96] and MPV 0.9558823704719543 and FOP 0.9558823515354672 and NOS 68
-2023-07-08 12:42:26 INFO     Values [0.96, 0.975] and MPV 0.9655172228813171 and FOP 0.9655172397146254 and NOS 58
-2023-07-08 12:42:26 INFO     Values [0.975, 0.985] and MPV 0.9770641922950745 and FOP 0.9770642197352917 and NOS 218
-2023-07-08 12:42:26 INFO     Values [0.985, 0.99] and MPV nan and FOP 0.0 and NOS 0
-2023-07-08 12:42:26 INFO     Values [0.99, 0.9925] and MPV 0.9924241304397583 and FOP 0.992424241672406 and NOS 132
-2023-07-08 12:42:26 INFO     Values [0.9925, 0.995] and MPV 0.9944138526916504 and FOP 0.9944134076360497 and NOS 537
-2023-07-08 12:42:26 INFO     Values [0.995, 0.9975] and MPV 0.9967426657676697 and FOP 0.9967426709286039 and NOS 1228
-2023-07-08 12:42:26 INFO     Values [0.9975, 1] and MPV 1.0 and FOP 0.9999999999474789 and NOS 1904
-2023-07-08 12:42:32 INFO     Values [0, 0.0025] and MPV 0.000345743348589167 and FOP 0.00034564866733103293 and NOS 26038
-2023-07-08 12:42:32 INFO     Values [0.0025, 0.005] and MPV 0.0032197320833802223 and FOP 0.003218884119998987 and NOS 1864
-2023-07-08 12:42:32 INFO     Values [0.005, 0.0075] and MPV 0.00570634612813592 and FOP 0.00570613409387988 and NOS 2103
-2023-07-08 12:42:32 INFO     Values [0.0075, 0.01] and MPV 0.008097165264189243 and FOP 0.008097165990810099 and NOS 741
-2023-07-08 12:42:32 INFO     Values [0.01, 0.015] and MPV 0.011494254693388939 and FOP 0.011494252860351434 and NOS 87
-2023-07-08 12:42:32 INFO     Values [0.015, 0.025] and MPV 0.01759999990463257 and FOP 0.017599999997184 and NOS 625
-2023-07-08 12:42:32 INFO     Values [0.025, 0.04] and MPV 0.029185861349105835 and FOP 0.02918586789106208 and NOS 651
-2023-07-08 12:42:32 INFO     Values [0.04, 0.05] and MPV nan and FOP 0.0 and NOS 0
-2023-07-08 12:42:32 INFO     Values [0.05, 0.06] and MPV 0.054794520139694214 and FOP 0.05479452051041472 and NOS 146
-2023-07-08 12:42:32 INFO     Values [0.06, 0.08] and MPV 0.0615384578704834 and FOP 0.06153846151479289 and NOS 260
-2023-07-08 12:42:32 INFO     Values [0.08, 0.1] and MPV 0.0882352814078331 and FOP 0.08823529403114187 and NOS 102
+2023-07-12 10:09:58 INFO     Platt Calibration train calibration metrics: ECE=0.0019831766743246856, MCE=0.2771272226030516
+2023-07-12 10:09:58 INFO     Platt Calibration validation calibration metrics: ECE=0.0030210562499530472, MCE=0.3856469930551085
+2023-07-12 10:09:58 INFO     Train Values [0, 0.01] and MPV 0.0011155207759355541 and FOP 0.0013644754795675235 and NOS 24918
+2023-07-12 10:09:58 INFO     Validation Values [0, 0.01] and MPV 0.001077148678637271 and FOP 0.0011293965795235658 and NOS 6198
+2023-07-12 10:09:58 INFO     Train Values [0.01, 0.05] and MPV 0.02031170548376432 and FOP 0.0297142857108898 and NOS 875
+2023-07-12 10:09:58 INFO     Validation Values [0.01, 0.05] and MPV 0.01951640629485877 and FOP 0.014218009471934592 and NOS 211
+2023-07-12 10:09:58 INFO     Train Values [0.05, 0.1] and MPV 0.07152404942038698 and FOP 0.05263157891658972 and NOS 171
+2023-07-12 10:09:58 INFO     Validation Values [0.05, 0.1] and MPV 0.07317627648838804 and FOP 0.12499999973958333 and NOS 48
+2023-07-12 10:09:58 INFO     Train Values [0.1, 0.2] and MPV 0.13769906735034607 and FOP 0.0614035087180671 and NOS 114
+2023-07-12 10:09:58 INFO     Validation Values [0.1, 0.2] and MPV 0.13715749515848016 and FOP 0.0 and NOS 24
+2023-07-12 10:09:58 INFO     Train Values [0.2, 0.4] and MPV 0.2903677509890918 and FOP 0.14925373112051682 and NOS 67
+2023-07-12 10:09:58 INFO     Validation Values [0.2, 0.4] and MPV 0.29059849747272365 and FOP 0.04545454524793388 and NOS 22
+2023-07-12 10:09:58 INFO     Train Values [0.4, 0.7] and MPV 0.5437505923516402 and FOP 0.45714285648979597 and NOS 70
+2023-07-12 10:09:58 INFO     Validation Values [0.4, 0.7] and MPV 0.5471195373145077 and FOP 0.562499996484375 and NOS 16
+2023-07-12 10:09:58 INFO     Train Values [0.7, 0.8] and MPV 0.76290234295955 and FOP 0.6734693863806747 and NOS 49
+2023-07-12 10:09:58 INFO     Validation Values [0.7, 0.8] and MPV 0.7626890847121306 and FOP 0.7499999906250002 and NOS 8
+2023-07-12 10:09:58 INFO     Train Values [0.8, 0.9] and MPV 0.857056563306588 and FOP 0.91999999816 and NOS 50
+2023-07-12 10:09:58 INFO     Validation Values [0.8, 0.9] and MPV 0.8477616579261946 and FOP 0.9411764650519031 and NOS 17
+2023-07-12 10:09:58 INFO     Train Values [0.9, 0.93] and MPV 0.9157532679144444 and FOP 0.8947368397506925 and NOS 38
+2023-07-12 10:09:58 INFO     Validation Values [0.9, 0.93] and MPV 0.9161243694372269 and FOP 0.9999999750000006 and NOS 4
+2023-07-12 10:09:58 INFO     Train Values [0.93, 0.96] and MPV 0.94836747917447 and FOP 0.9589041082754739 and NOS 73
+2023-07-12 10:09:58 INFO     Validation Values [0.93, 0.96] and MPV 0.9450698251458769 and FOP 0.9629629593964334 and NOS 27
+2023-07-12 10:09:58 INFO     Train Values [0.96, 0.98] and MPV 0.9740463379963628 and FOP 0.9801980193167337 and NOS 202
+2023-07-12 10:09:58 INFO     Validation Values [0.96, 0.98] and MPV 0.9739736628679212 and FOP 0.9811320736205055 and NOS 53
+2023-07-12 10:09:58 INFO     Train Values [0.98, 0.99] and MPV 0.9863493940632501 and FOP 0.9958677684578695 and NOS 726
+2023-07-12 10:09:58 INFO     Validation Values [0.98, 0.99] and MPV 0.9860248678455867 and FOP 0.9945355185822211 and NOS 183
+2023-07-12 10:09:58 INFO     Train Values [0.99, 0.995] and MPV 0.9927250207128578 and FOP 0.9957627117589235 and NOS 944
+2023-07-12 10:09:58 INFO     Validation Values [0.99, 0.995] and MPV 0.9927753801294206 and FOP 0.999999999593496 and NOS 246
+2023-07-12 10:09:58 INFO     Train Values [0.995, 1] and MPV 0.997523710207542 and FOP 0.9999999999240121 and NOS 1316
+2023-07-12 10:09:58 INFO     Validation Values [0.995, 1] and MPV 0.9974253326801558 and FOP 0.9999999997118155 and NOS 347
+2023-07-12 10:10:04 INFO     Train Values [0.9, 0.92] and MPV 0.9099342742765657 and FOP 0.869565213610586 and NOS 23
+2023-07-12 10:10:04 INFO     Validation Values [0.9, 0.92] and MPV 0.9080459212696723 and FOP 0.9999999500000026 and NOS 2
+2023-07-12 10:10:04 INFO     Train Values [0.92, 0.94] and MPV 0.9308567704680598 and FOP 0.935483867950052 and NOS 31
+2023-07-12 10:10:04 INFO     Validation Values [0.92, 0.94] and MPV 0.9339936697551803 and FOP 0.9999999923076924 and NOS 13
+2023-07-12 10:10:04 INFO     Train Values [0.94, 0.95] and MPV 0.9452746868814672 and FOP 0.952380947845805 and NOS 21
+2023-07-12 10:10:04 INFO     Validation Values [0.94, 0.95] and MPV 0.9458293556033177 and FOP 0.9999999833333336 and NOS 6
+2023-07-12 10:10:04 INFO     Train Values [0.95, 0.96] and MPV 0.9553787095306531 and FOP 0.9722222195216049 and NOS 36
+2023-07-12 10:10:04 INFO     Validation Values [0.95, 0.96] and MPV 0.954839707371099 and FOP 0.8999999910000002 and NOS 10
+2023-07-12 10:10:04 INFO     Train Values [0.96, 0.975] and MPV 0.9701700283262635 and FOP 0.9896907206291848 and NOS 97
+2023-07-12 10:10:04 INFO     Validation Values [0.96, 0.975] and MPV 0.9699496288791969 and FOP 0.9999999961538462 and NOS 26
+2023-07-12 10:10:04 INFO     Train Values [0.975, 0.985] and MPV 0.9812315551484087 and FOP 0.9876923073884023 and NOS 325
+2023-07-12 10:10:04 INFO     Validation Values [0.975, 0.985] and MPV 0.9812966137025227 and FOP 0.9888888877901235 and NOS 90
+2023-07-12 10:10:04 INFO     Train Values [0.985, 0.99] and MPV 0.9878266248899297 and FOP 0.9960474306331921 and NOS 506
+2023-07-12 10:10:04 INFO     Validation Values [0.985, 0.99] and MPV 0.9877314113638004 and FOP 0.9916666658402779 and NOS 120
+2023-07-12 10:10:04 INFO     Train Values [0.99, 0.9925] and MPV 0.9912830636482922 and FOP 0.9999999997512438 and NOS 402
+2023-07-12 10:10:04 INFO     Validation Values [0.99, 0.9925] and MPV 0.9914290257045447 and FOP 0.9999999990825689 and NOS 109
+2023-07-12 10:10:04 INFO     Train Values [0.9925, 0.995] and MPV 0.9937945165430339 and FOP 0.9926199260161218 and NOS 542
+2023-07-12 10:10:04 INFO     Validation Values [0.9925, 0.995] and MPV 0.9938465672265846 and FOP 0.999999999270073 and NOS 137
+2023-07-12 10:10:04 INFO     Train Values [0.995, 0.9975] and MPV 0.9962484048754856 and FOP 0.9999999998442368 and NOS 642
+2023-07-12 10:10:04 INFO     Validation Values [0.995, 0.9975] and MPV 0.996288657949633 and FOP 0.9999999994535519 and NOS 183
+2023-07-12 10:10:04 INFO     Train Values [0.9975, 1] and MPV 0.998738466918492 and FOP 0.9999999998516321 and NOS 674
+2023-07-12 10:10:04 INFO     Validation Values [0.9975, 1] and MPV 0.9986936953367753 and FOP 0.999999999390244 and NOS 164
+2023-07-12 10:10:11 INFO     Train Values [0, 0.0025] and MPV 0.0004306723631131216 and FOP 0.0004303954856275147 and NOS 20911
+2023-07-12 10:10:11 INFO     Validation Values [0, 0.0025] and MPV 0.00044493920830596454 and FOP 0.0005686125852811105 and NOS 5276
+2023-07-12 10:10:11 INFO     Train Values [0.0025, 0.005] and MPV 0.0035278258987506464 and FOP 0.005333333333130159 and NOS 2625
+2023-07-12 10:10:11 INFO     Validation Values [0.0025, 0.005] and MPV 0.0035518686748327306 and FOP 0.0016638935105384538 and NOS 601
+2023-07-12 10:10:11 INFO     Train Values [0.005, 0.0075] and MPV 0.006051626159407193 and FOP 0.00431034482712173 and NOS 928
+2023-07-12 10:10:11 INFO     Validation Values [0.005, 0.0075] and MPV 0.006063655603174407 and FOP 0.008849557518208161 and NOS 226
+2023-07-12 10:10:11 INFO     Train Values [0.0075, 0.01] and MPV 0.008621816849236415 and FOP 0.015418502199247026 and NOS 454
+2023-07-12 10:10:11 INFO     Validation Values [0.0075, 0.01] and MPV 0.008669568497680528 and FOP 0.010526315778393353 and NOS 95
+2023-07-12 10:10:11 INFO     Train Values [0.01, 0.015] and MPV 0.0122199979048623 and FOP 0.02162162161577794 and NOS 370
+2023-07-12 10:10:11 INFO     Validation Values [0.01, 0.015] and MPV 0.012044243099969949 and FOP 0.009999999990000001 and NOS 100
+2023-07-12 10:10:11 INFO     Train Values [0.015, 0.025] and MPV 0.019145444394349013 and FOP 0.03191489360570394 and NOS 282
+2023-07-12 10:10:11 INFO     Validation Values [0.015, 0.025] and MPV 0.019429053458245346 and FOP 0.016393442596076325 and NOS 61
+2023-07-12 10:10:11 INFO     Train Values [0.025, 0.04] and MPV 0.031381585349349206 and FOP 0.03205128203073636 and NOS 156
+2023-07-12 10:10:11 INFO     Validation Values [0.025, 0.04] and MPV 0.031594427682201 and FOP 0.0 and NOS 39
+2023-07-12 10:10:11 INFO     Train Values [0.04, 0.05] and MPV 0.0441313498476094 and FOP 0.05970149244820673 and NOS 67
+2023-07-12 10:10:11 INFO     Validation Values [0.04, 0.05] and MPV 0.04510749796903638 and FOP 0.09090909008264464 and NOS 11
+2023-07-12 10:10:11 INFO     Train Values [0.05, 0.06] and MPV 0.05443949512722032 and FOP 0.04444444434567901 and NOS 45
+2023-07-12 10:10:11 INFO     Validation Values [0.05, 0.06] and MPV 0.05522880991762835 and FOP 0.09090909008264464 and NOS 11
+2023-07-12 10:10:11 INFO     Train Values [0.06, 0.08] and MPV 0.06968573664887903 and FOP 0.06666666657777778 and NOS 75
+2023-07-12 10:10:11 INFO     Validation Values [0.06, 0.08] and MPV 0.07164267472762322 and FOP 0.12499999947916667 and NOS 24
+2023-07-12 10:10:11 INFO     Train Values [0.08, 0.1] and MPV 0.08930205728422219 and FOP 0.0392156861976163 and NOS 51
+2023-07-12 10:10:11 INFO     Validation Values [0.08, 0.1] and MPV 0.09119385914505816 and FOP 0.15384615266272192 and NOS 13
+2023-07-12 10:10:17 INFO     Logistic Calibration train calibration metrics: ECE=0.9893704113185742, MCE=0.9940185588966304
+2023-07-12 10:10:17 INFO     Logistic Calibration validation calibration metrics: ECE=0.9902883338993376, MCE=0.9943519423242286
+2023-07-12 10:10:17 INFO     Train Values [0, 0.01] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:17 INFO     Validation Values [0, 0.01] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:17 INFO     Train Values [0.01, 0.05] and MPV 0.014891031942370044 and FOP 0.9934308748583628 and NOS 3349
+2023-07-12 10:10:17 INFO     Validation Values [0.01, 0.05] and MPV 0.014983301215361792 and FOP 0.995433789840704 and NOS 876
+2023-07-12 10:10:17 INFO     Train Values [0.05, 0.1] and MPV 0.06697567170584633 and FOP 0.6734693863806747 and NOS 49
+2023-07-12 10:10:17 INFO     Validation Values [0.05, 0.1] and MPV 0.06479320668084355 and FOP 0.7777777691358027 and NOS 9
+2023-07-12 10:10:17 INFO     Train Values [0.1, 0.2] and MPV 0.14658179277222028 and FOP 0.6956521708884688 and NOS 23
+2023-07-12 10:10:17 INFO     Validation Values [0.1, 0.2] and MPV 0.1489019369693525 and FOP 0.7999999840000003 and NOS 5
+2023-07-12 10:10:17 INFO     Train Values [0.2, 0.4] and MPV 0.2922702416343944 and FOP 0.24999999843749998 and NOS 16
+2023-07-12 10:10:17 INFO     Validation Values [0.2, 0.4] and MPV 0.2738704639007435 and FOP 0.19999999600000007 and NOS 5
+2023-07-12 10:10:17 INFO     Train Values [0.4, 0.7] and MPV 0.5443244784372955 and FOP 0.33333333247863245 and NOS 39
+2023-07-12 10:10:17 INFO     Validation Values [0.4, 0.7] and MPV 0.5893406376532455 and FOP 0.3999999960000001 and NOS 10
+2023-07-12 10:10:17 INFO     Train Values [0.7, 0.8] and MPV 0.7431593340830105 and FOP 0.1666666652777778 and NOS 12
+2023-07-12 10:10:17 INFO     Validation Values [0.7, 0.8] and MPV 0.7384940043362216 and FOP 0.0 and NOS 1
+2023-07-12 10:10:17 INFO     Train Values [0.8, 0.9] and MPV 0.8600794846819084 and FOP 0.2173913034026465 and NOS 23
+2023-07-12 10:10:17 INFO     Validation Values [0.8, 0.9] and MPV 0.8619879894809801 and FOP 0.0 and NOS 8
+2023-07-12 10:10:17 INFO     Train Values [0.9, 0.93] and MPV 0.9199151718429859 and FOP 0.0 and NOS 7
+2023-07-12 10:10:17 INFO     Validation Values [0.9, 0.93] and MPV 0.920285154018494 and FOP 0.14285714081632656 and NOS 7
+2023-07-12 10:10:17 INFO     Train Values [0.93, 0.96] and MPV 0.9472585835556174 and FOP 0.09999999949999999 and NOS 20
+2023-07-12 10:10:17 INFO     Validation Values [0.93, 0.96] and MPV 0.9457757202993612 and FOP 0.0 and NOS 3
+2023-07-12 10:10:17 INFO     Train Values [0.96, 0.98] and MPV 0.9733439731629631 and FOP 0.07272727259504132 and NOS 55
+2023-07-12 10:10:17 INFO     Validation Values [0.96, 0.98] and MPV 0.9728315946136781 and FOP 0.0 and NOS 11
+2023-07-12 10:10:17 INFO     Train Values [0.98, 0.99] and MPV 0.985736026101628 and FOP 0.04494382017422043 and NOS 89
+2023-07-12 10:10:17 INFO     Validation Values [0.98, 0.99] and MPV 0.9864717492278688 and FOP 0.04545454524793388 and NOS 22
+2023-07-12 10:10:17 INFO     Train Values [0.99, 0.995] and MPV 0.9931561040206291 and FOP 0.05660377355820577 and NOS 212
+2023-07-12 10:10:17 INFO     Validation Values [0.99, 0.995] and MPV 0.9928952477690416 and FOP 0.11320754695621217 and NOS 53
+2023-07-12 10:10:17 INFO     Train Values [0.995, 1] and MPV 0.997187850520865 and FOP 0.002177378591694166 and NOS 25719
+2023-07-12 10:10:17 INFO     Validation Values [0.995, 1] and MPV 0.997190773895788 and FOP 0.0014075695964747019 and NOS 6394
+2023-07-12 10:10:23 INFO     Train Values [0.9, 0.92] and MPV 0.9080439665365715 and FOP 0.0 and NOS 2
+2023-07-12 10:10:23 INFO     Validation Values [0.9, 0.92] and MPV 0.9125845759383194 and FOP 0.3333333222222226 and NOS 3
+2023-07-12 10:10:23 INFO     Train Values [0.92, 0.94] and MPV 0.9296749757914944 and FOP 0.12499999843750002 and NOS 8
+2023-07-12 10:10:23 INFO     Validation Values [0.92, 0.94] and MPV 0.9284264482031427 and FOP 0.0 and NOS 5
+2023-07-12 10:10:23 INFO     Train Values [0.94, 0.95] and MPV 0.94574763233931 and FOP 0.09999999900000002 and NOS 10
+2023-07-12 10:10:23 INFO     Validation Values [0.94, 0.95] and MPV 0.9447656000190106 and FOP 0.0 and NOS 1
+2023-07-12 10:10:23 INFO     Train Values [0.95, 0.96] and MPV 0.9533734016021499 and FOP 0.0 and NOS 7
+2023-07-12 10:10:23 INFO     Validation Values [0.95, 0.96] and MPV 0.9546716701778593 and FOP 0.0 and NOS 1
+2023-07-12 10:10:23 INFO     Train Values [0.96, 0.975] and MPV 0.9694571367091944 and FOP 0.06896551700356718 and NOS 29
+2023-07-12 10:10:23 INFO     Validation Values [0.96, 0.975] and MPV 0.9685227576729142 and FOP 0.0 and NOS 6
+2023-07-12 10:10:23 INFO     Train Values [0.975, 0.985] and MPV 0.9804700303004055 and FOP 0.0655737703843053 and NOS 61
+2023-07-12 10:10:23 INFO     Validation Values [0.975, 0.985] and MPV 0.9804998029849888 and FOP 0.0 and NOS 11
+2023-07-12 10:10:23 INFO     Train Values [0.985, 0.99] and MPV 0.9878054821132684 and FOP 0.037037036968449934 and NOS 54
+2023-07-12 10:10:23 INFO     Validation Values [0.985, 0.99] and MPV 0.9879307278057003 and FOP 0.062499999609374995 and NOS 16
+2023-07-12 10:10:23 INFO     Train Values [0.99, 0.9925] and MPV 0.9912889805155278 and FOP 0.06060606051423325 and NOS 66
+2023-07-12 10:10:23 INFO     Validation Values [0.99, 0.9925] and MPV 0.9913296923757948 and FOP 0.190476189569161 and NOS 21
+2023-07-12 10:10:23 INFO     Train Values [0.9925, 0.995] and MPV 0.9940001461530726 and FOP 0.05479452051041472 and NOS 146
+2023-07-12 10:10:23 INFO     Validation Values [0.9925, 0.995] and MPV 0.9939226434958599 and FOP 0.0624999998046875 and NOS 32
+2023-07-12 10:10:23 INFO     Train Values [0.995, 0.9975] and MPV 0.997187850520865 and FOP 0.002177378591694166 and NOS 25719
+2023-07-12 10:10:23 INFO     Validation Values [0.995, 0.9975] and MPV 0.997190773895788 and FOP 0.0014075695964747019 and NOS 6394
+2023-07-12 10:10:23 INFO     Train Values [0.9975, 1] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:23 INFO     Validation Values [0.9975, 1] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:29 INFO     Train Values [0, 0.0025] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:29 INFO     Validation Values [0, 0.0025] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:29 INFO     Train Values [0.0025, 0.005] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:29 INFO     Validation Values [0.0025, 0.005] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:29 INFO     Train Values [0.005, 0.0075] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:29 INFO     Validation Values [0.005, 0.0075] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:29 INFO     Train Values [0.0075, 0.01] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:29 INFO     Validation Values [0.0075, 0.01] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:29 INFO     Train Values [0.01, 0.015] and MPV 0.014210558115626246 and FOP 0.9978315865197749 and NOS 2767
+2023-07-12 10:10:29 INFO     Validation Values [0.01, 0.015] and MPV 0.014203503727517072 and FOP 0.9985974753157648 and NOS 713
+2023-07-12 10:10:29 INFO     Train Values [0.015, 0.025] and MPV 0.0165055460272375 and FOP 0.9810606058747992 and NOS 528
+2023-07-12 10:10:29 INFO     Validation Values [0.015, 0.025] and MPV 0.01645323751652428 and FOP 0.9863945571521125 and NOS 147
+2023-07-12 10:10:29 INFO     Train Values [0.025, 0.04] and MPV 0.03117783708512338 and FOP 0.8809523788548753 and NOS 42
+2023-07-12 10:10:29 INFO     Validation Values [0.025, 0.04] and MPV 0.03253730892069791 and FOP 0.9999999909090911 and NOS 11
+2023-07-12 10:10:29 INFO     Train Values [0.04, 0.05] and MPV 0.043754517425239024 and FOP 0.9166666590277779 and NOS 12
+2023-07-12 10:10:29 INFO     Validation Values [0.04, 0.05] and MPV 0.04434747877610268 and FOP 0.7999999840000003 and NOS 5
+2023-07-12 10:10:29 INFO     Train Values [0.05, 0.06] and MPV 0.054970699231373786 and FOP 0.7916666633680556 and NOS 24
+2023-07-12 10:10:29 INFO     Validation Values [0.05, 0.06] and MPV 0.0543421281226876 and FOP 0.7499999812500004 and NOS 4
+2023-07-12 10:10:29 INFO     Train Values [0.06, 0.08] and MPV 0.06948879872398334 and FOP 0.49999999642857146 and NOS 14
+2023-07-12 10:10:29 INFO     Validation Values [0.06, 0.08] and MPV 0.0688871538336002 and FOP 0.7499999812500004 and NOS 4
+2023-07-12 10:10:29 INFO     Train Values [0.08, 0.1] and MPV 0.08996981362706659 and FOP 0.6363636305785125 and NOS 11
+2023-07-12 10:10:29 INFO     Validation Values [0.08, 0.1] and MPV 0.0902217323024408 and FOP 0.9999999000000099 and NOS 1
+2023-07-12 10:10:39 INFO     Isotonic Calibration train calibration metrics: ECE=1.5016660508878797e-07, MCE=5.862240951559627e-07
+2023-07-12 10:10:39 INFO     Isotonic Calibration validation calibration metrics: ECE=0.0011803477205069455, MCE=0.25961536169052124
+2023-07-12 10:10:39 INFO     Train Values [0, 0.01] and MPV 0.0010969496797770262 and FOP 0.0010968475788060738 and NOS 24616
+2023-07-12 10:10:39 INFO     Validation Values [0, 0.01] and MPV 0.0010565684642642736 and FOP 0.0009787928221700033 and NOS 6130
+2023-07-12 10:10:39 INFO     Train Values [0.01, 0.05] and MPV 0.02784602716565132 and FOP 0.02784602784374725 and NOS 1221
+2023-07-12 10:10:39 INFO     Validation Values [0.01, 0.05] and MPV 0.026980364695191383 and FOP 0.017301038056297218 and NOS 289
+2023-07-12 10:10:39 INFO     Train Values [0.05, 0.1] and MPV 0.06225680932402611 and FOP 0.06225680931429695 and NOS 257
+2023-07-12 10:10:39 INFO     Validation Values [0.05, 0.1] and MPV 0.05976562201976776 and FOP 0.0781249998779297 and NOS 64
+2023-07-12 10:10:39 INFO     Train Values [0.1, 0.2] and MPV 0.111111119389534 and FOP 0.11111111069958847 and NOS 27
+2023-07-12 10:10:39 INFO     Validation Values [0.1, 0.2] and MPV 0.1111111268401146 and FOP 0.07142857091836735 and NOS 14
+2023-07-12 10:10:39 INFO     Train Values [0.2, 0.4] and MPV 0.30000001192092896 and FOP 0.2999999995714286 and NOS 70
+2023-07-12 10:10:39 INFO     Validation Values [0.2, 0.4] and MPV 0.3031470775604248 and FOP 0.2941176453287197 and NOS 17
+2023-07-12 10:10:39 INFO     Train Values [0.4, 0.7] and MPV 0.6170213222503662 and FOP 0.6170212752829335 and NOS 47
+2023-07-12 10:10:39 INFO     Validation Values [0.4, 0.7] and MPV 0.6153846383094788 and FOP 0.8749999890625002 and NOS 8
+2023-07-12 10:10:39 INFO     Train Values [0.7, 0.8] and MPV 0.800000011920929 and FOP 0.7999999840000003 and NOS 5
+2023-07-12 10:10:39 INFO     Validation Values [0.7, 0.8] and MPV 0.7896871566772461 and FOP 0.4999999750000013 and NOS 2
+2023-07-12 10:10:39 INFO     Train Values [0.8, 0.9] and MPV 0.862500011920929 and FOP 0.862499998921875 and NOS 80
+2023-07-12 10:10:39 INFO     Validation Values [0.8, 0.9] and MPV 0.8660309910774231 and FOP 0.9047619004535147 and NOS 21
+2023-07-12 10:10:39 INFO     Train Values [0.9, 0.93] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:39 INFO     Validation Values [0.9, 0.93] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:39 INFO     Train Values [0.93, 0.96] and MPV 0.9423075318336487 and FOP 0.9423076904955621 and NOS 52
+2023-07-12 10:10:39 INFO     Validation Values [0.93, 0.96] and MPV 0.942307710647583 and FOP 0.9999999937499999 and NOS 16
+2023-07-12 10:10:39 INFO     Train Values [0.96, 0.98] and MPV 0.9769585132598877 and FOP 0.9769585248954108 and NOS 217
+2023-07-12 10:10:39 INFO     Validation Values [0.96, 0.98] and MPV 0.9770432710647583 and FOP 0.9661016932777937 and NOS 59
+2023-07-12 10:10:39 INFO     Train Values [0.98, 0.99] and MPV 0.9899997711181641 and FOP 0.98999999901 and NOS 100
+2023-07-12 10:10:39 INFO     Validation Values [0.98, 0.99] and MPV 0.9900000095367432 and FOP 0.999999996875 and NOS 32
+2023-07-12 10:10:39 INFO     Train Values [0.99, 0.995] and MPV 0.9928390979766846 and FOP 0.9928315408627844 and NOS 279
+2023-07-12 10:10:39 INFO     Validation Values [0.99, 0.995] and MPV 0.9927968382835388 and FOP 0.9999999985507247 and NOS 69
+2023-07-12 10:10:39 INFO     Train Values [0.995, 1] and MPV 0.9984854459762573 and FOP 0.9984854221507579 and NOS 2641
+2023-07-12 10:10:39 INFO     Validation Values [0.995, 1] and MPV 0.9985125660896301 and FOP 0.9985294116178633 and NOS 680
+2023-07-12 10:10:49 INFO     Train Values [0.9, 0.92] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:49 INFO     Validation Values [0.9, 0.92] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:49 INFO     Train Values [0.92, 0.94] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:49 INFO     Validation Values [0.92, 0.94] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:49 INFO     Train Values [0.94, 0.95] and MPV 0.9423075318336487 and FOP 0.9423076904955621 and NOS 52
+2023-07-12 10:10:49 INFO     Validation Values [0.94, 0.95] and MPV 0.942307710647583 and FOP 0.9999999937499999 and NOS 16
+2023-07-12 10:10:49 INFO     Train Values [0.95, 0.96] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:49 INFO     Validation Values [0.95, 0.96] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:49 INFO     Train Values [0.96, 0.975] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:49 INFO     Validation Values [0.96, 0.975] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:49 INFO     Train Values [0.975, 0.985] and MPV 0.9769585132598877 and FOP 0.9769585248954108 and NOS 217
+2023-07-12 10:10:49 INFO     Validation Values [0.975, 0.985] and MPV 0.9770432710647583 and FOP 0.9661016932777937 and NOS 59
+2023-07-12 10:10:49 INFO     Train Values [0.985, 0.99] and MPV 0.9899997711181641 and FOP 0.98999999901 and NOS 100
+2023-07-12 10:10:49 INFO     Validation Values [0.985, 0.99] and MPV 0.9900000095367432 and FOP 0.999999996875 and NOS 32
+2023-07-12 10:10:49 INFO     Train Values [0.99, 0.9925] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:49 INFO     Validation Values [0.99, 0.9925] and MPV 0.9904482960700989 and FOP 0.9999999000000099 and NOS 1
+2023-07-12 10:10:49 INFO     Train Values [0.9925, 0.995] and MPV 0.9928390979766846 and FOP 0.9928315408627844 and NOS 279
+2023-07-12 10:10:49 INFO     Validation Values [0.9925, 0.995] and MPV 0.9928314089775085 and FOP 0.9999999985294119 and NOS 68
+2023-07-12 10:10:49 INFO     Train Values [0.995, 0.9975] and MPV 0.9964632987976074 and FOP 0.9964633067200297 and NOS 1131
+2023-07-12 10:10:49 INFO     Validation Values [0.995, 0.9975] and MPV 0.9964632391929626 and FOP 0.9965034961550686 and NOS 286
+2023-07-12 10:10:49 INFO     Train Values [0.9975, 1] and MPV 1.0 and FOP 0.9999999999337748 and NOS 1510
+2023-07-12 10:10:49 INFO     Validation Values [0.9975, 1] and MPV 1.0 and FOP 0.9999999997461928 and NOS 394
+2023-07-12 10:10:57 INFO     Train Values [0, 0.0025] and MPV 0.00045313063310459256 and FOP 0.0004532269760675615 and NOS 22064
+2023-07-12 10:10:57 INFO     Validation Values [0, 0.0025] and MPV 0.00044305771007202566 and FOP 0.0007242440702385616 and NOS 5523
+2023-07-12 10:10:57 INFO     Train Values [0.0025, 0.005] and MPV 0.003979806788265705 and FOP 0.003984063743432644 and NOS 251
+2023-07-12 10:10:58 INFO     Validation Values [0.0025, 0.005] and MPV 0.003972111735492945 and FOP 0.0 and NOS 64
+2023-07-12 10:10:58 INFO     Train Values [0.005, 0.0075] and MPV 0.006955978460609913 and FOP 0.006953498478620013 and NOS 2301
+2023-07-12 10:10:58 INFO     Validation Values [0.005, 0.0075] and MPV 0.006953115575015545 and FOP 0.0036832412516237126 and NOS 543
+2023-07-12 10:10:58 INFO     Train Values [0.0075, 0.01] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:58 INFO     Validation Values [0.0075, 0.01] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:58 INFO     Train Values [0.01, 0.015] and MPV 0.014705882407724857 and FOP 0.01470588233131488 and NOS 68
+2023-07-12 10:10:58 INFO     Validation Values [0.01, 0.015] and MPV 0.014517446048557758 and FOP 0.0 and NOS 18
+2023-07-12 10:10:58 INFO     Train Values [0.015, 0.025] and MPV 0.018036073073744774 and FOP 0.018036072140674132 and NOS 499
+2023-07-12 10:10:58 INFO     Validation Values [0.015, 0.025] and MPV 0.01801324635744095 and FOP 0.01562499998779297 and NOS 128
+2023-07-12 10:10:58 INFO     Train Values [0.025, 0.04] and MPV 0.033771105110645294 and FOP 0.03377110693550261 and NOS 533
+2023-07-12 10:10:58 INFO     Validation Values [0.025, 0.04] and MPV 0.03381902724504471 and FOP 0.008474576264004597 and NOS 118
+2023-07-12 10:10:58 INFO     Train Values [0.04, 0.05] and MPV 0.04958677664399147 and FOP 0.049586776818523325 and NOS 121
+2023-07-12 10:10:58 INFO     Validation Values [0.04, 0.05] and MPV 0.04958677664399147 and FOP 0.07999999968 and NOS 25
+2023-07-12 10:10:58 INFO     Train Values [0.05, 0.06] and MPV 0.053658537566661835 and FOP 0.05365853655919096 and NOS 205
+2023-07-12 10:10:58 INFO     Validation Values [0.05, 0.06] and MPV 0.053658533841371536 and FOP 0.09259259242112483 and NOS 54
+2023-07-12 10:10:58 INFO     Train Values [0.06, 0.08] and MPV nan and FOP 0.0 and NOS 0
+2023-07-12 10:10:58 INFO     Validation Values [0.06, 0.08] and MPV 0.060771673917770386 and FOP 0.0 and NOS 1
+2023-07-12 10:10:58 INFO     Train Values [0.08, 0.1] and MPV 0.0961538553237915 and FOP 0.0961538459689349 and NOS 52
+2023-07-12 10:10:58 INFO     Validation Values [0.08, 0.1] and MPV 0.0962962955236435 and FOP 0.0 and NOS 9
+/home/mdevo/exoml_pycharm/iatson_planet_tces_launch.py:112: DtypeWarning: Columns (70,217,220,221,224,225,230,232,233,234,235,236,237,253,258,263,268,273,278,279,284,289,294,299,304,309,310,316,321,326,331,336,346,374,379,384,389,390,395,400,405,410,426,428,434,444,448,452,456,460,464,468,472,476,480,484,488,492,496,500,504,508,512,516,520,524) have mixed types. Specify dtype option on import or set low_memory=False.
+  candidates_df = pd.read_csv(training_dir + '/q1_q17/injected_objects_candidates.csv')
+/home/mdevo/exoml_pycharm/iatson_planet_tces_launch.py:113: DtypeWarning: Columns (222,223,341,347,352,357,362,367,368,369,420) have mixed types. Specify dtype option on import or set low_memory=False.
+  all_df = pd.read_csv(training_dir + '/q1_q17/classified_tces.csv')
