@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "exoml"
+authors = [
+    {name = "Martín Dévora-Pajares", email = "mdevorapajares@protonmail.com"},
+]
+description = "ExoML tools for exoplanet detections"
+readme = "README.md"
+requires-python = ">=3.9"
+keywords = []
+license = {text = "MIT"}
+dynamic = ["dependencies"]
+version = "0.0.1"
+
+[project.optional-dependencies]
+
+[project.scripts]
+my-script = "my_package.module:function"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.dynamic]
+dependencies = {file = ["requirements.txt"]}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+"models" = ["**"]
+"q1_q17" = ["**"]
+"ete6" = ["**"]

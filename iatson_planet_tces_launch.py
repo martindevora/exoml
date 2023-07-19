@@ -1,4 +1,12 @@
 import os
+import logging
+import sys
+from lcbuilder.lcbuilder_class import LcBuilder
+from lcbuilder.star.KicStarCatalog import KicStarCatalog
+from lcbuilder.star.TicStarCatalog import TicStarCatalog
+
+#from preparation.parser_utils import create_star_csv, CreateStarCsvInput
+
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 #import pydevd_pycharm
@@ -18,6 +26,18 @@ from iatson.IATSON_planet import IATSON_planet
 from ml.learning_rate.schedulers import ExponentialRescaleDecay
 from ml.loss.cross_entropy import fb_loss, dice_bce_loss, dice_loss
 from ml.model.base_model import HyperParams
+
+if not isinstance(logging.root, logging.RootLogger):
+    logging.root = logging.RootLogger(logging.INFO)
+# formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+# logger = logging.getLogger()
+# while len(logger.handlers) > 0:
+#     logger.handlers.pop()
+# logger.setLevel(logging.INFO)
+# handler = logging.StreamHandler(sys.stdout)
+# handler.setLevel(logging.INFO)
+# handler.setFormatter(formatter)
+# logger.addHandler(handler)
 
 training_dir = '/data/scratch/ml/'
 model_dir = './'
@@ -91,26 +111,39 @@ iatson = IATSON_planet({0: 'planet_transit', 1: 'planet', 2: 'fp', 3: 'fa', 4: '
 #iatson.train(training_dir, model_dir, hp)
 #iatson.train_cv(training_dir, model_dir, hp)
 
-# iatson.predict_test_set_cv(training_dir, "/home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk", batch_size, cores)
-#
+# Current model test metrics
+#iatson.predict_test_set_cv(training_dir, "/home/mdevo/exoml/IATSON_planet_model_chk", batch_size, cores)
+
+# Model test metrics with the additional tce_candidates
 # iatson.predict_test_set_cv(training_dir, "/home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk", batch_size, cores,
 #                            additional_test_set_filename=training_dir + '/q1_q17/injected_objects_tce_candidates.csv')
 
+# Model test metrics with calibration
 # iatson.predict_test_set_cv(training_dir, "/home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk", batch_size, cores,
 #                            calibration_method='isotonic',
 #                            calibrator_output="/home/mdevo/exoml/models/iatson/final/")
 
+# Calibration metrics
 # iatson.calibration_metrics_cv(training_dir, "/home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk", batch_size, cores)
 
+# Predict candidates
 candidates_df = pd.read_csv(training_dir + '/q1_q17/injected_objects_candidates.csv')
 all_df = pd.read_csv(training_dir + '/q1_q17/classified_tces.csv')
 # candidates_df = candidates_df.loc[candidates_df['object_id'] == 'KIC 4144236']
-# iatson.predict_df_cv(training_dir, "/home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk", candidates_df, batch_size, cores,
-#                      thresholds=[0.5, 0.99], validation_df=all_df)
-
 iatson.predict_df_cv(training_dir, "/home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk", candidates_df, batch_size, cores,
-                     thresholds=[0.5, 0.99], validation_df=all_df,
-                     calibrator_path="/home/mdevo/exoml/models/iatson/final/IATSON_planet_cal_isotonic.pkl")
+                     thresholds=[0.5, 0.99], validation_df=all_df, from_arrays=True)
+
+# Predict validated candidates only
+# candidates_df = pd.read_csv(training_dir + '/q1_q17/injected_objects_candidates.csv')
+#candidates_df = candidates_df.loc[candidates_df['disc_refname'].str.contains('Valizadegan', na=False)]
+#candidates_df = candidates_df.loc[candidates_df['disc_refname'].str.contains('Armstrong et al. 2021', na=False)]
+# iatson.predict_df_cv(training_dir, "/home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk", candidates_df, batch_size, cores,
+#                      thresholds=[0.5, 0.99], validation_df=all_df, from_arrays=False)
+
+# Predict candidates with previously calibrated model
+# iatson.predict_df_cv(training_dir, "/home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk", candidates_df, batch_size, cores,
+#                      thresholds=[0.5, 0.99], validation_df=all_df,
+#                      calibrator_path="/home/mdevo/exoml/models/iatson/final/IATSON_planet_cal_isotonic.pkl")
 
 #iatson.predict_test_set(training_dir, "./IATSON_planet_model", batch_size, cores)
 #iatson = iatson.load_model("/usr/bin/exoml/IATSON_planet_model/")

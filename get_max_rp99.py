@@ -5,12 +5,15 @@ import datetime
 
 
 folds = 10
-model_dir = './IATSON_planet_model'
+model_dir = '/home/mdevo/exoml/IATSON_planet_model_chk'
 if folds is not None:
     for fold in np.arange(0, folds):
         path = model_dir + f'_{fold}' + '/training_log.csv'
         log_df = pd.read_csv(path)
-        print(f"R@P99_{fold}={log_df['val_r@p99'].max()}. Obtained in {datetime.datetime.fromtimestamp(os.stat(path).st_mtime)}")
+        try:
+            print(f"R@P99_{fold}={log_df['val_r@p99'].max()}. T@P99_{fold}={log_df[log_df['val_r@p99'].max() == log_df['val_r@p99']]['val_t@p99'].iloc[0]}. Obtained in {datetime.datetime.fromtimestamp(os.stat(path).st_mtime)}")
+        except:
+            print(f"R@P99_{fold}={log_df['val_r@p99'].max()}. Obtained in {datetime.datetime.fromtimestamp(os.stat(path).st_mtime)}")
 else:
     path = model_dir + '/training_log.csv'
     log_df = pd.read_csv(path)

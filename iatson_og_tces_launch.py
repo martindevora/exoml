@@ -14,11 +14,11 @@ from ml.model.base_model import HyperParams
 
 training_dir = '/data/scratch/ml/'
 model_dir = './'
-batch_size = 500 #100
+batch_size = 200 #100
 lr = 0.001 #0.0001
 warmup_lr = 1e-7
-epochs = 200
-cores = 5
+epochs = 400
+cores = 10
 steps_per_epoch = 148
 #learning_rate_schedule = ExponentialRescaleDecay(lr,
                                                  # decay_steps=20,
@@ -56,10 +56,10 @@ hp = HyperParams(batch_size=batch_size,
                  run_eagerly=False,
                  dropout_rate=0.1,
                  dropout_max_rate=0.1,
-                 spatial_dropout_rate=0.1,
+                 spatial_dropout_rate=0.3,
                  white_noise_std=0.001, #0.001, #0.001, #0.001, #None,
-                 l1_regularization=0.000001, #0.001, #0.00001, #0.00001, #None,
-                 l2_regularization=0.000001, #0.001, #0.00001, #0.00001, #None,
+                 l1_regularization=0.0005, #0.001, #0.00001, #0.00001, #None,
+                 l2_regularization=0.0005, #0.001, #0.00001, #0.00001, #None,
                  stochastic_weight_average_wait=0, #int(0.75 * epochs),
                  callbacks=[ #ReduceLROnPlateau(monitor='val_pr_auc', mode='max', factor=0.75, patience=10, min_lr=lr / 100), #, #,
                             WarmUpAndLinDecreaseCallback(warmup_lr, lr, warmup_lr, epochs // 20, epochs - epochs // 20),
