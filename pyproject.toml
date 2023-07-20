@@ -18,7 +18,7 @@ version = "0.0.1"
 [project.optional-dependencies]
 
 [project.scripts]
-my-script = "my_package.module:function"
+#my-script = "my_package.module:function"
 
 [tool.setuptools]
 include-package-data = true
@@ -30,6 +30,6 @@ dependencies = {file = ["requirements.txt"]}
 where = ["src"]
 
 [tool.setuptools.package-data]
-"models" = ["**"]
+#"models" = ["**"]
 "q1_q17" = ["**"]
 "ete6" = ["**"]
