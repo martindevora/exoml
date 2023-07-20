@@ -31,5 +31,5 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 #"models" = ["**"]
-"q1_q17" = ["**"]
-"ete6" = ["**"]
+#"q1_q17" = ["q1_q17"]
+#"ete6" = ["ete6"]
