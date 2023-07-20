@@ -7,7 +7,7 @@ dearwatson
 timesynth @ git+https://github.com/TimeSynth/TimeSynth.git
 ruamel.yaml
 debugpy
-pydevd-pycharm~=223.8617.48
+#pydevd-pycharm~=223.8617.48
 pydot
 graphviz
 pandas
