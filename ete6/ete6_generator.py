@@ -4,7 +4,7 @@ from abc import abstractmethod
 import matplotlib.pyplot as plt
 import foldedleastsquares
 import scipy
-import timesynth
+#import timesynth
 import wotan
 from lcbuilder.helper import LcbuilderHelper
 from numpy.random import default_rng
@@ -138,8 +138,8 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         return input_df_clipped
 
     def _prepare_input_lc(self, input_df, period, epoch, duration, focus_range_in_durations=6,
-                          required_range_percent=0.75):
-        time = input_df["#time"].to_numpy()
+                          required_range_percent=0.75, time_key='#time', flux_key='flux_0'):
+        time = input_df[time_key].to_numpy()
         cadence_s = np.round(np.nanmedian(time[1:] - time[:-1]) * 3600 * 24)
         cadences_per_transit = LcbuilderHelper.estimate_transit_cadences(cadence_s, duration * focus_range_in_durations)
         transit_t0s_list = LcbuilderHelper.compute_t0s(time, period, epoch, duration)
@@ -158,8 +158,8 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
             if cadences_ratio >= required_range_percent:
                 good_quality_t0s.append(t0)
             else:
-                input_df = input_df[(input_df['#time'] < t0 - transit_with_baseline_half_length) |
-                                    (input_df['#time'] > t0 + transit_with_baseline_half_length)]
+                input_df = input_df[(input_df[time_key] < t0 - transit_with_baseline_half_length) |
+                                    (input_df[time_key] > t0 + transit_with_baseline_half_length)]
 
         # We don't want time encoding because time will be used for folding and then dropped
         #input_df["#time"] = value_encode_times(time - time[0])
@@ -176,8 +176,8 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         #     timeseries_rn = timeseries_rn + [rn_value]
         # timeseries_rn = np.array(timeseries_rn)
         # input_df['flux_0'] = input_df['flux_0'] + timeseries_rn
-        input_df['flux_0'] = input_df['flux_0'] / 2
-        input_df['flux_0'][input_df['flux_0'] > 1] = 1
+        input_df[flux_key] = input_df[flux_key] / 2
+        input_df[flux_key][input_df[flux_key] > 1] = 1
         input_df = input_df.fillna(self.zero_epsilon)
         input_df = input_df.replace(0.0, self.zero_epsilon)
         input_df = input_df.replace(0, self.zero_epsilon)
