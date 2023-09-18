@@ -360,8 +360,8 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
     return lc_df
 
 class CreateTargetInput:
-    def __init__(self, mission, id, lc_file, target_dir, models_dir, injected_files_df, cache_dir, max_lc_length=20610,
-                 force=False, tpf_files=None, inject_random=False, mode='all') -> None:
+    def __init__(self, mission, id, lc_file, target_dir, models_dir, injected_files_df, cache_dir, index,
+                 max_lc_length=20610, force=False, tpf_files=None, inject_random=False, mode='all') -> None:
         super().__init__()
         self.mission = mission
         self.id = id
@@ -371,6 +371,7 @@ class CreateTargetInput:
         self.injected_files_df = injected_files_df
         self.max_lc_length = max_lc_length
         self.cache_dir = cache_dir
+        self.index = index
         self.force = force
         self.tpf_files = tpf_files
         self.inject_random = inject_random
@@ -423,7 +424,8 @@ def create_target_csv(create_target_input):
                             modes=create_target_input.mode)
             for f in pathlib.Path(tpfs_dir).glob(f"*{file_id.split('_')[1]}*"):
                 os.remove(f)
-        logging.info("PID %s: Finished to get long cadence info for %s", pid, file_planet_prefix)
+        logging.info("PID %s: Finished to get long cadence info for index %s for file %s", pid,
+                     create_target_input.index, file_planet_prefix)
     except Exception as e:
         logging.exception("PID %s: Failed long cadence for %s", pid, file_planet_prefix)
 
