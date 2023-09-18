@@ -13,7 +13,7 @@ import pandas as pd
 import ruamel.yaml
 from abc import abstractmethod
 
-from keras.utils.vis_utils import plot_model
+from keras.utils import plot_model
 from sklearn.utils import shuffle
 
 from ml.callback.checkpoint import ModelCheckpointCallback
@@ -510,7 +510,8 @@ class BaseModel(WithLogging):
             logging.info("Validation set contains %s (%s %%) items of class %s", class_len,
                          class_len / validation_dataset_size * 100, labels)
 
-    def train_cv(self, training_dir, output_dir, hyperparams, folds=10, retry_rp99_threshold=0, retry_indexes=[]):
+    def train_cv(self, training_dir, output_dir, hyperparams, folds=10, retry_rp99_threshold=0, retry_indexes=[],
+                 continue_from=None):
         root_model_name = self._get_model_dir()
         dataset, fold_indexes = self.prepare_training_data_cv(training_dir, folds)
         dataset_length = len(dataset)
@@ -639,7 +640,16 @@ class BaseModel(WithLogging):
                                  ") (steps_per_epoch," + str(steps_per_epoch) +
                                  ") (model_validation_steps," + str(model_validation_steps) +
                                  ")")
-                    self.save(output_dir, model_name)
+                    if continue_from is None:
+                        self.save(output_dir, model_name)
+                    else:
+                        continue_from_model = continue_from + str(index)
+                        logging.info(f"Continuing model fit from checkpoint ${continue_from_model}")
+                        self.load_model(continue_from_model)
+                        self.compile(optimizer,
+                                     hyperparams.custom_loss if hyperparams.custom_loss is not None else loss,
+                                     metrics=metrics,
+                                     run_eagerly=hyperparams.run_eagerly)
                     self.__write_hyperparameters(hyperparams, model_name)
                     fit_history = self.model.fit(x=training_batch_generator,
                                    steps_per_epoch=steps_per_epoch,
