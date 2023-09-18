@@ -563,9 +563,8 @@ class IATSON_planet(ImbalancedBinaryModel):
         if 'with_radius' in self.mode:
             df = df[~df['radius(earth)'].isna()]
         df = df[df['type'].isin(include_categories)]
-        injected_objects_df = pd.concat(df)
-        injected_objects_df.reset_index(inplace=True, drop=True)
-        return injected_objects_df
+        df.reset_index(inplace=True, drop=True)
+        return df
 
     def instance_generator(self, dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon, shuffle=True):
         return IatsonPlanetModelGenerator(dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon,
