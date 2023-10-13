@@ -1,11 +1,18 @@
+import os
+from typing import List
+
+import keras
 import pandas as pd
 import numpy as np
 import tensorflow as tf
 import time
+
+from numpy import ndarray
 from numpy.lib.stride_tricks import sliding_window_view
 from sklearn.utils import shuffle
 
 from ml.layers.transformer import Transformer
+from ml.layers.transformer_classifier import TransformerClassifier
 from ml.model.base_model import HyperParams
 
 
@@ -26,89 +33,80 @@ class SANTO:
 
         return tf.reduce_mean(loss_)
 
-    def train(self, lcs_dir, injected_objects_file, model_dir, n_epochs,
-              hyperparams: HyperParams, input_dim=(500, 2), batch_size=1000):
+    def train(self, lcs_dir, model_dir, hyperparams: HyperParams, input_dim=500):
         tf.keras.backend.clear_session()
-        output_dim = len(input_dim)
         checkpoint_path = f"{model_dir}_chk"
-        transformer = Transformer(num_heads=4, key_dim=input_dim, ffn_units=input_dim, output_dim=output_dim,
-                                  stack_depth=2, dropout_rate=hyperparams.dropout_rate)
-        # TODO this loss function is probably not well suited for our purpose as we don't want an exclusive output, but
-        #  a linear one
-        # Define a categorical cross entropy loss
-        loss_holder = tf.keras.losses.BinaryCrossentropy(from_logits=True, reduction="none")
-        # Define a metric to store the mean loss of every epoch
-        train_loss = tf.keras.metrics.Mean(name="loss")
-        # Define a metric to save the accuracy in every epoch
-        train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name="accuracy")
-        # Define a metric to store the mean loss of every epoch
-        train_precision = tf.keras.metrics.Precision(name="precision")
-        # Define a metric to store the mean loss of every epoch
-        train_recall = tf.keras.metrics.Recall(name="recall")
-        # Define a metric to store the mean loss of every epoch
-        train_pr99 = tf.keras.metrics.PrecisionAtRecall(recall=0.99, name="p@r99")
-        # Create the Adam optimizer (Vaswani et al., 2017) with learning rate decay from Schedule
+        input_layer = keras.Input(shape=(input_dim, 1), name="input")
+        transformer = TransformerClassifier(transformer_input_size=input_dim, patch_size=input_dim,
+                                            num_heads=4, mlp_dim=input_dim, hyperparams=hyperparams, num_blocks=2,
+                                            classes=input_dim)(input_layer)
         leaning_rate = CustomSchedule(input_dim)
         optimizer = tf.keras.optimizers.Adam(leaning_rate, beta_1=0.9, beta_2=0.98, epsilon=1e-9)
-        # Create the Checkpoint
-        ckpt = tf.train.Checkpoint(transformer=transformer, optimizer=optimizer)
+        transformer_model = keras.Model(inputs=input_layer, outputs=transformer)
+        transformer_model.compile(optimizer=optimizer, loss='binary_crossentropy',
+                                  metrics=['accuracy', 'precision', 'recall'])
+        transformer_model.run_eagerly = hyperparams.run_eagerly
+        # transformer = Transformer(num_heads=4, key_dim=input_dim, ffn_units=input_dim[0], output_dim=input_dim[0],
+        #                           stack_depth=2, dropout_rate=hyperparams.dropout_rate)
+        train_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name="accuracy")
+        train_precision = tf.keras.metrics.Precision(name="precision")
+        train_recall = tf.keras.metrics.Recall(name="recall")
+        train_pr99 = tf.keras.metrics.PrecisionAtRecall(recall=0.99, name="p@r99")
+        ckpt = tf.train.Checkpoint(transformer=transformer_model, optimizer=optimizer)
         ckpt_manager = tf.train.CheckpointManager(ckpt, checkpoint_path, max_to_keep=5)
         if ckpt_manager.latest_checkpoint:
             ckpt.restore(ckpt_manager.latest_checkpoint)
             print("Last checkpoint restored.")
-
-        ''' Train the transformer model for n_epochs using the data generator dataset'''
-        injected_objects_df = pd.read_csv(injected_objects_file)
-        injected_objects_df = injected_objects_df.sort_values(by=["object_id"], ascending=True)
-        injected_objects_df_unique = injected_objects_df.drop_duplicates(subset=["object_id"], keep='last')
+        target_files: List[str] = os.listdir(lcs_dir)
         losses = []
         accuracies = []
         precisions = []
         recalls = []
         pr99s = []
-        for epoch in range(n_epochs):
-            print("Epoch {}".format(epoch + 1))
+        for epoch in range(hyperparams.epochs):
+            print(f"Epoch {epoch + 1}/{hyperparams.epochs}")
+            np.random.shuffle(target_files)
             start = time.time()
-            # In every epoch reset the loss and accuracy calculations
-            train_loss.reset_states()
             train_accuracy.reset_states()
-            for index, row in injected_objects_df_unique.iterrows():
-                input_lc_df = None
-                for object_index, object_row in injected_objects_df[injected_objects_df['object_id'] == row['object_id']].iterrows():
-                    lc_df = pd.read_csv(f"{lcs_dir}/{row['object_id']}_{round(object_row['period'], 2)}_lc_short.csv",
-                                        usecols=['#time', 'flux', 'planet_model', 'eb_model', 'bckeb_model'])
-                    if input_lc_df is None:
-                        input_lc_df = lc_df
-                    else:
-                        input_lc_df['planet_model_flux'] = input_lc_df['planet_model_flux'] - 1 + lc_df['planet_model_flux']
-                        input_lc_df['eb_model'] = input_lc_df['eb_model'] - 1 + lc_df['eb_model']
-                        input_lc_df['bckeb_model'] = input_lc_df['bckeb_model'] - 1 + lc_df['bckeb_model']
-                input_lc_df.dropna(inplace=True)
-                inputs = np.zeros((batch_size, input_dim[0], input_dim[1]))
-                outputs = np.zeros((batch_size, input_dim[0]))
-                time_arr = np.ones(len(input_dim) // 2) + input_lc_df['#time'].to_numpy() + np.ones(input_dim[0] // 2)
-                # TODO encode time??
-                flux = np.ones(len(input_dim) // 2) + input_lc_df['flux'].to_numpy() + np.ones(input_dim[0] // 2)
-                flux = flux / 2
-                input_values = np.column_stack((time_arr, flux))
-                model_values = ((input_lc_df['planet_model_flux'].to_numpy() < 1) |
-                                (input_lc_df['eb_model'].to_numpy() < 1) |
-                                (input_lc_df['bckeb_model'].to_numpy() < 0))
-                input_windows = sliding_window_view(input_values, window_shape=input_dim[0])
-                flux_predictions = transformer(input_windows, model_values, True)
-                loss = self.loss_function(model_values, flux_predictions, loss_holder)
-                train_loss(loss)
-                train_accuracy(input_windows, flux_predictions)
-                train_precision(input_windows, flux_predictions)
-                train_recall(input_windows, flux_predictions)
-                train_pr99(input_windows, flux_predictions)
-                losses.append(train_loss.result())
-                accuracies.append(train_accuracy.result())
-                precisions.append(train_accuracy.result())
-                recalls.append(train_accuracy.result())
-                pr99s.append(train_accuracy.result())
-                print("Epoch {} Batch {} Loss {:.4f} Accuracy {:.4f}".format(epoch + 1, index, train_loss.result(),
-                                                                             train_accuracy.result()))
+            last_target_file_index: int = 0
+            last_target_file_pos: int = 0
+            last_target_file: str = target_files[0]
+            flux = np.loadtxt(f'{lcs_dir}/{last_target_file}', delimiter=',')
+            train_batch: ndarray = np.zeros((hyperparams.batch_size, input_dim))
+            train_tags: ndarray = np.zeros((hyperparams.batch_size, input_dim))
+            iteration: int = 0
+            data_remaining: bool = True
+            while data_remaining:
+                if last_target_file_pos >= flux.shape[1] - input_dim // 2:
+                    last_target_file_pos = input_dim // 2
+                    last_target_file_index = last_target_file_index + 1
+                    last_target_file = target_files[last_target_file_index]
+                    flux = np.loadtxt(f'{lcs_dir}/{last_target_file}', delimiter=',')
+                train_batch[iteration] = flux[0][last_target_file_pos:last_target_file_pos + input_dim]
+                train_tags[iteration] = flux[1][last_target_file_pos:last_target_file_pos + input_dim]
+                last_target_file_pos = last_target_file_pos + 1
+                data_remaining = last_target_file_index != len(target_files) or \
+                                 last_target_file_pos < flux.shape[1] - input_dim // 2
+                batch_index = iteration // hyperparams.batch_size
+                if (iteration + 1) % hyperparams.batch_size == 0 or not data_remaining:
+                    with tf.GradientTape() as tape:
+                        flux_predictions = transformer_model(train_batch, train_tags, True)
+                        loss = transformer_model.compute_loss(train_tags, flux_predictions)
+                        gradients = tape.gradient(loss, transformer_model.trainable_variables)
+                        optimizer.apply_gradients(zip(gradients, transformer_model.trainable_variables))
+                    train_accuracy(train_batch, flux_predictions)
+                    train_precision(train_batch, flux_predictions)
+                    train_recall(train_batch, flux_predictions)
+                    train_pr99(train_batch, flux_predictions)
+                    losses.append(loss)
+                    accuracies.append(train_accuracy.result())
+                    precisions.append(train_accuracy.result())
+                    recalls.append(train_accuracy.result())
+                    pr99s.append(train_accuracy.result())
+                    print("Epoch {} Batch {} Loss {:.4f} Accuracy {:.4f}".format(epoch + 1, batch_index + 1,
+                                                                                 loss.result(),
+                                                                                 train_accuracy.result()))
+                iteration = iteration + 1
             # Checkpoint the model on every epoch
             ckpt_save_path = ckpt_manager.save()
             print("Saving checkpoint for epoch {} in {}".format(epoch + 1, ckpt_save_path))
@@ -189,3 +187,6 @@ class CustomSchedule(tf.keras.optimizers.schedules.LearningRateSchedule):
         arg1 = tf.math.rsqrt(tf.cast(step, tf.float32))
         arg2 = tf.cast(step, tf.float32) * tf.math.pow(warmup_steps, -1.5)
         return tf.math.rsqrt(self.d_model) * tf.math.minimum(arg1, arg2)
+
+SANTO().train("/data/scratch/ml/santo/training_data/", "/data/scratch/exoml/SANTO",
+              hyperparams=HyperParams(batch_size=100, epochs=10, run_eagerly=True))
