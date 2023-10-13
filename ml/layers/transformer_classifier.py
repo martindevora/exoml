@@ -143,7 +143,7 @@ class Transformer(tf.keras.layers.Layer):
         super().__init__(*args, **kwargs)
         self.num_heads = num_heads
         self.mlp_dim = mlp_dim
-        self.hyperparams= hyperparams
+        self.hyperparams = hyperparams
         self.num_blocks = num_blocks
         self.transformer_encoders = []
         self.regularizer_value = 0.1
@@ -197,13 +197,13 @@ class TransformerClassifier(tf.keras.layers.Layer):
     def build(self, input_shape):
         # The linear projection could be a conv1d if the input was an image to be patched in pieces. As it is not,
         # we don't need a convolutional layer because for us a patch is of kernel=1
-        self.linear_proj = tf.keras.layers.Conv1D(
-            filters=self.transformer_input_size,
-            kernel_size=self.patch_size,
-            strides=self.patch_size,
-            padding="same",
-            name="embedding"
-        )
+        # self.linear_proj = tf.keras.layers.Conv1D(
+        #     filters=self.transformer_input_size,
+        #     kernel_size=self.patch_size,
+        #     strides=self.patch_size,
+        #     padding="same",
+        #     name="embedding"
+        # )
         #self.linear_proj = tf.keras.layers.Dense(self.transformer_input_size)
         # self.linear_proj = tf.keras.layers.Dense(self.transformer_input_size, activation="relu")
         #self.class_token = ClassToken(name="class_token")
@@ -220,12 +220,12 @@ class TransformerClassifier(tf.keras.layers.Layer):
 
 
     def call(self, inputs, training=True):
-        result = self.linear_proj(inputs)
+        # result = self.linear_proj(inputs)
         # Assuming we don't need to reshape our data as we don't need to flatten the resulting image of the linear_proj
         #result = tf.keras.layers.Reshape((result.shape[1] * result.shape[2], self.transformer_input_size))(result)
         #result = self.class_token(result)
         #result = self.add_pos_embedding(result)
-        result = self.transformer(result, training=training)
+        result = self.transformer(inputs, training=training)
         # result = tf.keras.layers.Lambda(
         #      lambda v: v[:, 0],
         #      name="ExtractToken")(result)
