@@ -681,7 +681,7 @@ class IATSON_planet(ImbalancedBinaryModel):
 
     def predict_test_set_cv(self, training_dir, model_dir_prefix, batch_size=20, cores=os.cpu_count() - 1,
                             test_set_limit=None,
-                            zero_epsilon=1e-7, plot_mismatches=False, folds=10, thresholds=[0.5, 0.99],
+                            zero_epsilon=1e-7, plot_mismatches=False, folds=10, thresholds=[0.5],
                             k_values=np.arange(100, 2200, 100),
                             additional_test_set_filename=None, calibration_method=None,
                             calibrator_output=None):
@@ -720,8 +720,7 @@ class IATSON_planet(ImbalancedBinaryModel):
         predictions_df_q1q17 = predictions_df_q1q17.sort_values(by=['prediction_value'], ascending=False)
         predictions_df_ete6 = predictions_df_ete6.sort_values(by=['prediction_value'], ascending=False)
         logging.info("----------------------------------COMPLETE SET METRICS ---------------------------------------")
-        self.compute_cv_average_metrics(fold_thresholds_to_results,
-                                        ['tp', 'fp', 'fn', 'accuracy', 'precision', 'recall'], thresholds, True)
+        self.compute_metrics_p100(fold_thresholds_to_results, True)
         self.compute_metrics(predictions_df, log=True)
         self.log_prediction_metrics(predictions_df, k_values, "K METRICS")
         self.compute_rp_thresholds(fold_thresholds_to_results, log=True)
@@ -816,23 +815,22 @@ class IATSON_planet(ImbalancedBinaryModel):
         fps_df = fps_df.sort_values(by=['prediction_value'], ascending=False)
         logging.info("FPs DF: \n" + fps_df.to_string())
 
-    def compute_cv_average_metrics(self, fold_thresholds_to_results, metric_names, thresholds=[0.5], log=False):
-        metric_fold_stats = {}
-        metric_average_stats = {}
-        for threshold in thresholds:
-            metric_fold_stats[threshold] = {}
-            metric_average_stats[threshold] = {}
-            for metric in metric_names:
-                for fold in fold_thresholds_to_results:
-                    metric_val = getattr(fold_thresholds_to_results[fold][threshold], metric)
-                    if metric not in metric_fold_stats:
-                        metric_fold_stats[threshold][metric] = {}
-                    metric_fold_stats[threshold][metric][fold] = metric_val
-                metric_arr = [metric_val for metric_val in metric_fold_stats[threshold][metric].values()]
-                metric_average_stats[threshold][metric] = (np.nanmean(metric_arr), np.nanstd(metric_arr))
+    def compute_metrics_p100(self, fold_thresholds_to_results, log=False):
+        first_fp_thresholds = []
+        r_at_p100 = []
+        for fold in fold_thresholds_to_results:
+            sorted_pred_df = fold_thresholds_to_results[fold][0.5].predictions_df\
+                .sort_values(by=['prediction_value'], ascending=False)
+            first_fp_thresholds.append(
+                sorted_pred_df.loc[(sorted_pred_df['expected_class'] == 0) & (sorted_pred_df['predicted_class'] == 1),
+                'prediction_value'].iloc[0])
+            metric = tf.keras.metrics.RecallAtPrecision(precision=1, num_thresholds=10000)
+            metric.update_state(sorted_pred_df['expected_class'].to_numpy(),
+                                sorted_pred_df['prediction_value'].to_numpy())
+            r_at_p100.append(metric.result().numpy())
             if log:
-                logging.info(f"Average statistics for threshold {threshold}:\n {metric_average_stats}")
-        return metric_average_stats
+                logging.info(f'Fold {fold} T@P100={first_fp_thresholds[fold]}, R@P100={r_at_p100[fold]}')
+        return first_fp_thresholds, r_at_p100
 
     def compute_rp_thresholds(self, fold_thresholds_to_results, rp_values=[0.95, 0.975, 0.99], thresholds=1000,
                               log=False):
