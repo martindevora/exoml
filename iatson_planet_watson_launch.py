@@ -31,24 +31,24 @@ iatson = IATSON_planet({0: 'planet_transit', 1: 'planet', 2: 'fp', 3: 'fa', 4: '
                          'tce_source_offset': [0], 'tce_secondary': [0], 'tce_og': [0], 'tce_odd_even': [0], 'none': [0],
                          'EB': [0], 'bckEB': [0], 'candidate': [0], 'tce_candidate': [0]}, HyperParams(), mode="all")\
      .build(use_transformers=False, transformer_blocks=1, transformer_heads=2)
-target_id = "TIC 282576340"
+target_id = "TIC 459837008"
 watson_dir = f'/home/mdevo/exoml/watson/{target_id}/'
 if not os.path.exists(watson_dir):
     os.makedirs(watson_dir, exist_ok=True)
 star_filename = f'{watson_dir}/{target_id}_star.csv'
 lc_filename = f'{watson_dir}/lc.csv'
-period = 8.3761316
-epoch = 1210.732023
-duration = 1.976
-depth_ppt = 9060 / 1000
+period = 2.2891
+epoch = 1818.07
+duration = 0.9
+depth_ppt = 1
 a_rstar = 0.1
-rp_rstar = 0.1
-run_watson = True
+rp_rstar = 0.02560
+run_watson = False
 plot_inputs = True
 if run_watson:
     create_star_csv(CreateStarCsvInput(target_id, 4 if 'KIC' or 'EPIC' in target_id else 20.25, 50,
                                        KicStarCatalog() if 'KIC' in target_id else TicStarCatalog(),
-                                       watson_dir, force=False))
+                                       watson_dir, force=True))
     star_df = pd.read_csv(star_filename)
     Watson(f'{watson_dir}', f'{watson_dir}').vetting(target_id, period, epoch, duration * 60,
                                                          depth_ppt, 'all', rp_rstar, a_rstar,
@@ -62,8 +62,8 @@ if run_watson:
 predictions, predictions_cal = iatson.predict_watson(target_id, period, duration, epoch, depth_ppt, watson_dir,
                                                      star_filename, lc_filename,
                                                      cv_dir="/home/mdevo/exoml/models/iatson/final/",
-                                                     plot_inputs=plot_inputs,
-                                                     calibrator_path='/home/mdevo/exoml/models/iatson/final/IATSON_planet_cal_isotonic.pkl')
+                                                     plot_inputs=plot_inputs)
+                                                     #calibrator_path='/home/mdevo/exoml/models/iatson/final/IATSON_planet_cal_isotonic.pkl')
 print(f'Uncalibrated predictions are {predictions}')
 print(f'Calibrated predictions are {predictions_cal}')
 print(f'Average uncalibrated prediction: {np.nanmean(predictions)} +- {np.nanstd(predictions)}')
