@@ -3,27 +3,22 @@ import os
 import pathlib
 
 import keras
-import tensorflow as tf
 from keras import Model
 from keras.layers import LeakyReLU
-from keras.optimizer_v2.learning_rate_schedule import ExponentialDecay
-from keras.utils import losses_utils
 
 from ml import thread_config
-from ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
-from ml.callback.get_weights import GetWeights
 from detrend.detrend_generator import DetrendModelGenerator
-from ml.log.get_weights_logger import ModelWeightsLogger
+from ml.loss.unsupervised import intransit_weighted_mean_squared_error
 from ml.metrics.fixed_mean import FixedMean
-from ml.model.base_model import BaseModel
+
+from ml.model.base_model import BaseModel, HyperParams
 
 thread_config.setup_threads(5)
 
 
 class DETREND(BaseModel):
-    def __init__(self, input_size=(20610, 8)):
-        super().__init__('DETREND')
-        self.input_size = input_size
+    def __init__(self, hyperparameters, name='DETREND', input_size=(20610, 8)):
+        super().__init__(name, input_size, None, None, hyperparameters)
 
     def build(self):
         # (time, flux, flux_err, centroidx, centroidy, motionx, motiony, bck)
@@ -127,26 +122,17 @@ class DETREND(BaseModel):
         training_dir = kwargs.get('training_dir')
         return [str(file) for file in list(pathlib.Path(training_dir).glob('*_lc.csv'))]
 
-    def instance_generator(self, dataset, dir, batch_size, input_sizes, zero_epsilon):
+    def instance_generator(self, dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon):
         return DetrendModelGenerator(dataset, batch_size, input_sizes, zero_epsilon)
 
     def instance_loss_accuracy(self):
-        loss = tf.keras.losses.MeanAbsolutePercentageError(reduction=losses_utils.ReductionV2.AUTO)
+        #loss = tf.keras.losses.MeanAbsolutePercentageError(reduction=losses_utils.ReductionV2.AUTO)
+        loss = intransit_weighted_mean_squared_error
         accuracy = FixedMean()
         return loss, accuracy
 
+    def instance_metrics(self):
+        return []
 
-detrend = DETREND().build()
-#auto_encoder.inform("DETREND.png")
-detrend.train("/mnt/DATA-2/ete6/lcs/", os.getcwd(), 5, 50, dry_run=False, training_set_limit=100,
-              metrics=["mean_squared_error",
-                            "mean_absolute_error",
-                            "mean_absolute_percentage_error",
-                            "mean_squared_logarithmic_error",
-                            "cosine_proximity"])
-# lc_filenames = [str(file) for file in list(pathlib.Path("/mnt/DATA-2/ete6/lcs/").glob('*_lc.csv'))]
-# lc_filenames.sort()
-# lc_filenames = shuffle(lc_filenames)
-# dataset_length = len(lc_filenames)
-# acg = AutoencoderGenerator(lc_filenames, 20, (20610, 7), 1e-7)
-# acg.__getitem__(20)
+    def plot_metrics(self, model_dir, steps_per_epoch, with_validation=False):
+        return []
