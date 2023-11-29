@@ -8,10 +8,8 @@ import tensorflow as tf
 import time
 
 from numpy import ndarray
-from numpy.lib.stride_tricks import sliding_window_view
 from sklearn.utils import shuffle
 
-from ml.layers.transformer import Transformer
 from ml.layers.transformer_classifier import TransformerClassifier
 from ml.model.base_model import HyperParams
 
@@ -84,6 +82,8 @@ class SANTO:
                     flux = np.loadtxt(f'{lcs_dir}/{last_target_file}', delimiter=',')
                 train_batch[iteration] = flux[0][last_target_file_pos:last_target_file_pos + input_dim]
                 train_tags[iteration] = flux[1][last_target_file_pos:last_target_file_pos + input_dim]
+                train_tags[iteration][train_tags[iteration] == 1] = 0
+                train_tags[iteration][train_tags[iteration] > 0] = 1
                 last_target_file_pos = last_target_file_pos + 1
                 data_remaining = last_target_file_index != len(target_files) or \
                                  last_target_file_pos < flux.shape[1] - input_dim // 2
