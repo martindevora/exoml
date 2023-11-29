@@ -269,13 +269,17 @@ def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_cou
     tces_df = pd.read_csv(csv, comment='#')
     tces_df = tces_df.sort_values(by=["kepid"], ascending=True)
     #tces_df = tces_df.drop_duplicates(subset=["kepid"], keep='last')
-    tces_df = tces_df.sample(frac=1).reset_index(drop=True)
+    tces_df = tces_df.sort_values(by=["period"], ascending=True)
+    #tces_df = tces_df.sample(frac=1).reset_index(drop=True)
     inputs = []
     if ids is not None:
         tces_df = tces_df[tces_df['object_id'].isin(ids)]
+    tces_df = tces_df.reset_index(drop=True)
+    ranges = range(0, len(tces_df))
     print("Total number of targets is " + str(len(tces_df)))
-    for index, tce_row in tces_df.iterrows():
-        inputs = inputs + [CreateTargetInput('KIC', tce_row['object_id'], None, target_dir, None, tce_row, cache_dir, force=force, mode=mode)]
+    for index in ranges:
+        tce_row = tces_df.iloc[index]
+        inputs = inputs + [CreateTargetInput('KIC', tce_row['object_id'], None, target_dir, None, tce_row, cache_dir, index, force=force, mode=mode)]
     with Pool(processes=cores, maxtasksperchild=1) as pool:
         pool.map(create_target_csv, inputs, chunksize=1)
 
