@@ -6,7 +6,8 @@ from lcbuilder.star.TicStarCatalog import TicStarCatalog
 from preparation.parser_utils import create_star_csvs
 from preparation.ete6parser import create_target_csvs, create_injection_dataframe
 
-
+if not isinstance(logging.root, logging.RootLogger):
+    logging.root = logging.RootLogger(logging.INFO)
 formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 logger = logging.getLogger()
 while len(logger.handlers) > 0:
