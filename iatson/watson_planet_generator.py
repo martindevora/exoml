@@ -4,6 +4,7 @@ import sys
 
 import matplotlib.pyplot as plt
 import foldedleastsquares
+import wotan
 from lcbuilder.helper import LcbuilderHelper
 from numpy.random import default_rng
 from ete6.ete6_generator import Ete6ModelGenerator
@@ -47,7 +48,7 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
         plt.clf()
         plt.close()
 
-    def _plot_input(self, input_array, input_err_array, type, scenario):
+    def _plot_input(self, input_array, input_err_array, type, scenario, save_dir=None):
         if self.plot_inputs:
             transposed_err_array = []
             transposed_array = np.transpose(input_array)
@@ -156,7 +157,10 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
             # # axs[5][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
             # axs[5][1].set_title("Motion Y")
             fig.suptitle(type + " " + scenario)
-            plt.show()
+            if save_dir:
+                plt.savefig(f'{save_dir}/{type}_{scenario}.png')
+            else:
+                plt.show()
             plt.clf()
             plt.close()
 
@@ -200,9 +204,6 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
         batch_data_values = np.empty((len(target_indexes), 1))
         i = 0
         for df_index, target_row in injected_objects_df.iterrows():
-            if self.fixed_target_id is not None:
-                target_row = self.injected_objects_df[self.injected_objects_df['object_id'] == self.fixed_target_id[0]]
-                target_row = target_row[target_row['period'] == self.fixed_target_id[1]]
             #TODO refactor to use mission for object_id
             object_id = target_row['object_id'].split(' ')
             mission_id = object_id[0]
@@ -211,22 +212,30 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
             epoch = target_row['epoch']
             duration = target_row['duration(h)'] / 24
             duration_to_period = duration / period
-            type = target_row['type']
             batch_data_values[i] = [0]
             file_prefix = self.lcs_dir + '/' #+ mission_id + '_' + str(target_id)
             #TODO refactor to use mission for _lc files
             lc_filename = self.lc_filename
             centroids_filename = file_prefix + 'centroids.csv'
             og_filename = file_prefix + 'og_dg.csv'
-            lc_df = pd.read_csv(lc_filename, usecols=['#time', 'flux_0'], low_memory=True)
+            lc_df = pd.read_csv(lc_filename, usecols=['#time', 'flux'], low_memory=True)
             centroids_df = pd.read_csv(centroids_filename, usecols=['time', 'centroids_ra', 'centroids_dec'],
                                                 low_memory=True)
-            og_df = pd.read_csv(og_filename, usecols=['time', 'og_flux'], low_memory=True)
+            og_df = pd.read_csv(og_filename, usecols=['time', 'og_flux', 'halo_flux', 'core_flux'], low_memory=True)
             if lc_df is None:
                 logging.warning("No curve for target " + file_prefix)
                 raise ValueError("No curve for target " + file_prefix)
             lc_df = lc_df.sort_values(by=['#time'])
+            lc_df['flux'] = wotan.flatten(lc_df['#time'].to_numpy(), lc_df['flux'].to_numpy(), duration * 4, method='biweight')
+            centroids_df = centroids_df.sort_values(by=['time'])
+            centroids_df['centroids_ra'] = wotan.flatten(centroids_df['time'].to_numpy(), centroids_df['centroids_ra'].to_numpy(), duration * 4, method='biweight')
+            centroids_df['centroids_dec'] = wotan.flatten(centroids_df['time'].to_numpy(), centroids_df['centroids_dec'].to_numpy(), duration * 4, method='biweight')
             centroids_df['time'] = self.fold(centroids_df['time'].to_numpy(), period, epoch + period / 2)
+            og_df = og_df.sort_values(by=['time'])
+            og_df['halo_flux'] = wotan.flatten(og_df['time'].to_numpy(), og_df['halo_flux'].to_numpy(), duration * 4, method='biweight')
+            og_df['core_flux'] = wotan.flatten(og_df['time'].to_numpy(), og_df['core_flux'].to_numpy(), duration * 4, method='biweight')
+            og_df['og_flux'] = og_df['halo_flux'] - og_df['core_flux']
+            og_df = og_df.drop(columns=['halo_flux', 'core_flux'])
             og_df['time'] = self.fold(og_df['time'].to_numpy(), period, epoch + period / 2)
             centroids_df = centroids_df.sort_values(by=['time'])
             og_df = og_df.sort_values(by=['time'])
@@ -245,7 +254,8 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                                                       'dist_arcsec'], index_col=False)
             star_neighbours_df = self._prepare_input_neighbour_stars(star_neighbours_df)
             star_df, ra, dec = self._prepare_input_star(star_df)
-            lc_df, good_transits_count, transits_count = self._prepare_input_lc(lc_df, period, epoch, duration)
+            lc_df, good_transits_count, transits_count = self._prepare_input_lc(lc_df, period, epoch, duration,
+                                                                                time_key='#time', flux_key='flux')
             not_null_times_args = np.argwhere(lc_df['#time'].to_numpy() > 0).flatten()
             lc_df = lc_df.iloc[not_null_times_args]
             offset_filename = file_prefix + 'source_offsets.csv'
@@ -266,12 +276,13 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
             good_transits_ratio = good_transits_ratio if good_transits_ratio < 1 else 1 - self.zero_epsilon
             planet_radius = target_row['radius(earth)'] / 300
             planet_radius = planet_radius if planet_radius < 1 else 1 - self.zero_epsilon
-            depth = target_row['depth_primary'] / 1e6
+            depth = target_row['depth_primary'] / 1e3
             depth = depth if depth < 1 else 1 - self.zero_epsilon
-            scalar_values[i] = np.transpose([[period / 1200, duration / 15, depth,
+            scalar_values[i] = np.transpose([[period / 1200 if period < 1200 else 1, duration / 15, depth,
                                               planet_radius, good_transits_count_norm,
                                               good_transits_ratio,
-                                              target_dist, offset_err]])
+                                              target_dist if not np.isnan(target_dist) else self.zero_epsilon,
+                                              offset_err]])
             #['ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k'])
             neighbours_array = star_neighbours_df.to_numpy().flatten()
             star_neighbours_array[i] = np.transpose([neighbours_array if len(neighbours_array) == 9 * 15 \
@@ -318,12 +329,12 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
             folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i] = \
                 self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[8], target_row['object_id'])
             # Focus flux sub-harmonic even
-            lc_df_focus = pd.DataFrame(columns=['#time', 'flux_0'])
+            lc_df_focus = pd.DataFrame(columns=['#time', 'flux'])
             time, flux0, _ = LcbuilderHelper.mask_transits(time,
-                                                            lc_df.copy()['flux_0'].to_numpy(), period, duration * 6,
+                                                            lc_df.copy()['flux'].to_numpy(), period, duration * 2,
                                                             epoch)
             lc_df_focus['#time'] = time
-            lc_df_focus['flux_0'] = flux0
+            lc_df_focus['flux'] = flux0
             lc_df_focus['#time'] = self.fold(time, period / 2, epoch)
             lc_df_focus = lc_df_focus.sort_values(by=['#time'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
@@ -331,9 +342,9 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
             folded_flux_even_subhar_array[i], folded_flux_even_subhar_array_err[i] = \
                 self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[5], target_row['object_id'])
             # Focus flux sub-harmonic odd
-            lc_df_focus = pd.DataFrame(columns=['#time', 'flux_0'])
+            lc_df_focus = pd.DataFrame(columns=['#time', 'flux'])
             lc_df_focus['#time'] = time
-            lc_df_focus['flux_0'] = flux0
+            lc_df_focus['flux'] = flux0
             lc_df_focus['#time'] = self.fold(time, period / 2, epoch + period / 4)
             lc_df_focus = lc_df_focus.sort_values(by=['#time'])
             lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
@@ -351,31 +362,15 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
             self.assert_in_range(object_id, folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i])
             self.assert_in_range(object_id, folded_centroids_array[i], folded_centroids_array_err[i])
             self.assert_in_range(object_id, folded_og_array[i], folded_og_array_err[i])
-                # logging.info("GENERATOR Star Inputs max " + str(np.max(star_array[i])) + " and min " +
-                #              str(np.min(star_array[i])))
-                # logging.info("GENERATOR Global Flux Inputs max " + str(np.max(global_flux_array[i])) + " and min " +
-                #              str(np.min(global_flux_array[i])))
-                # logging.info("GENERATOR Folded Even Inputs max " + str(np.max(folded_flux_even_array[i])) + " and min " +
-                #              str(np.min(folded_flux_even_array[i])))
-                # logging.info("GENERATOR Folded Odd Inputs max " + str(np.max(folded_flux_odd_array[i])) + " and min " +
-                #              str(np.min(folded_flux_odd_array[i])))
-                # logging.info("GENERATOR Folded Even Subhar Inputs max " + str(np.max(folded_flux_even_subhar_array[i])) +
-                #              " and min " + str(np.min(folded_flux_even_subhar_array[i])))
-                # logging.info("GENERATOR Folded Odd Subhar Inputs max " + str(np.max(folded_flux_odd_subhar_array[i])) +
-                #              " and min " + str(np.min(folded_flux_odd_subhar_array[i])))
-                # logging.info("GENERATOR Folded Even Har Inputs max " + str(np.max(folded_flux_even_har_array[i])) +
-                #              " and min " + str(np.min(folded_flux_even_har_array[i])))
-                # logging.info("GENERATOR Folded Odd Har Inputs max " + str(np.max(folded_flux_odd_har_array[i])) +
-                #              " and min " + str(np.min(folded_flux_odd_har_array[i])))
-            self._plot_input(global_flux_array[i], global_flux_array_err[i], target_row['object_id'] + "_" + type, "global")
-            self._plot_input(folded_flux_even_array[i], folded_flux_even_array_err[i], target_row['object_id'] + "_" + type, "even")
-            self._plot_input(folded_flux_odd_array[i], folded_flux_odd_array_err[i], target_row['object_id'] + "_" + type, "odd")
-            self._plot_input(folded_flux_even_har_array[i], folded_flux_even_har_array_err[i], target_row['object_id'] + "_" + type, "even_har")
-            self._plot_input(folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i], target_row['object_id'] + "_" + type, "odd_har")
-            # self._plot_input(folded_flux_even_subhar_array[i], folded_flux_even_subhar_array_err[i], target_row['object_id'] + "_" + type, "even_subhar")
-            # self._plot_input(folded_flux_odd_subhar_array[i], folded_flux_odd_subhar_array_err[i], target_row['object_id'] + "_" + type, "odd_subhar")
-            self._plot_input(folded_og_array[i], folded_og_array_err[i], target_row['object_id'] + "_" + type, "OG")
-            self._plot_input(folded_centroids_array[i], folded_centroids_array_err[i], target_row['object_id'] + "_" + type, "CENTROIDS")
+            self._plot_input(global_flux_array[i], global_flux_array_err[i], target_row['object_id'], "global", save_dir=self.lcs_dir)
+            self._plot_input(folded_flux_even_array[i], folded_flux_even_array_err[i], target_row['object_id'], "even", save_dir=self.lcs_dir)
+            self._plot_input(folded_flux_odd_array[i], folded_flux_odd_array_err[i], target_row['object_id'], "odd", save_dir=self.lcs_dir)
+            self._plot_input(folded_flux_even_har_array[i], folded_flux_even_har_array_err[i], target_row['object_id'], "even_har", save_dir=self.lcs_dir)
+            self._plot_input(folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i], target_row['object_id'], "odd_har", save_dir=self.lcs_dir)
+            # self._plot_input(folded_flux_even_subhar_array[i], folded_flux_even_subhar_array_err[i], target_row['object_id'], "even_subhar")
+            # self._plot_input(folded_flux_odd_subhar_array[i], folded_flux_odd_subhar_array_err[i], target_row['object_id'], "odd_subhar")
+            self._plot_input(folded_og_array[i], folded_og_array_err[i], target_row['object_id'], "OG", save_dir=self.lcs_dir)
+            self._plot_input(folded_centroids_array[i], folded_centroids_array_err[i], target_row['object_id'], "CENTROIDS", save_dir=self.lcs_dir)
             i = i + 1
         filter_channels = np.array([0, 1, 6, 7, 8, 9, 10, 11])
         return [scalar_values[:, [0, 1, 2, 3, 4, 5]], scalar_values[:, [6, 7]],
