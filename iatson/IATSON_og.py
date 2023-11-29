@@ -163,7 +163,7 @@ class IATSON_og(ImbalancedBinaryModel):
 
     def load_training_set(self, **kwargs):
         training_dir = kwargs.get('training_dir')
-        injected_objects_df_q1_q17 = pd.read_csv(training_dir + "/q1_q17/injected_objects_tces.csv", index_col=None)
+        injected_objects_df_q1_q17 = pd.read_csv(training_dir + "/q1_q17/injected_objects_tces_multi.csv", index_col=None)
         injected_objects_df_q1_q17 = injected_objects_df_q1_q17.loc[(injected_objects_df_q1_q17['multitype'].str.contains('tce')) |
                                                                     (injected_objects_df_q1_q17['type'] == 'planet') |
                                                                     (injected_objects_df_q1_q17['type'] == 'planet_transit')]
@@ -172,8 +172,8 @@ class IATSON_og(ImbalancedBinaryModel):
         injected_objects_df.reset_index(inplace=True, drop=True)
         return injected_objects_df
 
-    def instance_generator(self, dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon):
-        return IatsonOgModelGenerator(dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon)
+    def instance_generator(self, dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon, shuffle=True):
+        return IatsonOgModelGenerator(dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon, shuffle_batch=shuffle)
 
     def predict(self, input):
         prediction = self.model(input, training=False)
