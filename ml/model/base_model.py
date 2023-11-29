@@ -432,17 +432,23 @@ class BaseModel(WithLogging):
                          ")")
             self.save(output_dir)
             self.__write_hyperparameters(hyperparams, model_path)
-            fit_history = self.model.fit(x=training_batch_generator,
-                           steps_per_epoch=steps_per_epoch,
-                           epochs=hyperparams.epochs, verbose=1, class_weight=class_weights,
-                           validation_data=validation_batch_generator,
-                           validation_steps=model_validation_steps,
-                           callbacks=hyperparams.callbacks,
-                           use_multiprocessing=hyperparams.cores > 0, workers=1 if hyperparams.cores <= 0
-                else hyperparams.cores)
+            fit_history = self.fit_model(hyperparams, training_batch_generator, steps_per_epoch, class_weights,
+                                         validation_batch_generator, model_validation_steps)
             self.save(output_dir)
         else:
             logging.warning("dry_run was activated and 'training' will not be launched")
+
+    def fit_model(self, hyperparams, training_batch_generator, steps_per_epoch, class_weights,
+                  validation_batch_generator, model_validation_steps):
+        fit_history = self.model.fit(x=training_batch_generator,
+                                     steps_per_epoch=steps_per_epoch,
+                                     epochs=hyperparams.epochs, verbose=1, class_weight=class_weights,
+                                     validation_data=validation_batch_generator,
+                                     validation_steps=model_validation_steps,
+                                     callbacks=hyperparams.callbacks,
+                                     use_multiprocessing=hyperparams.cores > 0, workers=1
+            if hyperparams.cores <= 0 else hyperparams.cores)
+        return fit_history
 
     def build_optimizer(self, hyperparams, steps_per_epoch):
         initial_lr = self.compute_initial_lr(hyperparams)
@@ -487,7 +493,7 @@ class BaseModel(WithLogging):
             else:
                 optimizer.lr = hyperparams.initial_learning_rate
         else:
-            optimizer = tf.keras.optimizers.Adam(lr,
+            optimizer = Adam(lr,
                                                  beta_1=0.9, beta_2=0.98, epsilon=1e-9,
                                                  clipnorm=hyperparams.gradient_clip_norm,
                                                  clipvalue=hyperparams.gradient_clip_value)
@@ -681,7 +687,7 @@ class BaseModel(WithLogging):
         # with open(output_dir + '/hp.yaml', 'w', newline='') as f:
         #     yaml.dump(hyperparameters, f)
 
-    def load_model(self, dir, custom_objects={}):
+    def load_model(self, dir, custom_objects={}, compile=False):
         custom_objects['ExponentialRescaleDecay'] = ExponentialRescaleDecay
         custom_objects['WarmUpAndLinDecreaseCallback'] = WarmUpAndLinDecreaseCallback
         custom_objects['precision_at_k'] = precision_at_k
@@ -689,9 +695,9 @@ class BaseModel(WithLogging):
         custom_objects['mean_true_positive_value'] = mean_true_positive_value
         custom_objects['mean_true_negative_value'] = mean_true_negative_value
         custom_objects['mean_false_negative_value'] = mean_false_positive_value
-        custom_objects['ThresholdAtPrecision'] = ThresholdAtPrecision
+        custom_objects['ThresholdAtPrecision'] = None
         logging.info("Loading model from %s", dir)
-        self.set_model(tf.keras.models.load_model(dir,
+        self.set_model(tf.keras.models.load_model(dir, compile=compile,
                                                   custom_objects=custom_objects))
         return self
 
