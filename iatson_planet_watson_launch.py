@@ -67,4 +67,6 @@ predictions, predictions_cal = iatson.predict_watson(target_id, period, duration
 print(f'Uncalibrated predictions are {predictions}')
 print(f'Calibrated predictions are {predictions_cal}')
 print(f'Average uncalibrated prediction: {np.nanmean(predictions)} +- {np.nanstd(predictions)}')
+print(f'Median uncalibrated prediction: {np.nanmedian(predictions)} +- {np.nanstd(predictions)}')
 print(f'Average calibrated prediction: {np.nanmean(predictions_cal)} +- {np.nanstd(predictions_cal)}')
+print(f'Median calibrated prediction: {np.nanmedian(predictions_cal)} +- {np.nanstd(predictions_cal)}')
