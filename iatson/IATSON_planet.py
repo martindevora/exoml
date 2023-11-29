@@ -13,7 +13,7 @@ from sklearn.isotonic import IsotonicRegression
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.utils import shuffle
-
+from astropy import units as u
 from iatson.iatson_planet_generator import IatsonPlanetModelGenerator
 from iatson.watson_planet_generator import WatsonPlanetModelGenerator
 from ml.calibration.calibrator import PlattCalibrator
@@ -990,7 +990,7 @@ class IATSON_planet(ImbalancedBinaryModel):
              'duration(h)': [duration],
              'epoch': [epoch],
              'depth_primary': [depth_ppt],
-             'radius(earth)': [(depth_ppt * 1000 * ((star_df.iloc[0]['radius'] ** 2) ** (1/2)))]},
+             'radius(earth)': [((((depth_ppt / 1000) * (star_df.iloc[0]['radius'] ** 2)) ** (1/2)) * u.R_sun).to(u.R_earth)]},
             orient='columns')], ignore_index=True)
         testing_batch_generator = WatsonPlanetModelGenerator(df, watson_dir, star_filename,
                                                              lc_filename, 1,
