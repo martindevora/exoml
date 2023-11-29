@@ -15,6 +15,9 @@ from iatson.iatson_planet_generator import IatsonPlanetModelGenerator
 class RowRegeneratorInput:
     df: DataFrame
     index: int
+    plot_inputs: bool = False
+    store_arrays: bool = True
+    from_arrays: bool = False
 
 def row_regenerator(row_regenerator_input: RowRegeneratorInput):
     row = row_regenerator_input.df.iloc[row_regenerator_input.index]
@@ -40,9 +43,9 @@ def row_regenerator(row_regenerator_input: RowRegeneratorInput):
                                       'tce_centroids_offset': [0],
                                       'tce_source_offset': [0], 'tce_secondary': [0], 'tce_og': [0],
                                       'tce_odd_even': [0], 'none': [0],
-                                      'EB': [0], 'bckEB': [0], 'candidate': [0], 'tce_candidate': [0]}, from_arrays=False,
-                                     store_arrays=True,
-                                     plot_inputs=False, shuffle_batch=False)
+                                      'EB': [0], 'bckEB': [0], 'candidate': [0], 'tce_candidate': [0]},
+                                     from_arrays=row_regenerator_input.from_arrays, store_arrays=row_regenerator_input.store_arrays,
+                                     plot_inputs=row_regenerator_input.plot_inputs, shuffle_batch=False)
     img.__getitem__(index[0])
 
 
@@ -76,13 +79,14 @@ df3 = pd.read_csv(data_dir + "q1_q17/injected_objects_candidates.csv")
 # df = pd.concat(df)
 df = pd.merge(df1, df2, on=['object_id', 'period', 'epoch', 'duration(h)', 'type', 'depth_primary', 'radius(earth)'], how="outer")
 df = pd.merge(df, df3, on=['object_id', 'period', 'epoch', 'duration(h)', 'type', 'depth_primary', 'radius(earth)'], how="outer")
+df = df.loc[(df['type'] == 'tce_og') | (df['type'] == 'tce_centroids')]
 cores = 1
 df_len = len(df)
 inputs = []
 df = df.reset_index(drop=True)
 range = range(0, df_len)
-range = df.index[df['object_id'] == 'KIC 7203326'].tolist()
+#range = df.index[df['object_id'] == 'KIC 7203326'].tolist()
 for i in range:
-    inputs = inputs + [RowRegeneratorInput(df, i)]
+    inputs = inputs + [RowRegeneratorInput(df, i, plot_inputs=True, store_arrays=False)]
 with Pool(processes=cores, maxtasksperchild=1) as pool:
     pool.map(row_regenerator, inputs, chunksize=1)
