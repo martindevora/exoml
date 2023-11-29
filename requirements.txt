@@ -1,6 +1,7 @@
 keras
 tensorflow
 tensorflow-addons
+tf-utils
 ellc
 lcbuilder
 dearwatson
