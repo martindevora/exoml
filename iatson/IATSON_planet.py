@@ -583,7 +583,7 @@ class IATSON_planet(ImbalancedBinaryModel):
         predictions = []
         predictions_cal = []
         calibrator = self.load_calibrator(calibrator_path)
-        for model in models:
+        for model in sorted(models):
             if '_chk_' in model:
                 self.load_model(f'{models_dir}/{model}')
                 prediction, _ = self.predict(input)
