@@ -94,7 +94,7 @@ hp = HyperParams(batch_size=batch_size,
                                                                 verbose=0, save_weights_only=False,
                                                                 save_best_only=True, monitor='val_r@p99',
                                                                 mode='max', save_freq='epoch',
-                                                                initial_value_threshold=0.85),
+                                                                initial_value_threshold=0.927),
                             WarmUpAndLinDecreaseCallback(lr, lr, warmup_lr, 1, epochs - 1)]
 )
 shutil.rmtree("./IATSON_planet_model", ignore_errors=True)
@@ -109,10 +109,11 @@ iatson = IATSON_planet({0: 'planet_transit', 1: 'planet', 2: 'fp', 3: 'fa', 4: '
      .build(use_transformers=False, transformer_blocks=1, transformer_heads=2).inform(model_dir)
 #iatson.load_model("./IATSON_planet_model_rp95_0.7")
 #iatson.train(training_dir, model_dir, hp)
-#iatson.train_cv(training_dir, model_dir, hp)
+# iatson.train_cv(training_dir, model_dir, hp, folds=10, retry_rp99_threshold=0.9272, retry_indexes=[6],
+#                 continue_from="/home/mdevo/exoml/IATSON_planet_model_chk_")
 
 # Current model test metrics
-#iatson.predict_test_set_cv(training_dir, "/home/mdevo/exoml/IATSON_planet_model_chk", batch_size, cores)
+iatson.predict_test_set_cv(training_dir, "/home/mdevo/exoml/IATSON_planet_model_chk", batch_size, cores)
 
 # Model test metrics with the additional tce_candidates
 # iatson.predict_test_set_cv(training_dir, "/home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk", batch_size, cores,
@@ -127,11 +128,11 @@ iatson = IATSON_planet({0: 'planet_transit', 1: 'planet', 2: 'fp', 3: 'fa', 4: '
 # iatson.calibration_metrics_cv(training_dir, "/home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk", batch_size, cores)
 
 # Predict candidates
-candidates_df = pd.read_csv(training_dir + '/q1_q17/injected_objects_candidates.csv')
-all_df = pd.read_csv(training_dir + '/q1_q17/classified_tces.csv')
-# candidates_df = candidates_df.loc[candidates_df['object_id'] == 'KIC 4144236']
-iatson.predict_df_cv(training_dir, "/home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk", candidates_df, batch_size, cores,
-                     thresholds=[0.5, 0.99], validation_df=all_df, from_arrays=True)
+# candidates_df = pd.read_csv(training_dir + '/q1_q17/injected_objects_candidates.csv')
+# all_df = pd.read_csv(training_dir + '/q1_q17/classified_tces.csv')
+# # candidates_df = candidates_df.loc[candidates_df['object_id'] == 'KIC 4144236']
+# iatson.predict_df_cv(training_dir, "/home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk", candidates_df, batch_size, cores,
+#                      thresholds=[0.5, 0.99], validation_df=all_df, from_arrays=True)
 
 # Predict validated candidates only
 # candidates_df = pd.read_csv(training_dir + '/q1_q17/injected_objects_candidates.csv')
