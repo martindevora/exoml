@@ -1,5 +1,6 @@
 import logging
 
+from ete6.ete6_generator import Ete6ModelGenerator
 from ml.encoding.time_position import value_encode_times
 from sklearn.utils import shuffle
 import tensorflow as tf
@@ -7,15 +8,15 @@ import numpy as np
 import pandas as pd
 
 
-class DetrendModelGenerator(tf.keras.utils.Sequence):
+class DetrendModelGenerator(Ete6ModelGenerator):
     """
     Sequence generator for DETREND model batches
     """
     def __init__(self, lc_filenames, batch_size, input_size, zero_epsilon):
+        super().__init__(zero_epsilon)
         self.lc_filenames = lc_filenames
         self.batch_size = batch_size
         self.input_size = input_size
-        self.zero_epsilon = zero_epsilon
 
     def __len__(self):
         return (np.ceil(len(self.lc_filenames) / float(self.batch_size))).astype(int)
@@ -71,3 +72,6 @@ class DetrendModelGenerator(tf.keras.utils.Sequence):
         input_df = input_df.replace(0.0, self.zero_epsilon)
         input_df = input_df.replace(0, self.zero_epsilon)
         return input_df
+
+    def class_weights(self):
+        return None
