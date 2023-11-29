@@ -4,6 +4,7 @@ import sys
 
 import matplotlib.pyplot as plt
 import foldedleastsquares
+import wotan
 from lcbuilder.helper import LcbuilderHelper
 from numpy.random import default_rng
 from ete6.ete6_generator import Ete6ModelGenerator
@@ -312,11 +313,27 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 if os.path.exists(centroids_long_filename):
                     read_centroids_df = pd.read_csv(centroids_long_filename, usecols=['time', 'centroids_ra', 'centroids_dec'],
                                                     low_memory=True)
-                    centroids_df = read_centroids_df if centroids_df is None \
-                        else centroids_df.append(read_centroids_df, ignore_index=True)
+                    read_centroids_df = read_centroids_df.sort_values(by=['time'])
+                    if len(read_centroids_df) > 0:
+                        read_centroids_df['centroids_ra'] = wotan.flatten(read_centroids_df['time'].to_numpy(),
+                                                                     read_centroids_df['centroids_ra'].to_numpy(), duration * 4,
+                                                                     method='biweight')
+                        read_centroids_df['centroids_dec'] = wotan.flatten(read_centroids_df['time'].to_numpy(),
+                                                                      read_centroids_df['centroids_dec'].to_numpy(),
+                                                                      duration * 4,
+                                                                      method='biweight')
+                        centroids_df = read_centroids_df if centroids_df is None \
+                            else centroids_df.append(read_centroids_df, ignore_index=True)
                 if os.path.exists(og_long_filename):
-                    read_og_df = pd.read_csv(og_long_filename, usecols=['time', 'og_flux'],
+                    read_og_df = pd.read_csv(og_long_filename, usecols=['time', 'og_flux', 'halo_flux', 'core_flux'],
                                              low_memory=True)
+                    if len(read_og_df) > 0:
+                        read_og_df['halo_flux'] = wotan.flatten(read_og_df['time'].to_numpy(), read_og_df['halo_flux'].to_numpy(),
+                                                           duration * 4, method='biweight')
+                        read_og_df['core_flux'] = wotan.flatten(read_og_df['time'].to_numpy(), read_og_df['core_flux'].to_numpy(),
+                                                           duration * 4, method='biweight')
+                        read_og_df['og_flux'] = read_og_df['halo_flux'] - read_og_df['core_flux']
+                    read_og_df = read_og_df.drop(columns=['halo_flux', 'core_flux'])
                     og_df = read_og_df if og_df is None \
                         else og_df.append(read_og_df, ignore_index=True)
                 if os.path.exists(lc_short_filename):
@@ -325,11 +342,27 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 if os.path.exists(centroids_short_filename):
                     read_centroids_df = pd.read_csv(centroids_short_filename, usecols=['time', 'centroids_ra', 'centroids_dec'],
                                                     low_memory=True)
+                    if len(read_centroids_df) > 0:
+                        read_centroids_df = read_centroids_df.sort_values(by=['time'])
+                        read_centroids_df['centroids_ra'] = wotan.flatten(read_centroids_df['time'].to_numpy(),
+                                                                     read_centroids_df['centroids_ra'].to_numpy(), duration * 4,
+                                                                     method='biweight')
+                        read_centroids_df['centroids_dec'] = wotan.flatten(read_centroids_df['time'].to_numpy(),
+                                                                      read_centroids_df['centroids_dec'].to_numpy(),
+                                                                      duration * 4,
+                                                                      method='biweight')
                     centroids_df = read_centroids_df if centroids_df is None \
                         else centroids_df.append(read_centroids_df, ignore_index=True)
                 if os.path.exists(og_short_filename):
-                    read_og_df = pd.read_csv(og_short_filename, usecols=['time', 'og_flux'],
+                    read_og_df = pd.read_csv(og_short_filename, usecols=['time', 'og_flux', 'halo_flux', 'core_flux'],
                                              low_memory=True)
+                    if len(read_og_df) > 0:
+                        read_og_df['halo_flux'] = wotan.flatten(read_og_df['time'].to_numpy(), read_og_df['halo_flux'].to_numpy(),
+                                                           duration * 4, method='biweight')
+                        read_og_df['core_flux'] = wotan.flatten(read_og_df['time'].to_numpy(), read_og_df['core_flux'].to_numpy(),
+                                                           duration * 4, method='biweight')
+                        read_og_df['og_flux'] = read_og_df['halo_flux'] - read_og_df['core_flux']
+                    read_og_df = read_og_df.drop(columns=['halo_flux', 'core_flux'])
                     og_df = read_og_df if og_df is None \
                         else og_df.append(read_og_df, ignore_index=True)
                 if lc_df is None:
@@ -391,16 +424,16 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                         offset_ra_err ** 2 + row['ra_err'] ** 2)
                     offset_dec_err = row['ra_err'] if offset_long_df is None or np.isnan(offset_dec_err) else np.sqrt(
                         offset_dec_err ** 2 + row['dec_err'] ** 2)
-                offset_err = offset_ra_err if offset_ra_err > offset_dec_err else offset_dec_err
-                offset_err = offset_err * 60 * 60
                 target_dist = np.sqrt((offset_ra - ra) ** 2 + (offset_dec - dec) ** 2)
-                offset_err = offset_err if offset_err > 0 else target_dist * 2
-                offset_err = offset_err if offset_err < 1 else 1 - self.zero_epsilon
+                offset_err = offset_ra_err if offset_ra_err > offset_dec_err else offset_dec_err
 
-
+                # offset_err = offset_err * 60 * 60
                 # offset_err = offset_err if offset_err > 0 else target_dist * 2
-                # offset_err = offset_err / (target_dist * 2)
-                # offset_err = 1 - self.zero_epsilon if offset_err >= 1 else offset_err
+                # offset_err = offset_err if offset_err < 1 else 1 - self.zero_epsilon
+
+                offset_err = offset_err if offset_err > 0 else target_dist * 2
+                offset_err = offset_err / (target_dist * 2)
+                offset_err = 1 - self.zero_epsilon if offset_err >= 1 else offset_err
 
                 good_transits_count_norm = good_transits_count / 20
                 good_transits_count_norm = good_transits_count_norm if good_transits_count_norm < 1 else 1 - self.zero_epsilon
