@@ -990,7 +990,7 @@ class IATSON_planet(ImbalancedBinaryModel):
              'duration(h)': [duration],
              'epoch': [epoch],
              'depth_primary': [depth_ppt],
-             'radius(earth)': [((((depth_ppt / 1000) * (star_df.iloc[0]['radius'] ** 2)) ** (1/2)) * u.R_sun).to(u.R_earth)]},
+             'radius(earth)': [((((depth_ppt / 1000) * (star_df.iloc[0]['radius'] ** 2)) ** (1/2)) * u.R_sun).to(u.R_earth).value]},
             orient='columns')], ignore_index=True)
         testing_batch_generator = WatsonPlanetModelGenerator(df, watson_dir, star_filename,
                                                              lc_filename, 1,
