@@ -13,7 +13,7 @@ from pathlib import Path
 import ellc
 import pandas as pd
 import numpy as np
-import timesynth
+#import timesynth
 from lcbuilder.star import starinfo
 from lcbuilder.star.HabitabilityCalculator import HabitabilityCalculator
 from lcbuilder.star.TicStarCatalog import TicStarCatalog
@@ -130,49 +130,51 @@ def create_injection_dataframe(injections_dir, lcs_dir):
             min_period = 0.5
             max_period = 10
             period = random_number_generator.uniform(min_period, max_period)
-            min_lc_time = 1612.85 + 0.5
-            epoch = random_number_generator.uniform(min_lc_time, min_lc_time + period)
-            duration = t14(star_radius, star_mass, period)
-            if 2 * duration < period:
-                duration = duration * 24
-                df = df.append({'object_id': object_id, 'type': 'none', 'period': period,
-                                'epoch': epoch,
-                                'Rsec/Rpri': 1e-7,
-                                'b': 0,
-                                'a/Rstar': 1e-7, 'duration(h)': duration,
-                                'depth_primary': 1e-6,
-                                'depth_secondary': 0,
-                                'insolation': 0, 'Rstar_primary': 1e-7,
-                                'Rstar_secondary': 1e-7,
-                                'contact_amplitude': 0,
-                                'Mstar': star_mass,
-                                'radius(earth)': 1}, ignore_index=True)
-                has_injected_object = True
-            # for match in Path("/data/scratch/ml/ete6/lcs/").glob(object_id + '_*_input_scalar_values.csv'):
-            #     period = float(re.findall("\d+\.\d+", str(match))[0])
-            #     min_lc_time = 1612.85 + 0.5
-            #     epoch = random_number_generator.uniform(min_lc_time, min_lc_time + period)
-            #     duration = t14(star_radius, star_mass, period)
-            #     while 2 * duration >= period:
-            #         duration = duration / 2
-            #     if 2 * duration < period:
-            #         duration = duration * 24
-            #         df = df.append({'object_id': object_id, 'type': 'none', 'period': period,
-            #                         'epoch': epoch,
-            #                         'Rsec/Rpri': 1e-7,
-            #                         'b': 0,
-            #                         'a/Rstar': 1e-7, 'duration(h)': duration,
-            #                         'depth_primary': 1e-6,
-            #                         'depth_secondary': 0,
-            #                         'insolation': 0, 'Rstar_primary': 1e-7,
-            #                         'Rstar_secondary': 1e-7,
-            #                         'contact_amplitude': 0,
-            #                         'Mstar': star_mass,
-            #                         'radius(earth)': 1}, ignore_index=True)
-            #         has_injected_object = True
-            #         break
-            #     else:
-            #         print("inloop")
+            depth_ppm = random_number_generator.uniform(100, 500)
+            planet_radius = (depth_ppm / 1e6 * ((star_radius * u.R_sun).to(u.R_earth).value ** 2)) ** 0.5
+            # min_lc_time = 1612.85 + 0.5
+            # epoch = random_number_generator.uniform(min_lc_time, min_lc_time + period)
+            # duration = t14(star_radius, star_mass, period)
+            # if 2 * duration < period:
+            #     duration = duration * 24
+            #     df = df.append({'object_id': object_id, 'type': 'none', 'period': period,
+            #                     'epoch': epoch,
+            #                     'Rsec/Rpri': 1e-7,
+            #                     'b': 0,
+            #                     'a/Rstar': 1e-7, 'duration(h)': duration,
+            #                     'depth_primary': depth_ppm,
+            #                     'depth_secondary': 0,
+            #                     'insolation': 0, 'Rstar_primary': 1e-7,
+            #                     'Rstar_secondary': 1e-7,
+            #                     'contact_amplitude': 0,
+            #                     'Mstar': star_mass,
+            #                     'radius(earth)': planet_radius}, ignore_index=True)
+            #     has_injected_object = True
+            for match in Path("/data/scratch/ml/ete6/lcs/").glob(object_id + '_*_input_scalar_values.csv'):
+                period = float(re.findall("\d+\.\d+", str(match))[0])
+                min_lc_time = 1612.85 + 0.5
+                epoch = random_number_generator.uniform(min_lc_time, min_lc_time + period)
+                duration = t14(star_radius, star_mass, period)
+                while 2 * duration >= period:
+                    duration = duration / 2
+                if 2 * duration < period:
+                    duration = duration * 24
+                    df = df.append({'object_id': object_id, 'type': 'none', 'period': period,
+                                    'epoch': epoch,
+                                    'Rsec/Rpri': 1e-7,
+                                    'b': 0,
+                                    'a/Rstar': 1e-7, 'duration(h)': duration,
+                                    'depth_primary': depth_ppm,
+                                    'depth_secondary': 0,
+                                    'insolation': 0, 'Rstar_primary': 1e-7,
+                                    'Rstar_secondary': 1e-7,
+                                    'contact_amplitude': 0,
+                                    'Mstar': star_mass,
+                                    'radius(earth)': planet_radius}, ignore_index=True)
+                    has_injected_object = True
+                    break
+                else:
+                    print("inloop")
         print("Processed " + str(i) + " TICs.")
         if (i + 1) % log_count == 0:
             print("Processed " + str(i) + " TICs.")
@@ -184,18 +186,23 @@ def create_injection_dataframe(injections_dir, lcs_dir):
 
 
 def create_target_csvs(lcs_dir, models_dir, cores=multiprocessing.cpu_count() - 1, max_lc_length=20610, force=False,
-                       ids=None):
+                       ids=None, mode=['all']):
     injected_files_df = pd.read_csv(models_dir + '/injected_objects.csv')
     inputs = []
     if ids is not None:
         injected_files_df = injected_files_df[injected_files_df['object_id'].isin(ids)]
-    for index, target_row in injected_files_df.iterrows():
+    injected_files_df = injected_files_df.sort_values(by=["period"], ascending=True)
+    injected_files_df = injected_files_df.reset_index(drop=True)
+    ranges = range(0, len(injected_files_df))
+    print("Total number of targets is " + str(len(injected_files_df)))
+    for index in ranges:
+        target_row = injected_files_df.iloc[index]
         object_id = target_row['object_id']
         mission_id = object_id.split(' ')[1]
         lc_file = lcs_dir + "/tess2019128220341-" + str(mission_id).zfill(16) + "-0016-s_lc.fits"
         tpf_file = lcs_dir + "/tpfs/tess2019128220341-" + str(mission_id).zfill(16) + "-0016-s_tp.fits"
         inputs = inputs + [CreateTargetInput('TIC', object_id, lc_file, lcs_dir, models_dir, target_row,
-                                             None, max_lc_length, tpf_files=[tpf_file], force=force)]
+                                             None, index, max_lc_length, tpf_files=[tpf_file], force=force, mode=mode)]
     with Pool(processes=cores, maxtasksperchild=1) as pool:
         pool.map(_create_target_csv, inputs, chunksize=1)
 
@@ -411,7 +418,8 @@ def _create_target_csv(create_target_input):
                             create_target_input.injected_files_df['duration(h)'] / 24,
                             create_target_input.injected_files_df['period'],
                             create_target_input.injected_files_df['epoch'],
-                            star_info.ra, star_info.dec, star_info, False, tpf_files=create_target_input.tpf_files)
+                            star_info.ra, star_info.dec, star_info, False, tpf_files=create_target_input.tpf_files,
+                            modes=create_target_input.mode)
         except Exception as e:
             logging.exception("PID %s: Failed get info for %s", pid, file_planet_prefix)
 
