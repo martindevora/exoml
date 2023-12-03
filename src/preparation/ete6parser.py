@@ -13,7 +13,7 @@ from pathlib import Path
 import ellc
 import pandas as pd
 import numpy as np
-import timesynth
+#import timesynth
 from lcbuilder.star import starinfo
 from lcbuilder.star.HabitabilityCalculator import HabitabilityCalculator
 from lcbuilder.star.TicStarCatalog import TicStarCatalog
@@ -191,13 +191,18 @@ def create_target_csvs(lcs_dir, models_dir, cores=multiprocessing.cpu_count() - 
     inputs = []
     if ids is not None:
         injected_files_df = injected_files_df[injected_files_df['object_id'].isin(ids)]
-    for index, target_row in injected_files_df.iterrows():
+    injected_files_df = injected_files_df.sort_values(by=["period"], ascending=True)
+    injected_files_df = injected_files_df.reset_index(drop=True)
+    ranges = range(0, len(injected_files_df))
+    print("Total number of targets is " + str(len(injected_files_df)))
+    for index in ranges:
+        target_row = injected_files_df.iloc[index]
         object_id = target_row['object_id']
         mission_id = object_id.split(' ')[1]
         lc_file = lcs_dir + "/tess2019128220341-" + str(mission_id).zfill(16) + "-0016-s_lc.fits"
         tpf_file = lcs_dir + "/tpfs/tess2019128220341-" + str(mission_id).zfill(16) + "-0016-s_tp.fits"
         inputs = inputs + [CreateTargetInput('TIC', object_id, lc_file, lcs_dir, models_dir, target_row,
-                                             None, max_lc_length, tpf_files=[tpf_file], force=force, mode=mode)]
+                                             None, index, max_lc_length, tpf_files=[tpf_file], force=force, mode=mode)]
     with Pool(processes=cores, maxtasksperchild=1) as pool:
         pool.map(_create_target_csv, inputs, chunksize=1)
 

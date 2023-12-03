@@ -13,7 +13,7 @@ from sklearn.isotonic import IsotonicRegression
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.utils import shuffle
-
+from astropy import units as u
 from iatson.iatson_planet_generator import IatsonPlanetModelGenerator
 from iatson.watson_planet_generator import WatsonPlanetModelGenerator
 from ml.calibration.calibrator import PlattCalibrator
@@ -563,9 +563,8 @@ class IATSON_planet(ImbalancedBinaryModel):
         if 'with_radius' in self.mode:
             df = df[~df['radius(earth)'].isna()]
         df = df[df['type'].isin(include_categories)]
-        injected_objects_df = pd.concat(df)
-        injected_objects_df.reset_index(inplace=True, drop=True)
-        return injected_objects_df
+        df.reset_index(inplace=True, drop=True)
+        return df
 
     def instance_generator(self, dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon, shuffle=True):
         return IatsonPlanetModelGenerator(dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon,
@@ -584,7 +583,7 @@ class IATSON_planet(ImbalancedBinaryModel):
         predictions = []
         predictions_cal = []
         calibrator = self.load_calibrator(calibrator_path)
-        for model in models:
+        for model in sorted(models):
             if '_chk_' in model:
                 self.load_model(f'{models_dir}/{model}')
                 prediction, _ = self.predict(input)
@@ -682,7 +681,7 @@ class IATSON_planet(ImbalancedBinaryModel):
 
     def predict_test_set_cv(self, training_dir, model_dir_prefix, batch_size=20, cores=os.cpu_count() - 1,
                             test_set_limit=None,
-                            zero_epsilon=1e-7, plot_mismatches=False, folds=10, thresholds=[0.5, 0.99],
+                            zero_epsilon=1e-7, plot_mismatches=False, folds=10, thresholds=[0.5],
                             k_values=np.arange(100, 2200, 100),
                             additional_test_set_filename=None, calibration_method=None,
                             calibrator_output=None):
@@ -721,8 +720,7 @@ class IATSON_planet(ImbalancedBinaryModel):
         predictions_df_q1q17 = predictions_df_q1q17.sort_values(by=['prediction_value'], ascending=False)
         predictions_df_ete6 = predictions_df_ete6.sort_values(by=['prediction_value'], ascending=False)
         logging.info("----------------------------------COMPLETE SET METRICS ---------------------------------------")
-        self.compute_cv_average_metrics(fold_thresholds_to_results,
-                                        ['tp', 'fp', 'fn', 'accuracy', 'precision', 'recall'], thresholds, True)
+        self.compute_metrics_p100(fold_thresholds_to_results, True)
         self.compute_metrics(predictions_df, log=True)
         self.log_prediction_metrics(predictions_df, k_values, "K METRICS")
         self.compute_rp_thresholds(fold_thresholds_to_results, log=True)
@@ -817,23 +815,22 @@ class IATSON_planet(ImbalancedBinaryModel):
         fps_df = fps_df.sort_values(by=['prediction_value'], ascending=False)
         logging.info("FPs DF: \n" + fps_df.to_string())
 
-    def compute_cv_average_metrics(self, fold_thresholds_to_results, metric_names, thresholds=[0.5], log=False):
-        metric_fold_stats = {}
-        metric_average_stats = {}
-        for threshold in thresholds:
-            metric_fold_stats[threshold] = {}
-            metric_average_stats[threshold] = {}
-            for metric in metric_names:
-                for fold in fold_thresholds_to_results:
-                    metric_val = getattr(fold_thresholds_to_results[fold][threshold], metric)
-                    if metric not in metric_fold_stats:
-                        metric_fold_stats[threshold][metric] = {}
-                    metric_fold_stats[threshold][metric][fold] = metric_val
-                metric_arr = [metric_val for metric_val in metric_fold_stats[threshold][metric].values()]
-                metric_average_stats[threshold][metric] = (np.nanmean(metric_arr), np.nanstd(metric_arr))
+    def compute_metrics_p100(self, fold_thresholds_to_results, log=False):
+        first_fp_thresholds = []
+        r_at_p100 = []
+        for fold in fold_thresholds_to_results:
+            sorted_pred_df = fold_thresholds_to_results[fold][0.5].predictions_df\
+                .sort_values(by=['prediction_value'], ascending=False)
+            first_fp_thresholds.append(
+                sorted_pred_df.loc[(sorted_pred_df['expected_class'] == 0) & (sorted_pred_df['predicted_class'] == 1),
+                'prediction_value'].iloc[0])
+            metric = tf.keras.metrics.RecallAtPrecision(precision=1, num_thresholds=10000)
+            metric.update_state(sorted_pred_df['expected_class'].to_numpy(),
+                                sorted_pred_df['prediction_value'].to_numpy())
+            r_at_p100.append(metric.result().numpy())
             if log:
-                logging.info(f"Average statistics for threshold {threshold}:\n {metric_average_stats}")
-        return metric_average_stats
+                logging.info(f'Fold {fold} T@P100={first_fp_thresholds[fold]}, R@P100={r_at_p100[fold]}')
+        return first_fp_thresholds, r_at_p100
 
     def compute_rp_thresholds(self, fold_thresholds_to_results, rp_values=[0.95, 0.975, 0.99], thresholds=1000,
                               log=False):
@@ -993,7 +990,7 @@ class IATSON_planet(ImbalancedBinaryModel):
              'duration(h)': [duration],
              'epoch': [epoch],
              'depth_primary': [depth_ppt],
-             'radius(earth)': [(depth_ppt * 1000 * ((star_df.iloc[0]['radius'] ** 2) ** (1/2)))]},
+             'radius(earth)': [((((depth_ppt / 1000) * (star_df.iloc[0]['radius'] ** 2)) ** (1/2)) * u.R_sun).to(u.R_earth).value]},
             orient='columns')], ignore_index=True)
         testing_batch_generator = WatsonPlanetModelGenerator(df, watson_dir, star_filename,
                                                              lc_filename, 1,

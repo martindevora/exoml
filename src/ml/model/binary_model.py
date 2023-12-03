@@ -1,7 +1,7 @@
 import logging
 
 from keras.losses import BinaryCrossentropy
-from keras.metrics import Precision, Recall, AUC, BinaryAccuracy, RecallAtPrecision, TopKCategoricalAccuracy
+from keras.metrics import Precision, Recall, AUC, BinaryAccuracy, RecallAtPrecision
 from tensorflow_addons.metrics import F1Score
 
 from ml.loss.cross_entropy import binary_focal_loss
@@ -23,8 +23,7 @@ class BinaryModel(BaseModel):
         return [Precision(name="precision"), Recall(name="recall"),
                 F1Score(num_classes=1, threshold=0.5, average='weighted', name='f1_score'),
                 RecallAtPrecision(precision=0.99, name="r@p99", num_thresholds=1000),
-                ThresholdAtPrecision(precision=0.99, name="t@p99", num_thresholds=1000),
-                #TopKCategoricalAccuracy(200, name='top_k_200'),
+                #ThresholdAtPrecision(precision=0.99, name="t@p99", num_thresholds=1000),
                 AUC(name="roc_auc"),
                 AUC(curve="PR", name="pr_auc")]
 
