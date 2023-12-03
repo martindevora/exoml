@@ -1,8 +1,8 @@
 from keras.losses import BinaryCrossentropy
 from keras.metrics import BinaryAccuracy
 
-from ml.loss.cross_entropy import binary_focal_loss
-from ml.model.binary_model import BinaryModel
+from src.ml.loss.cross_entropy import binary_focal_loss
+from src.ml.model.binary_model import BinaryModel
 
 
 class ImbalancedBinaryModel(BinaryModel):

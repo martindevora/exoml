@@ -14,14 +14,14 @@ from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
 from sklearn.utils import shuffle
 from astropy import units as u
-from iatson.iatson_planet_generator import IatsonPlanetModelGenerator
-from iatson.watson_planet_generator import WatsonPlanetModelGenerator
-from ml.calibration.calibrator import PlattCalibrator
-from ml.layers.dropout import AdaptiveStdDropout
-from ml.layers.transformer_classifier import TransformerClassifier
-from ml.metrics.auc import ThresholdAtPrecision
-from ml.model.base_model import CategoricalPredictionSetStats
-from ml.model.imbalanced_binary_model import ImbalancedBinaryModel
+from src.iatson.iatson_planet_generator import IatsonPlanetModelGenerator
+from src.iatson.watson_planet_generator import WatsonPlanetModelGenerator
+from src.ml.calibration.calibrator import PlattCalibrator
+from src.ml.layers.dropout import AdaptiveStdDropout
+from src.ml.layers.transformer_classifier import TransformerClassifier
+from src.ml.metrics.auc import ThresholdAtPrecision
+from src.ml.model.base_model import CategoricalPredictionSetStats
+from src.ml.model.imbalanced_binary_model import ImbalancedBinaryModel
 
 
 class IATSON_planet(ImbalancedBinaryModel):

@@ -16,19 +16,19 @@ from abc import abstractmethod
 from keras.utils import plot_model
 from sklearn.utils import shuffle
 
-from ml.callback.checkpoint import ModelCheckpointCallback
-from ml.callback.learning_rate import WarmUpAndLinDecreaseCallback
-from ml.callback.basemodel_aware_callback import MetricsPlotCallback
-from ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
-from ml.callback.early_stopping import ExoMlEarlyStopping
-from ml.callback.get_weights import GetWeights
-from ml.callback.training_data_aware import ValidationDataAwareCallback, ModelDirDataAwareCallback
-from ml.learning_rate.schedulers import ExponentialRescaleDecay
-from ml.log.get_weights_logger import ModelWeightsLogger
-from ml.log.with_logging import WithLogging
+from src.ml.callback.checkpoint import ModelCheckpointCallback
+from src.ml.callback.learning_rate import WarmUpAndLinDecreaseCallback
+from src.ml.callback.basemodel_aware_callback import MetricsPlotCallback
+from src.ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
+from src.ml.callback.early_stopping import ExoMlEarlyStopping
+from src.ml.callback.get_weights import GetWeights
+from src.ml.callback.training_data_aware import ValidationDataAwareCallback, ModelDirDataAwareCallback
+from src.ml.learning_rate.schedulers import ExponentialRescaleDecay
+from src.ml.log.get_weights_logger import ModelWeightsLogger
+from src.ml.log.with_logging import WithLogging
 from keras.optimizers.schedules.learning_rate_schedule import LearningRateSchedule
 
-from ml.metrics.auc import precision_at_k, mean_positive_value, mean_true_positive_value, mean_false_positive_value, \
+from src.ml.metrics.auc import precision_at_k, mean_positive_value, mean_true_positive_value, mean_false_positive_value, \
     mean_true_negative_value, ThresholdAtPrecision
 import tensorflow_addons as tfa
 

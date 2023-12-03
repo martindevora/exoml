@@ -20,12 +20,12 @@ import tensorflow_addons as tfa
 import pandas as pd
 #tf.config.run_functions_eagerly(True)
 # thread_config.setup_threads(1)
-from ml.callback.learning_rate import WarmUpAndLinDecreaseCallback
-from ml.callback.checkpoint import ModelCheckpointCallback
-from iatson.IATSON_planet import IATSON_planet
-from ml.learning_rate.schedulers import ExponentialRescaleDecay
-from ml.loss.cross_entropy import fb_loss, dice_bce_loss, dice_loss
-from ml.model.base_model import HyperParams
+from src.ml.callback.learning_rate import WarmUpAndLinDecreaseCallback
+from src.ml.callback.checkpoint import ModelCheckpointCallback
+from src.iatson.IATSON_planet import IATSON_planet
+from src.ml.learning_rate.schedulers import ExponentialRescaleDecay
+from src.ml.loss.cross_entropy import fb_loss, dice_bce_loss, dice_loss
+from src.ml.model.base_model import HyperParams
 
 if not isinstance(logging.root, logging.RootLogger):
     logging.root = logging.RootLogger(logging.INFO)
