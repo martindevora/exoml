@@ -113,38 +113,66 @@ iatson = IATSON_planet({0: 'planet_transit', 1: 'planet', 2: 'fp', 3: 'fa', 4: '
 #                 continue_from="/home/mdevo/exoml/IATSON_planet_model_chk_")
 
 # Current model test metrics
-iatson.predict_test_set_cv(training_dir, "/home/mdevo/exoml/IATSON_planet_model_chk", batch_size, cores)
+#iatson.predict_test_set_cv(training_dir, "/home/mdevo/exoml/IATSON_planet_model_chk", batch_size, cores)
 
 # Model test metrics with the additional tce_candidates
-# iatson.predict_test_set_cv(training_dir, "/home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk", batch_size, cores,
-#                            additional_test_set_filename=training_dir + '/q1_q17/injected_objects_tce_candidates.csv')
+#iatson.predict_test_set_cv(training_dir, "/home/mdevo/exoml/IATSON_planet_model_chk", batch_size, cores,
+#                           additional_test_set_filename=training_dir + '/q1_q17/injected_objects_tce_candidates.csv')
 
 # Model test metrics with calibration
-# iatson.predict_test_set_cv(training_dir, "/home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk", batch_size, cores,
-#                            calibration_method='isotonic',
-#                            calibrator_output="/home/mdevo/exoml/models/iatson/final/")
+#iatson.predict_test_set_cv(training_dir, "/home/mdevo/exoml/IATSON_planet_model_chk", batch_size, cores,
+#                           calibration_method='logistic',
+#                           calibrator_output="/home/mdevo/exoml/IATSON_planet_model",
+#                           calibration_mode='each')
+#iatson.predict_test_set_cv(training_dir, "/home/mdevo/exoml/IATSON_planet_model_chk", batch_size, cores,
+#                           calibration_method='platt',
+#                           calibrator_output="/home/mdevo/exoml/IATSON_planet_model",
+#                           calibration_mode='each')
+#iatson.predict_test_set_cv(training_dir, "/home/mdevo/exoml/IATSON_planet_model_chk", batch_size, cores,
+#                           calibration_method='isotonic',
+#                           calibrator_output="/home/mdevo/exoml/IATSON_planet_model",
+#                           calibration_mode='each')
+
+#iatson.predict_test_set_cv(training_dir, "/home/mdevo/exoml/IATSON_planet_model_chk", batch_size, cores,
+#                           calibration_method='isotonic',
+#                           calibrator_output="/home/mdevo/exoml/IATSON_planet_model",
+#                           calibration_mode='global')
+#iatson.predict_test_set_cv(training_dir, "/home/mdevo/exoml/IATSON_planet_model_chk", batch_size, cores,
+#                           calibration_method='platt',
+#                           calibrator_output="/home/mdevo/exoml/IATSON_planet_model",
+#                           calibration_mode='global')
+#iatson.predict_test_set_cv(training_dir, "/home/mdevo/exoml/IATSON_planet_model_chk", batch_size, cores,
+#                           calibration_method='logistic',
+#                           calibrator_output="/home/mdevo/exoml/IATSON_planet_model",
+#                           calibration_mode='global')
 
 # Calibration metrics
-# iatson.calibration_metrics_cv(training_dir, "/home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk", batch_size, cores)
+#iatson.calibration_metrics_cv(training_dir, "/home/mdevo/exoml/IATSON_planet_model_chk", batch_size, cores)
 
 # Predict candidates
-# candidates_df = pd.read_csv(training_dir + '/q1_q17/injected_objects_candidates.csv')
+candidates_df = pd.read_csv(training_dir + '/q1_q17/injected_objects_candidates.csv')
 # all_df = pd.read_csv(training_dir + '/q1_q17/classified_tces.csv')
 # # candidates_df = candidates_df.loc[candidates_df['object_id'] == 'KIC 4144236']
-# iatson.predict_df_cv(training_dir, "/home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk", candidates_df, batch_size, cores,
-#                      thresholds=[0.5, 0.99], validation_df=all_df, from_arrays=True)
+#iatson.predict_df_cv(training_dir, "/home/mdevo/exoml/IATSON_planet_model_chk", candidates_df, batch_size, cores,
+#                     thresholds=[0.5, 0.99],
+#                     #validation_df=all_df,
+#                     from_arrays=True)
 
 # Predict validated candidates only
-# candidates_df = pd.read_csv(training_dir + '/q1_q17/injected_objects_candidates.csv')
-#candidates_df = candidates_df.loc[candidates_df['disc_refname'].str.contains('Valizadegan', na=False)]
-#candidates_df = candidates_df.loc[candidates_df['disc_refname'].str.contains('Armstrong et al. 2021', na=False)]
-# iatson.predict_df_cv(training_dir, "/home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk", candidates_df, batch_size, cores,
-#                      thresholds=[0.5, 0.99], validation_df=all_df, from_arrays=False)
+#candidates_df = pd.read_csv(training_dir + '/q1_q17/classified_tces.csv')
+#candidates_df = candidates_df.loc[(candidates_df['disc_refname'].str.contains('Valizadegan', na=False)) |
+#                                  (candidates_df['disc_refname'].str.contains('Armstrong et al. 2021', na=False))]
+#iatson.predict_df_cv(training_dir, "/home/mdevo/exoml/IATSON_planet_model_chk", candidates_df, batch_size, cores,
+#                     thresholds=[0.5, 0.99],
+#                     #validation_df=all_df,
+#                     from_arrays=True)
 
 # Predict candidates with previously calibrated model
-# iatson.predict_df_cv(training_dir, "/home/mdevo/exoml/models/iatson/final/IATSON_planet_model_chk", candidates_df, batch_size, cores,
-#                      thresholds=[0.5, 0.99], validation_df=all_df,
-#                      calibrator_path="/home/mdevo/exoml/models/iatson/final/IATSON_planet_cal_isotonic.pkl")
+iatson.predict_df_cv(training_dir, "/home/mdevo/exoml/IATSON_planet_model_chk", candidates_df, batch_size, cores,
+                     thresholds=[0.5, 0.99],
+                     #validation_df=all_df,
+                     from_arrays=True,
+                     calibrator_path="/home/mdevo/exoml/IATSON_planet_model_cal_logistic.pkl")
 
 #iatson.predict_test_set(training_dir, "./IATSON_planet_model", batch_size, cores)
 #iatson = iatson.load_model("/usr/bin/exoml/IATSON_planet_model/")

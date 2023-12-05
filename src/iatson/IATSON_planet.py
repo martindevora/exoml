@@ -683,7 +683,7 @@ class IATSON_planet(ImbalancedBinaryModel):
                             test_set_limit=None,
                             zero_epsilon=1e-7, plot_mismatches=False, folds=10, thresholds=[0.5],
                             k_values=np.arange(100, 2200, 100),
-                            additional_test_set_filename=None, calibration_method=None,
+                            additional_test_set_filename=None, calibration_method=None, calibration_mode='each',
                             calibrator_output=None):
         fold_thresholds_to_results = {}
         prediction_dfs_thresholds = None
@@ -693,7 +693,7 @@ class IATSON_planet(ImbalancedBinaryModel):
         fold_indexes = None
         if additional_test_set_filename is not None:
             additional_test_df = pd.read_csv(additional_test_set_filename)
-            additional_test_df = additional_test_df[additional_test_df['object_id'] == 'KIC 4380558']
+            #additional_test_df = additional_test_df[additional_test_df['object_id'] == 'KIC 4380558']
             additional_dataset_len = len(additional_test_df)
             fold_indexes = [int(fold_index) for fold_index in np.linspace(additional_dataset_len // folds, additional_dataset_len, folds)]
         additional_test_fold_df = None
@@ -713,8 +713,13 @@ class IATSON_planet(ImbalancedBinaryModel):
                 fold_threshold_to_results.predictions_df['fold'] = fold
             predictions_df = fold_thresholds_to_results[fold][thresholds[0]].predictions_df if predictions_df is None \
                 else pd.concat([predictions_df, fold_thresholds_to_results[fold][thresholds[0]].predictions_df])
+            if calibration_mode == 'each':
+                predictions_df.loc[predictions_df['fold'] == fold], _ = (
+                    self.calibrate(predictions_df.loc[predictions_df['fold'] == fold], calibration_method,
+                                                   calibrator_dir=f'{model_dir}/{self.name}'))
         predictions_df = predictions_df.sort_values(by=['prediction_value'], ascending=False)
-        predictions_df, _ = self.calibrate(predictions_df, calibration_method, calibrator_dir=calibrator_output)
+        if calibration_mode == 'global':
+            predictions_df, _ = self.calibrate(predictions_df, calibration_method, calibrator_dir=calibrator_output)
         predictions_df_q1q17 = predictions_df[predictions_df['object_id'].str.contains("KIC")]
         predictions_df_ete6 = predictions_df[predictions_df['object_id'].str.contains("TIC")]
         predictions_df_q1q17 = predictions_df_q1q17.sort_values(by=['prediction_value'], ascending=False)
@@ -781,12 +786,12 @@ class IATSON_planet(ImbalancedBinaryModel):
             average_predictions_df_thresholds[threshold] = average_predictions_df
             #logging.info(f"Predictions for threshold {threshold}: \n" + average_predictions_df.to_string())
             self.compute_metrics(average_predictions_df_thresholds[threshold], [threshold], log=True)
-            tces_positive_df = average_predictions_df.loc[(average_predictions_df['type'] == 'tce_candidate') &
-                                       (average_predictions_df['prediction_value'] > threshold)]
-            logging.info(f"TCEs predicted as positive: \n" + tces_positive_df.sort_values(by=['prediction_value'], ascending=True).to_string())
-            candidates_positive_df = average_predictions_df.loc[(average_predictions_df['type'] == 'candidate') &
-                                       (average_predictions_df['prediction_value'] > threshold)]
-            logging.info(f"Candidates predicted as positive: \n" + candidates_positive_df.sort_values(by=['prediction_value'], ascending=True).to_string())
+            logging.info(f"Signals predicted as negative for threshold {threshold}: \n" +
+                         average_predictions_df.loc[(average_predictions_df['prediction_value'] <= threshold)]
+                         .sort_values(by=['prediction_value'], ascending=True).to_string())
+            logging.info(f"Signals predicted as positive for threshold {threshold}: \n" +
+                         average_predictions_df.loc[(average_predictions_df['prediction_value'] > threshold)]
+                         .sort_values(by=['prediction_value'], ascending=True).to_string())
         return average_predictions_df_thresholds
 
     def log_prediction_metrics(self, df, k_range, message):
@@ -1059,7 +1064,7 @@ class IATSON_planet(ImbalancedBinaryModel):
             results_df['prediction_value'] = calibrated
         if calibrator is not None and calibrator_dir is not None:
             try:
-                with open(f'{calibrator_dir}/{self.name}_cal_{method}.pkl', 'wb') as fid:
+                with open(f'{calibrator_dir}_cal_{method}.pkl', 'wb') as fid:
                     pickle.dump(calibrator, fid)
             except Exception as e:
                 logging.exception("Failed calibrator storage")
@@ -1143,9 +1148,11 @@ class IATSON_planet(ImbalancedBinaryModel):
             self.load_model(model_dir)
             calibration_df = pd.read_csv(f'{model_dir}/validation_dataset.csv')
             prediction_stats_for_thresholds = self.predict_df(calibration_df, training_dir, batch_size, cores,
-                                                              thresholds=thresholds)
+                                                              thresholds=thresholds, from_arrays=True)
             prediction_stats = prediction_stats_for_thresholds[thresholds[0]][0]
             fold_predictions_df = prediction_stats.predictions_df
+            logging.info(f"Calibration metrics for fold {fold}")
+            #self.calibration_metrics(fold_predictions_df)
             predictions_df = fold_predictions_df if predictions_df is None else \
                 pd.concat([predictions_df, fold_predictions_df])
         logging.info(f"Calibration metrics for CV")

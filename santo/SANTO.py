@@ -10,8 +10,8 @@ import time
 from numpy import ndarray
 from sklearn.utils import shuffle
 
-from ml.layers.transformer_classifier import TransformerClassifier
-from ml.model.base_model import HyperParams
+from src.ml.layers.transformer_classifier import TransformerClassifier
+from src.ml.model.base_model import HyperParams
 
 
 class SANTO:

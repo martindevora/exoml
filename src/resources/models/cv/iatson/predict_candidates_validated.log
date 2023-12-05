@@ -1,0 +1,1272 @@
+/home/mdevo/anaconda3/envs/exoml/bin/python /tmp/pycharm_project_157/iatson_planet_tces_launch.py
+/home/mdevo/anaconda3/envs/exoml/lib/python3.10/site-packages/lightkurve/config/__init__.py:119: UserWarning: The default Lightkurve cache directory, used by download(), etc., has been moved to /home/mdevo/.lightkurve/cache. Please move all the files in the legacy directory /home/mdevo/.lightkurve-cache to the new location and remove the legacy directory. Refer to https://docs.lightkurve.org/reference/config.html#default-cache-directory-migration for more information.
+  warnings.warn(
+2023-12-04 09:18:19.060002: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2023-12-04 09:18:19.823765: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Could not find TensorRT
+/home/mdevo/anaconda3/envs/exoml/lib/python3.10/site-packages/tensorflow_addons/utils/tfa_eol_msg.py:23: UserWarning:
+
+TensorFlow Addons (TFA) has ended development and introduction of new features.
+TFA has entered a minimal maintenance and release mode until a planned end of life in May 2024.
+Please modify downstream libraries to take dependencies from other repositories in our TensorFlow community (e.g. Keras, Keras-CV, and Keras-NLP).
+
+For more information see: https://github.com/tensorflow/addons/issues/2807
+
+  warnings.warn(
+2023-12-04 09:18:21.334367: E tensorflow/compiler/xla/stream_executor/cuda/cuda_driver.cc:266] failed call to cuInit: CUDA_ERROR_NO_DEVICE: no CUDA-capable device is detected
+2023-12-04 09:18:21.334404: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:168] retrieving CUDA diagnostic information for host: Tiki.Tiki.com
+2023-12-04 09:18:21.334413: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:175] hostname: Tiki.Tiki.com
+2023-12-04 09:18:21.334556: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:199] libcuda reported version is: 525.147.5
+2023-12-04 09:18:21.334584: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:203] kernel reported version is: 525.105.17
+2023-12-04 09:18:21.334593: E tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:312] kernel version 525.105.17 does not match DSO version 525.147.5 -- cannot find working devices in this configuration
+2023-12-04 09:18:22 INFO     Creating model plot and summary
+2023-12-04 09:18:22 ERROR    Can't plot model network.png
+Traceback (most recent call last):
+  File "/tmp/pycharm_project_157/src/ml/model/base_model.py", line 235, in inform
+    plot_model(self.model, dir + '/network.png', show_shapes=True)
+  File "/home/mdevo/anaconda3/envs/exoml/lib/python3.10/site-packages/keras/utils/vis_utils.py", line 464, in plot_model
+    raise ImportError(message)
+ImportError: You must install pydot (`pip install pydot`) and install graphviz (see instructions at https://graphviz.gitlab.io/download/) for plot_model to work.
+Model: "IATSON_planet"
+__________________________________________________________________________________________________
+ Layer (type)                   Output Shape         Param #     Connected to
+==================================================================================================
+ focus_odd_flux_branch (InputLa  [(None, 75, 2)]     0           []
+ yer)
+
+ focus_even_flux_branch (InputL  [(None, 75, 2)]     0           []
+ ayer)
+
+ global_flux_branch (InputLayer  [(None, 300, 2)]    0           []
+ )
+
+ gaussian_noise (GaussianNoise)  (None, 75, 2)       0           ['focus_odd_flux_branch[0][0]']
+
+ gaussian_noise_1 (GaussianNois  (None, 75, 2)       0           ['focus_even_flux_branch[0][0]']
+ e)
+
+ focus_harmonic_odd_flux_branch  [(None, 75, 2)]     0           []
+  (InputLayer)
+
+ focus_harmonic_even_flux_branc  [(None, 75, 2)]     0           []
+ h (InputLayer)
+
+ gn_flux (GaussianNoise)        (None, 300, 2)       0           ['global_flux_branch[0][0]']
+
+ conv1d_4 (Conv1D)              (None, 75, 32)       1312        ['gaussian_noise[0][0]']
+
+ conv1d_7 (Conv1D)              (None, 75, 32)       1312        ['gaussian_noise_1[0][0]']
+
+ gaussian_noise_2 (GaussianNois  (None, 75, 2)       0           ['focus_harmonic_odd_flux_branch[
+ e)                                                              0][0]']
+
+ gaussian_noise_3 (GaussianNois  (None, 75, 2)       0           ['focus_harmonic_even_flux_branch
+ e)                                                              [0][0]']
+
+ centroids_branch (InputLayer)  [(None, 75, 3)]      0           []
+
+ conv1d (Conv1D)                (None, 300, 16)      2896        ['gn_flux[0][0]']
+
+ max_pooling1d_4 (MaxPooling1D)  (None, 71, 32)      0           ['conv1d_4[0][0]']
+
+ max_pooling1d_7 (MaxPooling1D)  (None, 71, 32)      0           ['conv1d_7[0][0]']
+
+ conv1d_10 (Conv1D)             (None, 75, 32)       1312        ['gaussian_noise_2[0][0]']
+
+ conv1d_13 (Conv1D)             (None, 75, 32)       1312        ['gaussian_noise_3[0][0]']
+
+ gaussian_noise_4 (GaussianNois  (None, 75, 3)       0           ['centroids_branch[0][0]']
+ e)
+
+ og_branch (InputLayer)         [(None, 75, 2)]      0           []
+
+ max_pooling1d (MaxPooling1D)   (None, 291, 16)      0           ['conv1d[0][0]']
+
+ spatial_dropout1d_3 (SpatialDr  (None, 71, 32)      0           ['max_pooling1d_4[0][0]']
+ opout1D)
+
+ spatial_dropout1d_5 (SpatialDr  (None, 71, 32)      0           ['max_pooling1d_7[0][0]']
+ opout1D)
+
+ max_pooling1d_10 (MaxPooling1D  (None, 71, 32)      0           ['conv1d_10[0][0]']
+ )
+
+ max_pooling1d_13 (MaxPooling1D  (None, 71, 32)      0           ['conv1d_13[0][0]']
+ )
+
+ conv1d_16 (Conv1D)             (None, 75, 32)       1952        ['gaussian_noise_4[0][0]']
+
+ gaussian_noise_5 (GaussianNois  (None, 75, 2)       0           ['og_branch[0][0]']
+ e)
+
+ spatial_dropout1d (SpatialDrop  (None, 291, 16)     0           ['max_pooling1d[0][0]']
+ out1D)
+
+ conv1d_5 (Conv1D)              (None, 71, 64)       20544       ['spatial_dropout1d_3[0][0]']
+
+ conv1d_8 (Conv1D)              (None, 71, 64)       20544       ['spatial_dropout1d_5[0][0]']
+
+ spatial_dropout1d_7 (SpatialDr  (None, 71, 32)      0           ['max_pooling1d_10[0][0]']
+ opout1D)
+
+ spatial_dropout1d_9 (SpatialDr  (None, 71, 32)      0           ['max_pooling1d_13[0][0]']
+ opout1D)
+
+ max_pooling1d_16 (MaxPooling1D  (None, 71, 32)      0           ['conv1d_16[0][0]']
+ )
+
+ conv1d_19 (Conv1D)             (None, 75, 32)       1312        ['gaussian_noise_5[0][0]']
+
+ conv1d_1 (Conv1D)              (None, 291, 32)      15392       ['spatial_dropout1d[0][0]']
+
+ max_pooling1d_5 (MaxPooling1D)  (None, 69, 64)      0           ['conv1d_5[0][0]']
+
+ max_pooling1d_8 (MaxPooling1D)  (None, 69, 64)      0           ['conv1d_8[0][0]']
+
+ conv1d_11 (Conv1D)             (None, 71, 64)       20544       ['spatial_dropout1d_7[0][0]']
+
+ conv1d_14 (Conv1D)             (None, 71, 64)       20544       ['spatial_dropout1d_9[0][0]']
+
+ spatial_dropout1d_11 (SpatialD  (None, 71, 32)      0           ['max_pooling1d_16[0][0]']
+ ropout1D)
+
+ max_pooling1d_19 (MaxPooling1D  (None, 71, 32)      0           ['conv1d_19[0][0]']
+ )
+
+ max_pooling1d_1 (MaxPooling1D)  (None, 288, 32)     0           ['conv1d_1[0][0]']
+
+ spatial_dropout1d_4 (SpatialDr  (None, 69, 64)      0           ['max_pooling1d_5[0][0]']
+ opout1D)
+
+ spatial_dropout1d_6 (SpatialDr  (None, 69, 64)      0           ['max_pooling1d_8[0][0]']
+ opout1D)
+
+ max_pooling1d_11 (MaxPooling1D  (None, 69, 64)      0           ['conv1d_11[0][0]']
+ )
+
+ max_pooling1d_14 (MaxPooling1D  (None, 69, 64)      0           ['conv1d_14[0][0]']
+ )
+
+ conv1d_17 (Conv1D)             (None, 71, 64)       20544       ['spatial_dropout1d_11[0][0]']
+
+ spatial_dropout1d_13 (SpatialD  (None, 71, 32)      0           ['max_pooling1d_19[0][0]']
+ ropout1D)
+
+ spatial_dropout1d_1 (SpatialDr  (None, 288, 32)     0           ['max_pooling1d_1[0][0]']
+ opout1D)
+
+ conv1d_6 (Conv1D)              (None, 69, 128)      41088       ['spatial_dropout1d_4[0][0]']
+
+ conv1d_9 (Conv1D)              (None, 69, 128)      41088       ['spatial_dropout1d_6[0][0]']
+
+ spatial_dropout1d_8 (SpatialDr  (None, 69, 64)      0           ['max_pooling1d_11[0][0]']
+ opout1D)
+
+ spatial_dropout1d_10 (SpatialD  (None, 69, 64)      0           ['max_pooling1d_14[0][0]']
+ ropout1D)
+
+ max_pooling1d_17 (MaxPooling1D  (None, 69, 64)      0           ['conv1d_17[0][0]']
+ )
+
+ conv1d_20 (Conv1D)             (None, 71, 64)       20544       ['spatial_dropout1d_13[0][0]']
+
+ conv1d_2 (Conv1D)              (None, 288, 64)      30784       ['spatial_dropout1d_1[0][0]']
+
+ max_pooling1d_6 (MaxPooling1D)  (None, 67, 128)     0           ['conv1d_6[0][0]']
+
+ transit_params (InputLayer)    [(None, 6, 1)]       0           []
+
+ max_pooling1d_9 (MaxPooling1D)  (None, 67, 128)     0           ['conv1d_9[0][0]']
+
+ conv1d_12 (Conv1D)             (None, 69, 128)      41088       ['spatial_dropout1d_8[0][0]']
+
+ conv1d_15 (Conv1D)             (None, 69, 128)      41088       ['spatial_dropout1d_10[0][0]']
+
+ spatial_dropout1d_12 (SpatialD  (None, 69, 64)      0           ['max_pooling1d_17[0][0]']
+ ropout1D)
+
+ max_pooling1d_20 (MaxPooling1D  (None, 69, 64)      0           ['conv1d_20[0][0]']
+ )
+
+ max_pooling1d_2 (MaxPooling1D)  (None, 143, 64)     0           ['conv1d_2[0][0]']
+
+ flatten (Flatten)              (None, 8576)         0           ['max_pooling1d_6[0][0]']
+
+ flatten_1 (Flatten)            (None, 6)            0           ['transit_params[0][0]']
+
+ flatten_2 (Flatten)            (None, 8576)         0           ['max_pooling1d_9[0][0]']
+
+ flatten_3 (Flatten)            (None, 6)            0           ['transit_params[0][0]']
+
+ max_pooling1d_12 (MaxPooling1D  (None, 67, 128)     0           ['conv1d_12[0][0]']
+ )
+
+ max_pooling1d_15 (MaxPooling1D  (None, 67, 128)     0           ['conv1d_15[0][0]']
+ )
+
+ conv1d_18 (Conv1D)             (None, 69, 128)      41088       ['spatial_dropout1d_12[0][0]']
+
+ spatial_dropout1d_14 (SpatialD  (None, 69, 64)      0           ['max_pooling1d_20[0][0]']
+ ropout1D)
+
+ spatial_dropout1d_2 (SpatialDr  (None, 143, 64)     0           ['max_pooling1d_2[0][0]']
+ opout1D)
+
+ concatenate (Concatenate)      (None, 8582)         0           ['flatten[0][0]',
+                                                                  'flatten_1[0][0]']
+
+ concatenate_1 (Concatenate)    (None, 8582)         0           ['flatten_2[0][0]',
+                                                                  'flatten_3[0][0]']
+
+ flatten_4 (Flatten)            (None, 8576)         0           ['max_pooling1d_12[0][0]']
+
+ flatten_5 (Flatten)            (None, 8576)         0           ['max_pooling1d_15[0][0]']
+
+ max_pooling1d_18 (MaxPooling1D  (None, 67, 128)     0           ['conv1d_18[0][0]']
+ )
+
+ offset_params (InputLayer)     [(None, 2, 1)]       0           []
+
+ conv1d_21 (Conv1D)             (None, 69, 128)      41088       ['spatial_dropout1d_14[0][0]']
+
+ conv1d_3 (Conv1D)              (None, 143, 128)     65664       ['spatial_dropout1d_2[0][0]']
+
+ dense_1 (Dense)                (None, 64)           549312      ['concatenate[0][0]']
+
+ dense_2 (Dense)                (None, 64)           549312      ['concatenate_1[0][0]']
+
+ dense_3 (Dense)                (None, 64)           548928      ['flatten_4[0][0]']
+
+ dense_4 (Dense)                (None, 64)           548928      ['flatten_5[0][0]']
+
+ flatten_6 (Flatten)            (None, 8576)         0           ['max_pooling1d_18[0][0]']
+
+ flatten_7 (Flatten)            (None, 2)            0           ['offset_params[0][0]']
+
+ max_pooling1d_21 (MaxPooling1D  (None, 67, 128)     0           ['conv1d_21[0][0]']
+ )
+
+ max_pooling1d_3 (MaxPooling1D)  (None, 71, 128)     0           ['conv1d_3[0][0]']
+
+ adaptive_std_dropout_1 (Adapti  (None, 64)          0           ['dense_1[0][0]']
+ veStdDropout)
+
+ adaptive_std_dropout_2 (Adapti  (None, 64)          0           ['dense_2[0][0]']
+ veStdDropout)
+
+ adaptive_std_dropout_3 (Adapti  (None, 64)          0           ['dense_3[0][0]']
+ veStdDropout)
+
+ adaptive_std_dropout_4 (Adapti  (None, 64)          0           ['dense_4[0][0]']
+ veStdDropout)
+
+ concatenate_2 (Concatenate)    (None, 8578)         0           ['flatten_6[0][0]',
+                                                                  'flatten_7[0][0]']
+
+ flatten_8 (Flatten)            (None, 8576)         0           ['max_pooling1d_21[0][0]']
+
+ dense (Dense)                  (None, 71, 64)       8256        ['max_pooling1d_3[0][0]']
+
+ layer_normalization_1 (LayerNo  (None, 64)          128         ['adaptive_std_dropout_1[0][0]']
+ rmalization)
+
+ layer_normalization_2 (LayerNo  (None, 64)          128         ['adaptive_std_dropout_2[0][0]']
+ rmalization)
+
+ layer_normalization_3 (LayerNo  (None, 64)          128         ['adaptive_std_dropout_3[0][0]']
+ rmalization)
+
+ layer_normalization_4 (LayerNo  (None, 64)          128         ['adaptive_std_dropout_4[0][0]']
+ rmalization)
+
+ dense_5 (Dense)                (None, 64)           549056      ['concatenate_2[0][0]']
+
+ dense_6 (Dense)                (None, 64)           548928      ['flatten_8[0][0]']
+
+ adaptive_std_dropout (Adaptive  (None, 71, 64)      0           ['dense[0][0]']
+ StdDropout)
+
+ add (Add)                      (None, 64)           0           ['layer_normalization_1[0][0]',
+                                                                  'layer_normalization_2[0][0]']
+
+ add_1 (Add)                    (None, 64)           0           ['layer_normalization_3[0][0]',
+                                                                  'layer_normalization_4[0][0]']
+
+ adaptive_std_dropout_5 (Adapti  (None, 64)          0           ['dense_5[0][0]']
+ veStdDropout)
+
+ adaptive_std_dropout_6 (Adapti  (None, 64)          0           ['dense_6[0][0]']
+ veStdDropout)
+
+ stellar_model (InputLayer)     [(None, 3, 1)]       0           []
+
+ layer_normalization (LayerNorm  (None, 71, 64)      128         ['adaptive_std_dropout[0][0]']
+ alization)
+
+ add_2 (Add)                    (None, 64)           0           ['add[0][0]',
+                                                                  'add_1[0][0]']
+
+ layer_normalization_5 (LayerNo  (None, 64)          128         ['adaptive_std_dropout_5[0][0]']
+ rmalization)
+
+ layer_normalization_6 (LayerNo  (None, 64)          128         ['adaptive_std_dropout_6[0][0]']
+ rmalization)
+
+ flatten_9 (Flatten)            (None, 3)            0           ['stellar_model[0][0]']
+
+ flatten_10 (Flatten)           (None, 4544)         0           ['layer_normalization[0][0]']
+
+ flatten_11 (Flatten)           (None, 64)           0           ['add_2[0][0]']
+
+ flatten_12 (Flatten)           (None, 64)           0           ['layer_normalization_5[0][0]']
+
+ flatten_13 (Flatten)           (None, 64)           0           ['layer_normalization_6[0][0]']
+
+ concatenate_3 (Concatenate)    (None, 4739)         0           ['flatten_9[0][0]',
+                                                                  'flatten_10[0][0]',
+                                                                  'flatten_11[0][0]',
+                                                                  'flatten_12[0][0]',
+                                                                  'flatten_13[0][0]']
+
+ final-dense2 (Dense)           (None, 1000)         4740000     ['concatenate_3[0][0]']
+
+ final-dropout2 (AdaptiveStdDro  (None, 1000)        0           ['final-dense2[0][0]']
+ pout)
+
+ final-dense3 (Dense)           (None, 250)          250250      ['final-dropout2[0][0]']
+
+ final-dropout3 (AdaptiveStdDro  (None, 250)         0           ['final-dense3[0][0]']
+ pout)
+
+ final-dense4 (Dense)           (None, 75)           18825       ['final-dropout3[0][0]']
+
+ final-dropout4 (AdaptiveStdDro  (None, 75)          0           ['final-dense4[0][0]']
+ pout)
+
+ final-dense5 (Dense)           (None, 35)           2660        ['final-dropout4[0][0]']
+
+ final-dropout5 (AdaptiveStdDro  (None, 35)          0           ['final-dense5[0][0]']
+ pout)
+
+ final-dense6 (Dense)           (None, 16)           576         ['final-dropout5[0][0]']
+
+ final-dropout6 (AdaptiveStdDro  (None, 16)          0           ['final-dense6[0][0]']
+ pout)
+
+ logits (Dense)                 (None, 1)            17          ['final-dropout6[0][0]']
+
+==================================================================================================
+Total params: 8,808,984
+Trainable params: 8,808,984
+Non-trainable params: 0
+__________________________________________________________________________________________________
+2023-12-04 09:18:22 INFO     Min weights: -0.5859028 from layer logits
+2023-12-04 09:18:22 INFO     Max weights: 1.0 from layer layer_normalization_6
+/tmp/pycharm_project_157/iatson_planet_tces_launch.py:162: DtypeWarning: Columns (222,223,341,347,352,357,362,367,368,369,420) have mixed types. Specify dtype option on import or set low_memory=False.
+  candidates_df = pd.read_csv(training_dir + '/q1_q17/classified_tces.csv')
+2023-12-04 09:18:23 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_0/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 09:18:31.115739: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+3/3 [==============================] - 2s 170ms/step
+2023-12-04 09:18:38 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_1/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 09:18:45.803566: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+3/3 [==============================] - 3s 246ms/step
+2023-12-04 09:18:49 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_2/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 09:18:57.415416: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+3/3 [==============================] - 3s 251ms/step
+2023-12-04 09:19:01 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_3/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 09:19:08.992024: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+3/3 [==============================] - 3s 244ms/step
+2023-12-04 09:19:13 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_4/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 09:19:20.582530: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+WARNING:tensorflow:5 out of the last 13 calls to <function Model.make_predict_function.<locals>.predict_function at 0x7fa2b03ee3b0> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+3/3 [==============================] - 3s 255ms/step
+2023-12-04 09:19:24 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_5/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 09:19:32.276681: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+WARNING:tensorflow:5 out of the last 13 calls to <function Model.make_predict_function.<locals>.predict_function at 0x7fa3f30ca170> triggered tf.function retracing. Tracing is expensive and the excessive number of tracings could be due to (1) creating @tf.function repeatedly in a loop, (2) passing tensors with different shapes, (3) passing Python objects instead of tensors. For (1), please define your @tf.function outside of the loop. For (2), @tf.function has reduce_retracing=True option that can avoid unnecessary retracing. For (3), please refer to https://www.tensorflow.org/guide/function#controlling_retracing and https://www.tensorflow.org/api_docs/python/tf/function for  more details.
+3/3 [==============================] - 3s 295ms/step
+2023-12-04 09:19:36 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_6/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 09:19:43.209361: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+3/3 [==============================] - 4s 253ms/step
+2023-12-04 09:19:48 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_7/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 09:19:55.301585: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+3/3 [==============================] - 3s 257ms/step
+2023-12-04 09:19:59 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_8/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 09:20:06.936822: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+3/3 [==============================] - 3s 292ms/step
+2023-12-04 09:20:11 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_9/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 09:20:18.819832: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+3/3 [==============================] - 3s 276ms/step
+2023-12-04 09:20:25 INFO     Metrics: tps={0.5: 410.0}, fps={0.5: 0.0}, tns={0.5: 1.0}, fns={0.5: 10.0},precision=1.0, recall=0.976190447807312, accuracy=0.9762470126152039
+2023-12-04 09:20:25 INFO     Signals predicted as negative for threshold 0.5:
+               object_id            type  expected_class predicted_class  prediction_value  prediction_value_std
+282    KIC 7677005_38.06              fp             0.0               0      4.460605e-17          1.336567e-16
+249   KIC 6766634_321.21  planet_transit             1.0               0      3.865966e-03          5.136338e-03
+284    KIC 7679812_38.58  planet_transit             1.0               0      8.754789e-02          1.363327e-01
+110    KIC 3098810_40.81  planet_transit             1.0               0      1.123017e-01          2.323424e-01
+46   KIC 11122894_150.02  planet_transit             1.0               0      1.128092e-01          1.323958e-01
+114    KIC 3229150_18.51  planet_transit             1.0               0      1.331165e-01          2.546172e-01
+166    KIC 4947556_13.03  planet_transit             1.0               0      3.081111e-01          3.765860e-01
+127   KIC 3634051_453.54  planet_transit             1.0               0      3.500306e-01          4.122164e-01
+230    KIC 6197215_10.61  planet_transit             1.0               0      3.540103e-01          2.680821e-01
+352    KIC 8804283_22.79  planet_transit             1.0               0      3.973241e-01          4.206334e-01
+357    KIC 8890924_26.66  planet_transit             1.0               0      4.613909e-01          3.422717e-01
+2023-12-04 09:20:25 INFO     Signals predicted as positive for threshold 0.5:
+               object_id            type  expected_class predicted_class  prediction_value  prediction_value_std
+190     KIC 5530112_9.69  planet_transit             1.0               1          0.628469              0.413842
+351    KIC 8804283_13.26  planet_transit             1.0               1          0.646605              0.396474
+325     KIC 8439323_4.63  planet_transit             1.0               1          0.658424              0.340908
+60     KIC 11519187_2.44  planet_transit             1.0               1          0.693545              0.374404
+373     KIC 9117416_3.16  planet_transit             1.0               1          0.709640              0.246968
+309    KIC 8087812_27.21  planet_transit             1.0               1          0.772704              0.245206
+413   KIC 9839821_180.93  planet_transit             1.0               1          0.780691              0.381200
+252    KIC 6846911_14.03  planet_transit             1.0               1          0.786493              0.277796
+341   KIC 8630788_148.27  planet_transit             1.0               1          0.789384              0.355543
+361     KIC 9003401_21.1  planet_transit             1.0               1          0.808406              0.275807
+420    KIC 9963265_16.49  planet_transit             1.0               1          0.827710              0.266979
+22    KIC 10363115_59.36  planet_transit             1.0               1          0.854448              0.197159
+96     KIC 1849702_39.83  planet_transit             1.0               1          0.873308              0.243953
+223    KIC 6058816_73.75  planet_transit             1.0               1          0.881599              0.246528
+377   KIC 9205938_199.67  planet_transit             1.0               1          0.881941              0.270563
+158     KIC 4673628_3.95  planet_transit             1.0               1          0.883679              0.130806
+202     KIC 5773121_0.52  planet_transit             1.0               1          0.890092              0.076221
+346   KIC 8686373_126.56  planet_transit             1.0               1          0.895680              0.283087
+154     KIC 4548098_3.82  planet_transit             1.0               1          0.896653              0.114385
+369     KIC 9086251_6.89  planet_transit             1.0               1          0.898083              0.231729
+269   KIC 7289577_109.44  planet_transit             1.0               1          0.899587              0.293155
+95      KIC 1718958_1.42  planet_transit             1.0               1          0.905227              0.080732
+118     KIC 3338885_5.06  planet_transit             1.0               1          0.911914              0.143722
+250    KIC 6779726_47.06  planet_transit             1.0               1          0.913179              0.231559
+258     KIC 7102227_0.76  planet_transit             1.0               1          0.922292              0.052333
+276     KIC 7450747_2.21  planet_transit             1.0               1          0.925482              0.149126
+321     KIC 8360640_4.02  planet_transit             1.0               1          0.948060              0.108832
+147    KIC 4248120_23.34  planet_transit             1.0               1          0.948113              0.140680
+265     KIC 7257966_3.04  planet_transit             1.0               1          0.954985              0.065166
+417     KIC 9898447_2.38  planet_transit             1.0               1          0.956213              0.022739
+178     KIC 5195172_1.48  planet_transit             1.0               1          0.957310              0.022041
+24     KIC 10387742_3.03  planet_transit             1.0               1          0.957534              0.034174
+12     KIC 10220837_1.96  planet_transit             1.0               1          0.966591              0.024882
+247     KIC 6697605_3.42  planet_transit             1.0               1          0.970846              0.067439
+73     KIC 11754430_6.16  planet_transit             1.0               1          0.972380              0.012730
+235    KIC 6342333_80.23  planet_transit             1.0               1          0.972516              0.075660
+411   KIC 9836959_105.02  planet_transit             1.0               1          0.973634              0.040296
+376    KIC 9205907_12.02  planet_transit             1.0               1          0.973853              0.032057
+108   KIC 2854181_101.13  planet_transit             1.0               1          0.973884              0.071238
+300    KIC 7939330_29.54  planet_transit             1.0               1          0.973900              0.015651
+192      KIC 5534941_3.7  planet_transit             1.0               1          0.974120              0.011140
+222    KIC 6049190_70.47  planet_transit             1.0               1          0.974470              0.061247
+298     KIC 7879433_1.39  planet_transit             1.0               1          0.975288              0.012425
+375      KIC 9177629_5.6  planet_transit             1.0               1          0.975564              0.046968
+387     KIC 9472074_0.56  planet_transit             1.0               1          0.976036              0.017053
+210     KIC 5942808_0.63  planet_transit             1.0               1          0.976360              0.018308
+372    KIC 9117416_20.03  planet_transit             1.0               1          0.976639              0.025571
+206     KIC 5794570_1.12  planet_transit             1.0               1          0.977019              0.017388
+196     KIC 5688683_2.79  planet_transit             1.0               1          0.977646              0.037570
+231     KIC 6198182_3.88  planet_transit             1.0               1          0.977890              0.008010
+200    KIC 5716932_56.49  planet_transit             1.0               1          0.979012              0.030295
+207     KIC 5881120_4.85  planet_transit             1.0               1          0.979112              0.007532
+131     KIC 3756264_7.36  planet_transit             1.0               1          0.979631              0.030122
+416      KIC 9898017_2.3  planet_transit             1.0               1          0.980920              0.008068
+303    KIC 7983117_11.49  planet_transit             1.0               1          0.980922              0.017175
+392     KIC 9569711_6.06  planet_transit             1.0               1          0.981716              0.028611
+19    KIC 10350571_17.16  planet_transit             1.0               1          0.981883              0.017048
+93     KIC 12505654_5.19  planet_transit             1.0               1          0.984009              0.020944
+189     KIC 5450893_4.82  planet_transit             1.0               1          0.984046              0.007451
+386    KIC 9472000_31.59  planet_transit             1.0               1          0.984149              0.022236
+156     KIC 4665571_0.77  planet_transit             1.0               1          0.984246              0.009598
+119     KIC 3346154_1.95  planet_transit             1.0               1          0.984265              0.013024
+229     KIC 6183511_0.73  planet_transit             1.0               1          0.984377              0.011877
+61    KIC 11566064_30.65  planet_transit             1.0               1          0.984836              0.012847
+330    KIC 8494542_10.86  planet_transit             1.0               1          0.985922              0.012493
+257     KIC 7097965_7.72  planet_transit             1.0               1          0.986102              0.013034
+144     KIC 4164922_1.21  planet_transit             1.0               1          0.986144              0.009080
+172    KIC 5092266_44.87  planet_transit             1.0               1          0.986625              0.015773
+125     KIC 3561464_35.8  planet_transit             1.0               1          0.987555              0.010519
+236    KIC 6356692_11.39  planet_transit             1.0               1          0.987624              0.009234
+355    KIC 8827575_15.61  planet_transit             1.0               1          0.987690              0.008027
+305     KIC 8013439_8.26  planet_transit             1.0               1          0.988080              0.007304
+142     KIC 4149450_3.22  planet_transit             1.0               1          0.988281              0.005680
+350     KIC 8780959_9.63  planet_transit             1.0               1          0.988505              0.008598
+2    KIC 10055126_232.05  planet_transit             1.0               1          0.988775              0.009002
+102     KIC 2574338_9.23  planet_transit             1.0               1          0.988971              0.008382
+91      KIC 12469800_1.3  planet_transit             1.0               1          0.988983              0.006178
+344    KIC 8651389_15.14  planet_transit             1.0               1          0.989039              0.006626
+103    KIC 2581316_10.51  planet_transit             1.0               1          0.989076              0.004129
+343     KIC 8636600_6.39  planet_transit             1.0               1          0.989165              0.010131
+132     KIC 3831053_6.15  planet_transit             1.0               1          0.989341              0.004582
+215    KIC 5963582_25.54  planet_transit             1.0               1          0.989369              0.006199
+191     KIC 5531953_1.99  planet_transit             1.0               1          0.989626              0.007532
+279     KIC 7584650_45.0  planet_transit             1.0               1          0.989771              0.005947
+288    KIC 7749773_13.79  planet_transit             1.0               1          0.990004              0.005654
+404     KIC 9714550_4.73  planet_transit             1.0               1          0.990104              0.008474
+248     KIC 6752002_6.08  planet_transit             1.0               1          0.990281              0.009805
+184     KIC 5357545_3.76  planet_transit             1.0               1          0.990296              0.009199
+4     KIC 10074466_35.01  planet_transit             1.0               1          0.990403              0.009416
+208     KIC 5905822_6.99          planet             1.0               1          0.990620              0.003980
+399     KIC 9636135_2.42  planet_transit             1.0               1          0.990629              0.002995
+182    KIC 5308537_14.27  planet_transit             1.0               1          0.990702              0.004598
+348    KIC 8742590_49.48  planet_transit             1.0               1          0.990783              0.013785
+140     KIC 4078311_9.84  planet_transit             1.0               1          0.991085              0.013563
+390     KIC 9489524_6.89  planet_transit             1.0               1          0.991278              0.002363
+394     KIC 9602613_4.61  planet_transit             1.0               1          0.991315              0.001857
+290     KIC 7762723_9.89  planet_transit             1.0               1          0.991380              0.004635
+291     KIC 7778621_7.28  planet_transit             1.0               1          0.991571              0.003459
+31     KIC 10604592_2.19  planet_transit             1.0               1          0.991743              0.002933
+173    KIC 5095082_20.66  planet_transit             1.0               1          0.991780              0.004765
+254     KIC 6879171_6.96  planet_transit             1.0               1          0.991785              0.003195
+327     KIC 8456679_4.07  planet_transit             1.0               1          0.991787              0.003711
+324     KIC 8430964_2.99  planet_transit             1.0               1          0.991791              0.002889
+260     KIC 7120108_1.03  planet_transit             1.0               1          0.991901              0.003789
+113      KIC 3128552_2.5  planet_transit             1.0               1          0.992010              0.004268
+383    KIC 9285265_61.57  planet_transit             1.0               1          0.992027              0.004322
+414     KIC 9896018_2.73  planet_transit             1.0               1          0.992066              0.002473
+216    KIC 5965819_19.59  planet_transit             1.0               1          0.992073              0.003625
+16     KIC 1026957_21.76  planet_transit             1.0               1          0.992226              0.005848
+17     KIC 10332213_2.52  planet_transit             1.0               1          0.992226              0.006872
+162     KIC 4814502_4.94  planet_transit             1.0               1          0.992273              0.003615
+66     KIC 11618601_2.76  planet_transit             1.0               1          0.992288              0.003757
+263     KIC 7202957_1.72  planet_transit             1.0               1          0.992329              0.002786
+76     KIC 11818607_5.06  planet_transit             1.0               1          0.992424              0.003270
+36     KIC 10793172_5.36  planet_transit             1.0               1          0.992426              0.002325
+123     KIC 3545135_8.48  planet_transit             1.0               1          0.992442              0.002588
+183     KIC 5342473_4.64  planet_transit             1.0               1          0.992464              0.002716
+228     KIC 6153407_5.99  planet_transit             1.0               1          0.992558              0.002845
+109    KIC 2857607_41.87  planet_transit             1.0               1          0.992586              0.004034
+37     KIC 10794087_7.65  planet_transit             1.0               1          0.992664              0.004573
+117     KIC 3328080_4.77  planet_transit             1.0               1          0.992876              0.002195
+318     KIC 8263545_4.45  planet_transit             1.0               1          0.992930              0.003867
+238   KIC 6428794_169.13  planet_transit             1.0               1          0.992936              0.012697
+185     KIC 5369827_3.61  planet_transit             1.0               1          0.992939              0.005111
+111    KIC 3109930_37.81  planet_transit             1.0               1          0.992957              0.002473
+165     KIC 4860678_9.98  planet_transit             1.0               1          0.993015              0.003414
+28     KIC 10513530_3.52  planet_transit             1.0               1          0.993106              0.002195
+179     KIC 5211199_4.56  planet_transit             1.0               1          0.993121              0.002528
+415      KIC 9896018_3.6  planet_transit             1.0               1          0.993146              0.002331
+106     KIC 2718778_3.92  planet_transit             1.0               1          0.993180              0.002391
+295     KIC 7841925_6.21  planet_transit             1.0               1          0.993222              0.002275
+338    KIC 8613535_29.97  planet_transit             1.0               1          0.993285              0.003325
+218     KIC 5978170_5.69  planet_transit             1.0               1          0.993304              0.002735
+44     KIC 11046025_3.72  planet_transit             1.0               1          0.993336              0.002541
+328    KIC 8480285_29.67  planet_transit             1.0               1          0.993443              0.002604
+203     KIC 5775129_3.85  planet_transit             1.0               1          0.993452              0.003458
+176     KIC 5125347_7.17  planet_transit             1.0               1          0.993573              0.005222
+255     KIC 6945786_2.39  planet_transit             1.0               1          0.993696              0.002026
+289    KIC 7761918_89.19  planet_transit             1.0               1          0.993707              0.004944
+268    KIC 7288444_15.33  planet_transit             1.0               1          0.993765              0.003127
+180    KIC 5213230_52.61  planet_transit             1.0               1          0.993803              0.002524
+225    KIC 6062929_22.13  planet_transit             1.0               1          0.993805              0.007685
+398    KIC 9635606_48.89  planet_transit             1.0               1          0.993817              0.003236
+221     KIC 5980783_37.3  planet_transit             1.0               1          0.993912              0.002255
+49    KIC 11177543_38.33  planet_transit             1.0               1          0.993943              0.004252
+5     KIC 10094670_22.06  planet_transit             1.0               1          0.994052              0.003659
+232     KIC 6211812_2.52  planet_transit             1.0               1          0.994088              0.003522
+277     KIC 7463685_8.99  planet_transit             1.0               1          0.994161              0.002239
+92    KIC 12505076_11.93  planet_transit             1.0               1          0.994242              0.001574
+393    KIC 9592705_10.28  planet_transit             1.0               1          0.994297              0.002134
+347     KIC 8709688_4.18  planet_transit             1.0               1          0.994346              0.001800
+57    KIC 11465651_31.34  planet_transit             1.0               1          0.994372              0.002152
+326     KIC 8456679_1.74  planet_transit             1.0               1          0.994484              0.002949
+27     KIC 10482160_7.34  planet_transit             1.0               1          0.994495              0.002889
+74    KIC 11771430_40.03  planet_transit             1.0               1          0.994555              0.002569
+14     KIC 10252275_5.65  planet_transit             1.0               1          0.994649              0.001924
+130    KIC 3745559_30.25  planet_transit             1.0               1          0.994665              0.002220
+267     KIC 7287415_3.02  planet_transit             1.0               1          0.994672              0.001352
+62     KIC 11566256_5.78  planet_transit             1.0               1          0.994703              0.004032
+382      KIC 9279354_2.8  planet_transit             1.0               1          0.994708              0.003525
+306   KIC 8022489_197.51  planet_transit             1.0               1          0.994731              0.005708
+126    KIC 3629967_85.65  planet_transit             1.0               1          0.994770              0.004310
+259    KIC 7103919_10.78  planet_transit             1.0               1          0.994799              0.002283
+418    KIC 9957627_39.75  planet_transit             1.0               1          0.994817              0.002053
+242     KIC 6605493_9.31  planet_transit             1.0               1          0.994841              0.001998
+400     KIC 9650989_3.42  planet_transit             1.0               1          0.994861              0.001912
+48     KIC 11137180_6.07  planet_transit             1.0               1          0.994864              0.003108
+150     KIC 4458082_8.93  planet_transit             1.0               1          0.994901              0.001454
+148     KIC 4365645_4.17  planet_transit             1.0               1          0.994917              0.001892
+77    KIC 11818872_12.74  planet_transit             1.0               1          0.994918              0.002236
+365     KIC 9020114_3.48  planet_transit             1.0               1          0.994958              0.003033
+293    KIC 7810483_29.92  planet_transit             1.0               1          0.994961              0.002344
+337    KIC 8591693_29.46  planet_transit             1.0               1          0.994998              0.003151
+99     KIC 2164169_32.31  planet_transit             1.0               1          0.994998              0.002251
+287     KIC 7742408_33.5  planet_transit             1.0               1          0.995014              0.002155
+281    KIC 7670943_18.01  planet_transit             1.0               1          0.995044              0.001957
+67     KIC 11618601_5.05  planet_transit             1.0               1          0.995065              0.002140
+168    KIC 5005121_76.42  planet_transit             1.0               1          0.995079              0.001745
+90    KIC 12406807_17.07  planet_transit             1.0               1          0.995081              0.001613
+124    KIC 3559860_33.03  planet_transit             1.0               1          0.995085              0.001876
+356    KIC 8880123_46.72  planet_transit             1.0               1          0.995114              0.001928
+304     KIC 7987866_3.14  planet_transit             1.0               1          0.995125              0.002178
+171    KIC 5042210_12.15  planet_transit             1.0               1          0.995129              0.001939
+80    KIC 11874577_34.46  planet_transit             1.0               1          0.995138              0.001739
+395    KIC 9605514_25.85  planet_transit             1.0               1          0.995189              0.001549
+52     KIC 11244682_3.49  planet_transit             1.0               1          0.995201              0.001994
+3      KIC 10064256_5.96  planet_transit             1.0               1          0.995219              0.002322
+167     KIC 5003670_7.99  planet_transit             1.0               1          0.995251              0.001613
+333    KIC 8547429_11.66  planet_transit             1.0               1          0.995284              0.001810
+29    KIC 10525049_15.57  planet_transit             1.0               1          0.995287              0.002256
+364   KIC 9009953_234.24  planet_transit             1.0               1          0.995296              0.003876
+201    KIC 5770074_63.04  planet_transit             1.0               1          0.995303              0.002062
+213     KIC 5953297_5.62  planet_transit             1.0               1          0.995323              0.002053
+159     KIC 4770365_1.61  planet_transit             1.0               1          0.995437              0.002664
+363     KIC 9006186_4.27  planet_transit             1.0               1          0.995452              0.001683
+245    KIC 6619815_65.94  planet_transit             1.0               1          0.995490              0.001809
+155    KIC 4650733_29.54  planet_transit             1.0               1          0.995500              0.001903
+211     KIC 5942808_2.94  planet_transit             1.0               1          0.995503              0.002862
+278     KIC 7522911_20.5  planet_transit             1.0               1          0.995516              0.001662
+69    KIC 11718144_16.46  planet_transit             1.0               1          0.995557              0.002240
+51     KIC 11192235_1.62  planet_transit             1.0               1          0.995575              0.002302
+174      KIC 5106313_3.9  planet_transit             1.0               1          0.995576              0.001920
+367    KIC 9030537_62.56  planet_transit             1.0               1          0.995586              0.001865
+419    KIC 9958962_51.07  planet_transit             1.0               1          0.995613              0.002590
+408    KIC 9785921_26.76  planet_transit             1.0               1          0.995624              0.001992
+177     KIC 5174858_7.97  planet_transit             1.0               1          0.995628              0.002684
+323     KIC 8410415_44.3  planet_transit             1.0               1          0.995666              0.003568
+35     KIC 10793172_12.1  planet_transit             1.0               1          0.995719              0.001760
+311    KIC 8126558_12.19  planet_transit             1.0               1          0.995740              0.002890
+83     KIC 12061969_1.09  planet_transit             1.0               1          0.995743              0.002545
+134      KIC 3937519_5.9  planet_transit             1.0               1          0.995767              0.001787
+32     KIC 10676824_6.45  planet_transit             1.0               1          0.995768              0.002106
+152     KIC 4484336_8.94  planet_transit             1.0               1          0.995785              0.001663
+13    KIC 10252275_14.86  planet_transit             1.0               1          0.995832              0.001677
+239   KIC 6432345_234.64  planet_transit             1.0               1          0.995837              0.004793
+313    KIC 8162789_10.16  planet_transit             1.0               1          0.995938              0.002388
+139     KIC 4077526_4.46  planet_transit             1.0               1          0.995939              0.001607
+122    KIC 3544640_30.83  planet_transit             1.0               1          0.995951              0.001661
+214     KIC 5962262_8.62  planet_transit             1.0               1          0.995951              0.001914
+8       KIC 10141900_4.1  planet_transit             1.0               1          0.995965              0.001702
+312     KIC 8142942_5.76  planet_transit             1.0               1          0.995980              0.002157
+353     KIC 8804845_5.43  planet_transit             1.0               1          0.995984              0.001997
+56    KIC 11450414_85.52  planet_transit             1.0               1          0.996013              0.001488
+197    KIC 5695524_59.77  planet_transit             1.0               1          0.996013              0.001421
+64     KIC 11599038_7.02  planet_transit             1.0               1          0.996051              0.001670
+88     KIC 12352520_4.58  planet_transit             1.0               1          0.996068              0.002725
+233     KIC 6276791_9.33  planet_transit             1.0               1          0.996086              0.001801
+362     KIC 9006186_3.27  planet_transit             1.0               1          0.996109              0.001781
+368    KIC 9071593_59.28  planet_transit             1.0               1          0.996130              0.001703
+55    KIC 11394027_14.39  planet_transit             1.0               1          0.996130              0.001572
+220    KIC 5978559_95.61  planet_transit             1.0               1          0.996139              0.002012
+286     KIC 7703882_5.88  planet_transit             1.0               1          0.996159              0.001510
+283     KIC 7678434_3.97  planet_transit             1.0               1          0.996195              0.002129
+121    KIC 3448130_78.55  planet_transit             1.0               1          0.996219              0.001804
+187    KIC 5436013_25.89  planet_transit             1.0               1          0.996222              0.001689
+370     KIC 9092504_6.46  planet_transit             1.0               1          0.996255              0.001615
+26    KIC 10480915_19.59  planet_transit             1.0               1          0.996263              0.001276
+308    KIC 8078502_37.89  planet_transit             1.0               1          0.996268              0.001668
+47    KIC 11126381_33.79  planet_transit             1.0               1          0.996289              0.001377
+307    KIC 8073806_11.96  planet_transit             1.0               1          0.996291              0.001606
+226      KIC 6131236_6.8  planet_transit             1.0               1          0.996301              0.001542
+396    KIC 9605514_40.72  planet_transit             1.0               1          0.996316              0.001522
+160     KIC 4770365_4.73  planet_transit             1.0               1          0.996336              0.001918
+296    KIC 7869917_11.81  planet_transit             1.0               1          0.996343              0.001563
+391    KIC 9517393_56.78  planet_transit             1.0               1          0.996350              0.001402
+389    KIC 9480310_15.43  planet_transit             1.0               1          0.996392              0.003484
+141    KIC 4140813_13.36  planet_transit             1.0               1          0.996407              0.001715
+405     KIC 9729691_21.0  planet_transit             1.0               1          0.996423              0.001833
+237     KIC 6383785_3.62  planet_transit             1.0               1          0.996465              0.001491
+153      KIC 4545570_5.6  planet_transit             1.0               1          0.996474              0.001532
+105    KIC 2717158_13.22  planet_transit             1.0               1          0.996483              0.001627
+75     KIC 11810124_11.6  planet_transit             1.0               1          0.996484              0.001593
+359     KIC 8935810_6.23  planet_transit             1.0               1          0.996499              0.001666
+224     KIC 6061773_8.28  planet_transit             1.0               1          0.996505              0.001656
+15     KIC 10265898_5.25  planet_transit             1.0               1          0.996521              0.001593
+315     KIC 8257205_7.13  planet_transit             1.0               1          0.996543              0.001782
+378     KIC 9210387_5.91  planet_transit             1.0               1          0.996544              0.001694
+322    KIC 8379705_11.13  planet_transit             1.0               1          0.996546              0.001444
+70     KIC 11718389_5.94  planet_transit             1.0               1          0.996566              0.001814
+379    KIC 9244756_16.34  planet_transit             1.0               1          0.996574              0.001566
+157      KIC 4665571_4.6  planet_transit             1.0               1          0.996575              0.001763
+41    KIC 10973664_11.68  planet_transit             1.0               1          0.996588              0.002141
+20     KIC 10351231_7.67  planet_transit             1.0               1          0.996596              0.001582
+331    KIC 8505920_42.43  planet_transit             1.0               1          0.996637              0.001527
+45     KIC 11074178_9.18  planet_transit             1.0               1          0.996653              0.001558
+63     KIC 11568987_7.38  planet_transit             1.0               1          0.996662              0.001848
+9       KIC 10141900_6.5  planet_transit             1.0               1          0.996690              0.001654
+244     KIC 6609270_3.82  planet_transit             1.0               1          0.996705              0.001866
+59     KIC 11513486_6.65  planet_transit             1.0               1          0.996709              0.001670
+262     KIC 7183745_4.87  planet_transit             1.0               1          0.996711              0.002110
+336    KIC 8591173_12.29  planet_transit             1.0               1          0.996755              0.001724
+7     KIC 10134152_39.31  planet_transit             1.0               1          0.996759              0.001683
+339    KIC 8617363_19.95  planet_transit             1.0               1          0.996762              0.001455
+299    KIC 7938496_13.81  planet_transit             1.0               1          0.996766              0.001448
+280     KIC 7659389_3.83  planet_transit             1.0               1          0.996769              0.001821
+54     KIC 11337141_4.04  planet_transit             1.0               1          0.996772              0.001902
+320    KIC 8331612_13.84  planet_transit             1.0               1          0.996776              0.001781
+314    KIC 8231667_42.88  planet_transit             1.0               1          0.996780              0.001706
+120    KIC 3440118_19.58  planet_transit             1.0               1          0.996791              0.001709
+89    KIC 12406749_56.36  planet_transit             1.0               1          0.996792              0.001349
+264     KIC 7202957_8.17  planet_transit             1.0               1          0.996797              0.001711
+266    KIC 7285757_19.55  planet_transit             1.0               1          0.996798              0.001506
+302    KIC 7948784_10.09  planet_transit             1.0               1          0.996807              0.001508
+212    KIC 5942949_57.29  planet_transit             1.0               1          0.996810              0.001769
+143     KIC 4157325_3.08  planet_transit             1.0               1          0.996813              0.001875
+319    KIC 8321314_15.03  planet_transit             1.0               1          0.996821              0.001831
+193     KIC 5542466_2.36  planet_transit             1.0               1          0.996822              0.001649
+6      KIC 10118816_7.72  planet_transit             1.0               1          0.996828              0.001660
+195     KIC 5621586_5.25  planet_transit             1.0               1          0.996834              0.001750
+169    KIC 5020319_16.72  planet_transit             1.0               1          0.996862              0.001472
+188     KIC 5436338_6.31  planet_transit             1.0               1          0.996863              0.001877
+104      KIC 2715695_4.1  planet_transit             1.0               1          0.996869              0.001747
+310    KIC 8110767_20.49  planet_transit             1.0               1          0.996892              0.001633
+246     KIC 6636320_6.33  planet_transit             1.0               1          0.996898              0.001667
+164     KIC 4857213_8.77  planet_transit             1.0               1          0.996902              0.001725
+275    KIC 7386827_10.42  planet_transit             1.0               1          0.996904              0.001668
+40    KIC 10922659_31.25  planet_transit             1.0               1          0.996906              0.001568
+129      KIC 3645438_7.3  planet_transit             1.0               1          0.996906              0.001695
+58    KIC 11465950_16.06  planet_transit             1.0               1          0.996912              0.001577
+340     KIC 8620402_14.2  planet_transit             1.0               1          0.996920              0.001814
+97     KIC 1872821_10.27  planet_transit             1.0               1          0.996921              0.001670
+163     KIC 4857058_7.33  planet_transit             1.0               1          0.996927              0.001447
+403     KIC 9702006_6.25  planet_transit             1.0               1          0.996939              0.001808
+94      KIC 1717722_4.54  planet_transit             1.0               1          0.996953              0.001887
+39    KIC 10874215_31.03  planet_transit             1.0               1          0.996963              0.001517
+138    KIC 4067925_24.22  planet_transit             1.0               1          0.997007              0.001435
+82     KIC 12017109_9.75  planet_transit             1.0               1          0.997009              0.001645
+234     KIC 6291837_35.6  planet_transit             1.0               1          0.997133              0.001503
+385    KIC 9405595_23.36  planet_transit             1.0               1          0.997141              0.001638
+381     KIC 9269281_5.82  planet_transit             1.0               1          0.997145              0.001857
+240     KIC 6543893_5.94  planet_transit             1.0               1          0.997147              0.001563
+42     KIC 11030475_2.82  planet_transit             1.0               1          0.997148              0.001648
+388     KIC 9475552_6.57  planet_transit             1.0               1          0.997172              0.001851
+133     KIC 3859628_8.17  planet_transit             1.0               1          0.997172              0.001572
+33    KIC 10713616_83.58  planet_transit             1.0               1          0.997199              0.001519
+0     KIC 10015937_59.66  planet_transit             1.0               1          0.997206              0.001771
+21    KIC 10354039_64.62  planet_transit             1.0               1          0.997212              0.001475
+360     KIC 8951205_4.95  planet_transit             1.0               1          0.997217              0.001732
+68     KIC 11705004_9.03  planet_transit             1.0               1          0.997225              0.001708
+371    KIC 9100953_44.99  planet_transit             1.0               1          0.997228              0.001608
+87     KIC 12156347_5.78  planet_transit             1.0               1          0.997247              0.001743
+149    KIC 4385148_24.28  planet_transit             1.0               1          0.997252              0.001616
+354     KIC 8824737_12.9  planet_transit             1.0               1          0.997267              0.001592
+342    KIC 8631504_14.82  planet_transit             1.0               1          0.997274              0.001695
+136      KIC 3967326_4.2  planet_transit             1.0               1          0.997281              0.001927
+271     KIC 7376983_2.35  planet_transit             1.0               1          0.997295              0.001870
+219     KIC 5978361_9.18  planet_transit             1.0               1          0.997307              0.001658
+335    KIC 8578780_13.59  planet_transit             1.0               1          0.997330              0.001704
+261     KIC 7135852_4.22  planet_transit             1.0               1          0.997336              0.001730
+384     KIC 9307509_9.76  planet_transit             1.0               1          0.997355              0.001614
+329     KIC 8480582_18.5  planet_transit             1.0               1          0.997359              0.001695
+198     KIC 5705819_8.78  planet_transit             1.0               1          0.997370              0.001532
+18     KIC 10337517_7.05  planet_transit             1.0               1          0.997380              0.001674
+1     KIC 10028140_19.66  planet_transit             1.0               1          0.997399              0.001568
+380     KIC 9266431_18.4  planet_transit             1.0               1          0.997412              0.001608
+112    KIC 3122913_11.61  planet_transit             1.0               1          0.997423              0.001575
+135     KIC 3940418_4.78  planet_transit             1.0               1          0.997461              0.001719
+128     KIC 3641726_9.03  planet_transit             1.0               1          0.997462              0.001741
+409     KIC 9823487_16.0  planet_transit             1.0               1          0.997464              0.001600
+107    KIC 2832589_10.85  planet_transit             1.0               1          0.997466              0.001753
+410    KIC 9832208_88.07  planet_transit             1.0               1          0.997469              0.001639
+194     KIC 5601258_8.85  planet_transit             1.0               1          0.997476              0.001821
+209    KIC 5906694_13.06  planet_transit             1.0               1          0.997482              0.001660
+85     KIC 12120307_5.61  planet_transit             1.0               1          0.997485              0.001605
+38     KIC 10843431_8.74  planet_transit             1.0               1          0.997486              0.001498
+270   KIC 7364176_135.19  planet_transit             1.0               1          0.997498              0.001637
+23    KIC 10386922_26.63  planet_transit             1.0               1          0.997500              0.001888
+253     KIC 6862721_4.89  planet_transit             1.0               1          0.997503              0.001668
+151    KIC 4473226_14.83  planet_transit             1.0               1          0.997505              0.001483
+292    KIC 7779077_16.84  planet_transit             1.0               1          0.997519              0.001612
+217     KIC 5972334_2.42  planet_transit             1.0               1          0.997594              0.001719
+204    KIC 5786676_11.95  planet_transit             1.0               1          0.997608              0.001671
+170    KIC 5031857_24.81  planet_transit             1.0               1          0.997613              0.001321
+98     KIC 2161536_16.86  planet_transit             1.0               1          0.997630              0.001575
+301     KIC 7941200_65.7  planet_transit             1.0               1          0.997639              0.001570
+256     KIC 6946199_37.1  planet_transit             1.0               1          0.997646              0.001616
+366     KIC 9021075_7.28  planet_transit             1.0               1          0.997682              0.001767
+317     KIC 8261920_7.73  planet_transit             1.0               1          0.997690              0.001515
+272     KIC 7376983_3.65  planet_transit             1.0               1          0.997696              0.001681
+53    KIC 11297236_88.64  planet_transit             1.0               1          0.997711              0.001579
+145    KIC 4173026_10.44  planet_transit             1.0               1          0.997728              0.001654
+43   KIC 11030711_205.91  planet_transit             1.0               1          0.997780              0.001401
+402     KIC 9661979_69.9  planet_transit             1.0               1          0.997784              0.001462
+137     KIC 4061149_2.76  planet_transit             1.0               1          0.997794              0.001725
+100    KIC 2438513_12.18  planet_transit             1.0               1          0.997812              0.001458
+186    KIC 5374854_23.78  planet_transit             1.0               1          0.997813              0.001872
+116    KIC 3247268_12.22  planet_transit             1.0               1          0.997818              0.001344
+243   KIC 6606438_103.43  planet_transit             1.0               1          0.997838              0.001638
+78      KIC 11821363_8.2  planet_transit             1.0               1          0.997840              0.001669
+251    KIC 6803202_21.06  planet_transit             1.0               1          0.997916              0.001527
+181     KIC 5219234_3.21  planet_transit             1.0               1          0.997932              0.001650
+101    KIC 2444412_14.91  planet_transit             1.0               1          0.997958              0.001682
+161     KIC 4770365_9.51  planet_transit             1.0               1          0.998003              0.001742
+401    KIC 9654468_47.71  planet_transit             1.0               1          0.998011              0.001565
+205     KIC 5792202_6.55  planet_transit             1.0               1          0.998037              0.001675
+334    KIC 8558011_39.68  planet_transit             1.0               1          0.998068              0.001655
+349   KIC 8758204_159.39  planet_transit             1.0               1          0.998069              0.001373
+30    KIC 10587105_35.87  planet_transit             1.0               1          0.998120              0.001925
+71    KIC 11752906_20.62  planet_transit             1.0               1          0.998131              0.001617
+115   KIC 3239671_147.97  planet_transit             1.0               1          0.998133              0.001629
+358     KIC 8934495_4.59  planet_transit             1.0               1          0.998139              0.001610
+285    KIC 7700622_35.58  planet_transit             1.0               1          0.998175              0.001622
+81    KIC 11968463_56.42  planet_transit             1.0               1          0.998188              0.001754
+316    KIC 8261920_33.14  planet_transit             1.0               1          0.998190              0.001570
+397    KIC 9634821_73.76  planet_transit             1.0               1          0.998196              0.001752
+84    KIC 12061969_14.09  planet_transit             1.0               1          0.998197              0.001571
+273     KIC 7376983_5.64  planet_transit             1.0               1          0.998217              0.001512
+274     KIC 7376983_8.74  planet_transit             1.0               1          0.998257              0.001537
+294   KIC 7826659_211.03  planet_transit             1.0               1          0.998277              0.001671
+10    KIC 10155434_12.71  planet_transit             1.0               1          0.998287              0.001546
+65    KIC 11601584_13.98  planet_transit             1.0               1          0.998290              0.001704
+175   KIC 5124667_150.88  planet_transit             1.0               1          0.998344              0.001844
+72     KIC 11752906_6.38  planet_transit             1.0               1          0.998394              0.001576
+11    KIC 10189546_24.61  planet_transit             1.0               1          0.998404              0.001808
+297    KIC 7877978_56.57  planet_transit             1.0               1          0.998413              0.001775
+146   KIC 4173026_116.58  planet_transit             1.0               1          0.998455              0.001662
+79    KIC 11852982_13.81  planet_transit             1.0               1          0.998492              0.001559
+50     KIC 11187837_17.6  planet_transit             1.0               1          0.998507              0.001589
+345    KIC 8678594_15.19  planet_transit             1.0               1          0.998538              0.001719
+227   KIC 6149910_131.19  planet_transit             1.0               1          0.998549              0.001448
+332    KIC 8540376_10.69  planet_transit             1.0               1          0.998564              0.001537
+374    KIC 9150827_14.53  planet_transit             1.0               1          0.998606              0.001649
+25    KIC 10460984_94.89  planet_transit             1.0               1          0.998615              0.001504
+86     KIC 12121570_91.5  planet_transit             1.0               1          0.998617              0.001721
+199    KIC 5709725_86.49  planet_transit             1.0               1          0.998641              0.001651
+241   KIC 6587002_122.08  planet_transit             1.0               1          0.998656              0.001741
+34     KIC 10788461_9.21  planet_transit             1.0               1          0.998663              0.001519
+412     KIC 9837661_5.72  planet_transit             1.0               1          0.998817              0.001561
+407    KIC 9758089_92.73  planet_transit             1.0               1          0.998825              0.001596
+406    KIC 9758089_32.38  planet_transit             1.0               1          0.999098              0.001465
+2023-12-04 09:20:27 INFO     Metrics: tps={0.99: 326.0}, fps={0.99: 0.0}, tns={0.99: 1.0}, fns={0.99: 94.0},precision=1.0, recall=0.776190459728241, accuracy=0.7767220735549927
+2023-12-04 09:20:27 INFO     Signals predicted as negative for threshold 0.99:
+               object_id            type  expected_class predicted_class  prediction_value  prediction_value_std
+282    KIC 7677005_38.06              fp             0.0               0      4.460605e-17          1.336567e-16
+249   KIC 6766634_321.21  planet_transit             1.0               0      3.865966e-03          5.136338e-03
+284    KIC 7679812_38.58  planet_transit             1.0               0      8.754789e-02          1.363327e-01
+110    KIC 3098810_40.81  planet_transit             1.0               0      1.123017e-01          2.323424e-01
+46   KIC 11122894_150.02  planet_transit             1.0               0      1.128092e-01          1.323958e-01
+114    KIC 3229150_18.51  planet_transit             1.0               0      1.331165e-01          2.546172e-01
+166    KIC 4947556_13.03  planet_transit             1.0               0      3.081111e-01          3.765860e-01
+127   KIC 3634051_453.54  planet_transit             1.0               0      3.500306e-01          4.122164e-01
+230    KIC 6197215_10.61  planet_transit             1.0               0      3.540103e-01          2.680821e-01
+352    KIC 8804283_22.79  planet_transit             1.0               0      3.973241e-01          4.206334e-01
+357    KIC 8890924_26.66  planet_transit             1.0               0      4.613909e-01          3.422717e-01
+190     KIC 5530112_9.69  planet_transit             1.0               0      6.284686e-01          4.138416e-01
+351    KIC 8804283_13.26  planet_transit             1.0               0      6.466055e-01          3.964735e-01
+325     KIC 8439323_4.63  planet_transit             1.0               0      6.584240e-01          3.409075e-01
+60     KIC 11519187_2.44  planet_transit             1.0               0      6.935445e-01          3.744042e-01
+373     KIC 9117416_3.16  planet_transit             1.0               0      7.096404e-01          2.469680e-01
+309    KIC 8087812_27.21  planet_transit             1.0               0      7.727041e-01          2.452062e-01
+413   KIC 9839821_180.93  planet_transit             1.0               0      7.806908e-01          3.812001e-01
+252    KIC 6846911_14.03  planet_transit             1.0               0      7.864927e-01          2.777957e-01
+341   KIC 8630788_148.27  planet_transit             1.0               0      7.893842e-01          3.555434e-01
+361     KIC 9003401_21.1  planet_transit             1.0               0      8.084064e-01          2.758072e-01
+420    KIC 9963265_16.49  planet_transit             1.0               0      8.277100e-01          2.669791e-01
+22    KIC 10363115_59.36  planet_transit             1.0               0      8.544480e-01          1.971591e-01
+96     KIC 1849702_39.83  planet_transit             1.0               0      8.733076e-01          2.439530e-01
+223    KIC 6058816_73.75  planet_transit             1.0               0      8.815991e-01          2.465283e-01
+377   KIC 9205938_199.67  planet_transit             1.0               0      8.819407e-01          2.705627e-01
+158     KIC 4673628_3.95  planet_transit             1.0               0      8.836786e-01          1.308063e-01
+202     KIC 5773121_0.52  planet_transit             1.0               0      8.900925e-01          7.622054e-02
+346   KIC 8686373_126.56  planet_transit             1.0               0      8.956802e-01          2.830866e-01
+154     KIC 4548098_3.82  planet_transit             1.0               0      8.966529e-01          1.143847e-01
+369     KIC 9086251_6.89  planet_transit             1.0               0      8.980831e-01          2.317288e-01
+269   KIC 7289577_109.44  planet_transit             1.0               0      8.995873e-01          2.931546e-01
+95      KIC 1718958_1.42  planet_transit             1.0               0      9.052268e-01          8.073244e-02
+118     KIC 3338885_5.06  planet_transit             1.0               0      9.119145e-01          1.437224e-01
+250    KIC 6779726_47.06  planet_transit             1.0               0      9.131788e-01          2.315594e-01
+258     KIC 7102227_0.76  planet_transit             1.0               0      9.222919e-01          5.233255e-02
+276     KIC 7450747_2.21  planet_transit             1.0               0      9.254816e-01          1.491255e-01
+321     KIC 8360640_4.02  planet_transit             1.0               0      9.480602e-01          1.088318e-01
+147    KIC 4248120_23.34  planet_transit             1.0               0      9.481126e-01          1.406801e-01
+265     KIC 7257966_3.04  planet_transit             1.0               0      9.549850e-01          6.516629e-02
+417     KIC 9898447_2.38  planet_transit             1.0               0      9.562130e-01          2.273904e-02
+178     KIC 5195172_1.48  planet_transit             1.0               0      9.573102e-01          2.204132e-02
+24     KIC 10387742_3.03  planet_transit             1.0               0      9.575335e-01          3.417400e-02
+12     KIC 10220837_1.96  planet_transit             1.0               0      9.665911e-01          2.488218e-02
+247     KIC 6697605_3.42  planet_transit             1.0               0      9.708455e-01          6.743928e-02
+73     KIC 11754430_6.16  planet_transit             1.0               0      9.723799e-01          1.273012e-02
+235    KIC 6342333_80.23  planet_transit             1.0               0      9.725157e-01          7.565993e-02
+411   KIC 9836959_105.02  planet_transit             1.0               0      9.736344e-01          4.029619e-02
+376    KIC 9205907_12.02  planet_transit             1.0               0      9.738532e-01          3.205716e-02
+108   KIC 2854181_101.13  planet_transit             1.0               0      9.738837e-01          7.123813e-02
+300    KIC 7939330_29.54  planet_transit             1.0               0      9.739001e-01          1.565144e-02
+192      KIC 5534941_3.7  planet_transit             1.0               0      9.741200e-01          1.113966e-02
+222    KIC 6049190_70.47  planet_transit             1.0               0      9.744697e-01          6.124713e-02
+298     KIC 7879433_1.39  planet_transit             1.0               0      9.752876e-01          1.242512e-02
+375      KIC 9177629_5.6  planet_transit             1.0               0      9.755643e-01          4.696760e-02
+387     KIC 9472074_0.56  planet_transit             1.0               0      9.760359e-01          1.705311e-02
+210     KIC 5942808_0.63  planet_transit             1.0               0      9.763604e-01          1.830831e-02
+372    KIC 9117416_20.03  planet_transit             1.0               0      9.766393e-01          2.557093e-02
+206     KIC 5794570_1.12  planet_transit             1.0               0      9.770194e-01          1.738839e-02
+196     KIC 5688683_2.79  planet_transit             1.0               0      9.776465e-01          3.756982e-02
+231     KIC 6198182_3.88  planet_transit             1.0               0      9.778900e-01          8.009516e-03
+200    KIC 5716932_56.49  planet_transit             1.0               0      9.790120e-01          3.029529e-02
+207     KIC 5881120_4.85  planet_transit             1.0               0      9.791120e-01          7.531560e-03
+131     KIC 3756264_7.36  planet_transit             1.0               0      9.796306e-01          3.012247e-02
+416      KIC 9898017_2.3  planet_transit             1.0               0      9.809195e-01          8.067583e-03
+303    KIC 7983117_11.49  planet_transit             1.0               0      9.809222e-01          1.717538e-02
+392     KIC 9569711_6.06  planet_transit             1.0               0      9.817162e-01          2.861073e-02
+19    KIC 10350571_17.16  planet_transit             1.0               0      9.818827e-01          1.704798e-02
+93     KIC 12505654_5.19  planet_transit             1.0               0      9.840094e-01          2.094370e-02
+189     KIC 5450893_4.82  planet_transit             1.0               0      9.840463e-01          7.451001e-03
+386    KIC 9472000_31.59  planet_transit             1.0               0      9.841485e-01          2.223649e-02
+156     KIC 4665571_0.77  planet_transit             1.0               0      9.842464e-01          9.597576e-03
+119     KIC 3346154_1.95  planet_transit             1.0               0      9.842652e-01          1.302432e-02
+229     KIC 6183511_0.73  planet_transit             1.0               0      9.843772e-01          1.187708e-02
+61    KIC 11566064_30.65  planet_transit             1.0               0      9.848365e-01          1.284701e-02
+330    KIC 8494542_10.86  planet_transit             1.0               0      9.859222e-01          1.249315e-02
+257     KIC 7097965_7.72  planet_transit             1.0               0      9.861024e-01          1.303367e-02
+144     KIC 4164922_1.21  planet_transit             1.0               0      9.861444e-01          9.080064e-03
+172    KIC 5092266_44.87  planet_transit             1.0               0      9.866252e-01          1.577303e-02
+125     KIC 3561464_35.8  planet_transit             1.0               0      9.875552e-01          1.051949e-02
+236    KIC 6356692_11.39  planet_transit             1.0               0      9.876243e-01          9.234175e-03
+355    KIC 8827575_15.61  planet_transit             1.0               0      9.876898e-01          8.026941e-03
+305     KIC 8013439_8.26  planet_transit             1.0               0      9.880802e-01          7.303815e-03
+142     KIC 4149450_3.22  planet_transit             1.0               0      9.882812e-01          5.679822e-03
+350     KIC 8780959_9.63  planet_transit             1.0               0      9.885051e-01          8.597970e-03
+2    KIC 10055126_232.05  planet_transit             1.0               0      9.887750e-01          9.002313e-03
+102     KIC 2574338_9.23  planet_transit             1.0               0      9.889714e-01          8.382137e-03
+91      KIC 12469800_1.3  planet_transit             1.0               0      9.889835e-01          6.177871e-03
+344    KIC 8651389_15.14  planet_transit             1.0               0      9.890391e-01          6.625589e-03
+103    KIC 2581316_10.51  planet_transit             1.0               0      9.890755e-01          4.128837e-03
+343     KIC 8636600_6.39  planet_transit             1.0               0      9.891655e-01          1.013064e-02
+132     KIC 3831053_6.15  planet_transit             1.0               0      9.893414e-01          4.581624e-03
+215    KIC 5963582_25.54  planet_transit             1.0               0      9.893686e-01          6.199266e-03
+191     KIC 5531953_1.99  planet_transit             1.0               0      9.896262e-01          7.531917e-03
+279     KIC 7584650_45.0  planet_transit             1.0               0      9.897712e-01          5.947195e-03
+2023-12-04 09:20:27 INFO     Signals predicted as positive for threshold 0.99:
+               object_id            type  expected_class predicted_class  prediction_value  prediction_value_std
+288    KIC 7749773_13.79  planet_transit             1.0               1          0.990004              0.005654
+404     KIC 9714550_4.73  planet_transit             1.0               1          0.990104              0.008474
+248     KIC 6752002_6.08  planet_transit             1.0               1          0.990281              0.009805
+184     KIC 5357545_3.76  planet_transit             1.0               1          0.990296              0.009199
+4     KIC 10074466_35.01  planet_transit             1.0               1          0.990403              0.009416
+208     KIC 5905822_6.99          planet             1.0               1          0.990620              0.003980
+399     KIC 9636135_2.42  planet_transit             1.0               1          0.990629              0.002995
+182    KIC 5308537_14.27  planet_transit             1.0               1          0.990702              0.004598
+348    KIC 8742590_49.48  planet_transit             1.0               1          0.990783              0.013785
+140     KIC 4078311_9.84  planet_transit             1.0               1          0.991085              0.013563
+390     KIC 9489524_6.89  planet_transit             1.0               1          0.991278              0.002363
+394     KIC 9602613_4.61  planet_transit             1.0               1          0.991315              0.001857
+290     KIC 7762723_9.89  planet_transit             1.0               1          0.991380              0.004635
+291     KIC 7778621_7.28  planet_transit             1.0               1          0.991571              0.003459
+31     KIC 10604592_2.19  planet_transit             1.0               1          0.991743              0.002933
+173    KIC 5095082_20.66  planet_transit             1.0               1          0.991780              0.004765
+254     KIC 6879171_6.96  planet_transit             1.0               1          0.991785              0.003195
+327     KIC 8456679_4.07  planet_transit             1.0               1          0.991787              0.003711
+324     KIC 8430964_2.99  planet_transit             1.0               1          0.991791              0.002889
+260     KIC 7120108_1.03  planet_transit             1.0               1          0.991901              0.003789
+113      KIC 3128552_2.5  planet_transit             1.0               1          0.992010              0.004268
+383    KIC 9285265_61.57  planet_transit             1.0               1          0.992027              0.004322
+414     KIC 9896018_2.73  planet_transit             1.0               1          0.992066              0.002473
+216    KIC 5965819_19.59  planet_transit             1.0               1          0.992073              0.003625
+17     KIC 10332213_2.52  planet_transit             1.0               1          0.992226              0.006872
+16     KIC 1026957_21.76  planet_transit             1.0               1          0.992226              0.005848
+162     KIC 4814502_4.94  planet_transit             1.0               1          0.992273              0.003615
+66     KIC 11618601_2.76  planet_transit             1.0               1          0.992288              0.003757
+263     KIC 7202957_1.72  planet_transit             1.0               1          0.992329              0.002786
+76     KIC 11818607_5.06  planet_transit             1.0               1          0.992424              0.003270
+36     KIC 10793172_5.36  planet_transit             1.0               1          0.992426              0.002325
+123     KIC 3545135_8.48  planet_transit             1.0               1          0.992442              0.002588
+183     KIC 5342473_4.64  planet_transit             1.0               1          0.992464              0.002716
+228     KIC 6153407_5.99  planet_transit             1.0               1          0.992558              0.002845
+109    KIC 2857607_41.87  planet_transit             1.0               1          0.992586              0.004034
+37     KIC 10794087_7.65  planet_transit             1.0               1          0.992664              0.004573
+117     KIC 3328080_4.77  planet_transit             1.0               1          0.992876              0.002195
+318     KIC 8263545_4.45  planet_transit             1.0               1          0.992930              0.003867
+238   KIC 6428794_169.13  planet_transit             1.0               1          0.992936              0.012697
+185     KIC 5369827_3.61  planet_transit             1.0               1          0.992939              0.005111
+111    KIC 3109930_37.81  planet_transit             1.0               1          0.992957              0.002473
+165     KIC 4860678_9.98  planet_transit             1.0               1          0.993015              0.003414
+28     KIC 10513530_3.52  planet_transit             1.0               1          0.993106              0.002195
+179     KIC 5211199_4.56  planet_transit             1.0               1          0.993121              0.002528
+415      KIC 9896018_3.6  planet_transit             1.0               1          0.993146              0.002331
+106     KIC 2718778_3.92  planet_transit             1.0               1          0.993180              0.002391
+295     KIC 7841925_6.21  planet_transit             1.0               1          0.993222              0.002275
+338    KIC 8613535_29.97  planet_transit             1.0               1          0.993285              0.003325
+218     KIC 5978170_5.69  planet_transit             1.0               1          0.993304              0.002735
+44     KIC 11046025_3.72  planet_transit             1.0               1          0.993336              0.002541
+328    KIC 8480285_29.67  planet_transit             1.0               1          0.993443              0.002604
+203     KIC 5775129_3.85  planet_transit             1.0               1          0.993452              0.003458
+176     KIC 5125347_7.17  planet_transit             1.0               1          0.993573              0.005222
+255     KIC 6945786_2.39  planet_transit             1.0               1          0.993696              0.002026
+289    KIC 7761918_89.19  planet_transit             1.0               1          0.993707              0.004944
+268    KIC 7288444_15.33  planet_transit             1.0               1          0.993765              0.003127
+180    KIC 5213230_52.61  planet_transit             1.0               1          0.993803              0.002524
+225    KIC 6062929_22.13  planet_transit             1.0               1          0.993805              0.007685
+398    KIC 9635606_48.89  planet_transit             1.0               1          0.993817              0.003236
+221     KIC 5980783_37.3  planet_transit             1.0               1          0.993912              0.002255
+49    KIC 11177543_38.33  planet_transit             1.0               1          0.993943              0.004252
+5     KIC 10094670_22.06  planet_transit             1.0               1          0.994052              0.003659
+232     KIC 6211812_2.52  planet_transit             1.0               1          0.994088              0.003522
+277     KIC 7463685_8.99  planet_transit             1.0               1          0.994161              0.002239
+92    KIC 12505076_11.93  planet_transit             1.0               1          0.994242              0.001574
+393    KIC 9592705_10.28  planet_transit             1.0               1          0.994297              0.002134
+347     KIC 8709688_4.18  planet_transit             1.0               1          0.994346              0.001800
+57    KIC 11465651_31.34  planet_transit             1.0               1          0.994372              0.002152
+326     KIC 8456679_1.74  planet_transit             1.0               1          0.994484              0.002949
+27     KIC 10482160_7.34  planet_transit             1.0               1          0.994495              0.002889
+74    KIC 11771430_40.03  planet_transit             1.0               1          0.994555              0.002569
+14     KIC 10252275_5.65  planet_transit             1.0               1          0.994649              0.001924
+130    KIC 3745559_30.25  planet_transit             1.0               1          0.994665              0.002220
+267     KIC 7287415_3.02  planet_transit             1.0               1          0.994672              0.001352
+62     KIC 11566256_5.78  planet_transit             1.0               1          0.994703              0.004032
+382      KIC 9279354_2.8  planet_transit             1.0               1          0.994708              0.003525
+306   KIC 8022489_197.51  planet_transit             1.0               1          0.994731              0.005708
+126    KIC 3629967_85.65  planet_transit             1.0               1          0.994770              0.004310
+259    KIC 7103919_10.78  planet_transit             1.0               1          0.994799              0.002283
+418    KIC 9957627_39.75  planet_transit             1.0               1          0.994817              0.002053
+242     KIC 6605493_9.31  planet_transit             1.0               1          0.994841              0.001998
+400     KIC 9650989_3.42  planet_transit             1.0               1          0.994861              0.001912
+48     KIC 11137180_6.07  planet_transit             1.0               1          0.994864              0.003108
+150     KIC 4458082_8.93  planet_transit             1.0               1          0.994901              0.001454
+148     KIC 4365645_4.17  planet_transit             1.0               1          0.994917              0.001892
+77    KIC 11818872_12.74  planet_transit             1.0               1          0.994918              0.002236
+365     KIC 9020114_3.48  planet_transit             1.0               1          0.994958              0.003033
+293    KIC 7810483_29.92  planet_transit             1.0               1          0.994961              0.002344
+99     KIC 2164169_32.31  planet_transit             1.0               1          0.994998              0.002251
+337    KIC 8591693_29.46  planet_transit             1.0               1          0.994998              0.003151
+287     KIC 7742408_33.5  planet_transit             1.0               1          0.995014              0.002155
+281    KIC 7670943_18.01  planet_transit             1.0               1          0.995044              0.001957
+67     KIC 11618601_5.05  planet_transit             1.0               1          0.995065              0.002140
+168    KIC 5005121_76.42  planet_transit             1.0               1          0.995079              0.001745
+90    KIC 12406807_17.07  planet_transit             1.0               1          0.995081              0.001613
+124    KIC 3559860_33.03  planet_transit             1.0               1          0.995085              0.001876
+356    KIC 8880123_46.72  planet_transit             1.0               1          0.995114              0.001928
+304     KIC 7987866_3.14  planet_transit             1.0               1          0.995125              0.002178
+171    KIC 5042210_12.15  planet_transit             1.0               1          0.995129              0.001939
+80    KIC 11874577_34.46  planet_transit             1.0               1          0.995138              0.001739
+395    KIC 9605514_25.85  planet_transit             1.0               1          0.995189              0.001549
+52     KIC 11244682_3.49  planet_transit             1.0               1          0.995201              0.001994
+3      KIC 10064256_5.96  planet_transit             1.0               1          0.995219              0.002322
+167     KIC 5003670_7.99  planet_transit             1.0               1          0.995251              0.001613
+333    KIC 8547429_11.66  planet_transit             1.0               1          0.995284              0.001810
+29    KIC 10525049_15.57  planet_transit             1.0               1          0.995287              0.002256
+364   KIC 9009953_234.24  planet_transit             1.0               1          0.995296              0.003876
+201    KIC 5770074_63.04  planet_transit             1.0               1          0.995303              0.002062
+213     KIC 5953297_5.62  planet_transit             1.0               1          0.995323              0.002053
+159     KIC 4770365_1.61  planet_transit             1.0               1          0.995437              0.002664
+363     KIC 9006186_4.27  planet_transit             1.0               1          0.995452              0.001683
+245    KIC 6619815_65.94  planet_transit             1.0               1          0.995490              0.001809
+155    KIC 4650733_29.54  planet_transit             1.0               1          0.995500              0.001903
+211     KIC 5942808_2.94  planet_transit             1.0               1          0.995503              0.002862
+278     KIC 7522911_20.5  planet_transit             1.0               1          0.995516              0.001662
+69    KIC 11718144_16.46  planet_transit             1.0               1          0.995557              0.002240
+51     KIC 11192235_1.62  planet_transit             1.0               1          0.995575              0.002302
+174      KIC 5106313_3.9  planet_transit             1.0               1          0.995576              0.001920
+367    KIC 9030537_62.56  planet_transit             1.0               1          0.995586              0.001865
+419    KIC 9958962_51.07  planet_transit             1.0               1          0.995613              0.002590
+408    KIC 9785921_26.76  planet_transit             1.0               1          0.995624              0.001992
+177     KIC 5174858_7.97  planet_transit             1.0               1          0.995628              0.002684
+323     KIC 8410415_44.3  planet_transit             1.0               1          0.995666              0.003568
+35     KIC 10793172_12.1  planet_transit             1.0               1          0.995719              0.001760
+311    KIC 8126558_12.19  planet_transit             1.0               1          0.995740              0.002890
+83     KIC 12061969_1.09  planet_transit             1.0               1          0.995743              0.002545
+134      KIC 3937519_5.9  planet_transit             1.0               1          0.995767              0.001787
+32     KIC 10676824_6.45  planet_transit             1.0               1          0.995768              0.002106
+152     KIC 4484336_8.94  planet_transit             1.0               1          0.995785              0.001663
+13    KIC 10252275_14.86  planet_transit             1.0               1          0.995832              0.001677
+239   KIC 6432345_234.64  planet_transit             1.0               1          0.995837              0.004793
+313    KIC 8162789_10.16  planet_transit             1.0               1          0.995938              0.002388
+139     KIC 4077526_4.46  planet_transit             1.0               1          0.995939              0.001607
+122    KIC 3544640_30.83  planet_transit             1.0               1          0.995951              0.001661
+214     KIC 5962262_8.62  planet_transit             1.0               1          0.995951              0.001914
+8       KIC 10141900_4.1  planet_transit             1.0               1          0.995965              0.001702
+312     KIC 8142942_5.76  planet_transit             1.0               1          0.995980              0.002157
+353     KIC 8804845_5.43  planet_transit             1.0               1          0.995984              0.001997
+56    KIC 11450414_85.52  planet_transit             1.0               1          0.996013              0.001488
+197    KIC 5695524_59.77  planet_transit             1.0               1          0.996013              0.001421
+64     KIC 11599038_7.02  planet_transit             1.0               1          0.996051              0.001670
+88     KIC 12352520_4.58  planet_transit             1.0               1          0.996068              0.002725
+233     KIC 6276791_9.33  planet_transit             1.0               1          0.996086              0.001801
+362     KIC 9006186_3.27  planet_transit             1.0               1          0.996109              0.001781
+368    KIC 9071593_59.28  planet_transit             1.0               1          0.996130              0.001703
+55    KIC 11394027_14.39  planet_transit             1.0               1          0.996130              0.001572
+220    KIC 5978559_95.61  planet_transit             1.0               1          0.996139              0.002012
+286     KIC 7703882_5.88  planet_transit             1.0               1          0.996159              0.001510
+283     KIC 7678434_3.97  planet_transit             1.0               1          0.996195              0.002129
+121    KIC 3448130_78.55  planet_transit             1.0               1          0.996219              0.001804
+187    KIC 5436013_25.89  planet_transit             1.0               1          0.996222              0.001689
+370     KIC 9092504_6.46  planet_transit             1.0               1          0.996255              0.001615
+26    KIC 10480915_19.59  planet_transit             1.0               1          0.996263              0.001276
+308    KIC 8078502_37.89  planet_transit             1.0               1          0.996268              0.001668
+47    KIC 11126381_33.79  planet_transit             1.0               1          0.996289              0.001377
+307    KIC 8073806_11.96  planet_transit             1.0               1          0.996291              0.001606
+226      KIC 6131236_6.8  planet_transit             1.0               1          0.996301              0.001542
+396    KIC 9605514_40.72  planet_transit             1.0               1          0.996316              0.001522
+160     KIC 4770365_4.73  planet_transit             1.0               1          0.996336              0.001918
+296    KIC 7869917_11.81  planet_transit             1.0               1          0.996343              0.001563
+391    KIC 9517393_56.78  planet_transit             1.0               1          0.996350              0.001402
+389    KIC 9480310_15.43  planet_transit             1.0               1          0.996392              0.003484
+141    KIC 4140813_13.36  planet_transit             1.0               1          0.996407              0.001715
+405     KIC 9729691_21.0  planet_transit             1.0               1          0.996423              0.001833
+237     KIC 6383785_3.62  planet_transit             1.0               1          0.996465              0.001491
+153      KIC 4545570_5.6  planet_transit             1.0               1          0.996474              0.001532
+105    KIC 2717158_13.22  planet_transit             1.0               1          0.996483              0.001627
+75     KIC 11810124_11.6  planet_transit             1.0               1          0.996484              0.001593
+359     KIC 8935810_6.23  planet_transit             1.0               1          0.996499              0.001666
+224     KIC 6061773_8.28  planet_transit             1.0               1          0.996505              0.001656
+15     KIC 10265898_5.25  planet_transit             1.0               1          0.996521              0.001593
+315     KIC 8257205_7.13  planet_transit             1.0               1          0.996543              0.001782
+378     KIC 9210387_5.91  planet_transit             1.0               1          0.996544              0.001694
+322    KIC 8379705_11.13  planet_transit             1.0               1          0.996546              0.001444
+70     KIC 11718389_5.94  planet_transit             1.0               1          0.996566              0.001814
+379    KIC 9244756_16.34  planet_transit             1.0               1          0.996574              0.001566
+157      KIC 4665571_4.6  planet_transit             1.0               1          0.996575              0.001763
+41    KIC 10973664_11.68  planet_transit             1.0               1          0.996588              0.002141
+20     KIC 10351231_7.67  planet_transit             1.0               1          0.996596              0.001582
+331    KIC 8505920_42.43  planet_transit             1.0               1          0.996637              0.001527
+45     KIC 11074178_9.18  planet_transit             1.0               1          0.996653              0.001558
+63     KIC 11568987_7.38  planet_transit             1.0               1          0.996662              0.001848
+9       KIC 10141900_6.5  planet_transit             1.0               1          0.996690              0.001654
+244     KIC 6609270_3.82  planet_transit             1.0               1          0.996705              0.001866
+59     KIC 11513486_6.65  planet_transit             1.0               1          0.996709              0.001670
+262     KIC 7183745_4.87  planet_transit             1.0               1          0.996711              0.002110
+336    KIC 8591173_12.29  planet_transit             1.0               1          0.996755              0.001724
+7     KIC 10134152_39.31  planet_transit             1.0               1          0.996759              0.001683
+339    KIC 8617363_19.95  planet_transit             1.0               1          0.996762              0.001455
+299    KIC 7938496_13.81  planet_transit             1.0               1          0.996766              0.001448
+280     KIC 7659389_3.83  planet_transit             1.0               1          0.996769              0.001821
+54     KIC 11337141_4.04  planet_transit             1.0               1          0.996772              0.001902
+320    KIC 8331612_13.84  planet_transit             1.0               1          0.996776              0.001781
+314    KIC 8231667_42.88  planet_transit             1.0               1          0.996780              0.001706
+120    KIC 3440118_19.58  planet_transit             1.0               1          0.996791              0.001709
+89    KIC 12406749_56.36  planet_transit             1.0               1          0.996792              0.001349
+264     KIC 7202957_8.17  planet_transit             1.0               1          0.996797              0.001711
+266    KIC 7285757_19.55  planet_transit             1.0               1          0.996798              0.001506
+302    KIC 7948784_10.09  planet_transit             1.0               1          0.996807              0.001508
+212    KIC 5942949_57.29  planet_transit             1.0               1          0.996810              0.001769
+143     KIC 4157325_3.08  planet_transit             1.0               1          0.996813              0.001875
+319    KIC 8321314_15.03  planet_transit             1.0               1          0.996821              0.001831
+193     KIC 5542466_2.36  planet_transit             1.0               1          0.996822              0.001649
+6      KIC 10118816_7.72  planet_transit             1.0               1          0.996828              0.001660
+195     KIC 5621586_5.25  planet_transit             1.0               1          0.996834              0.001750
+169    KIC 5020319_16.72  planet_transit             1.0               1          0.996862              0.001472
+188     KIC 5436338_6.31  planet_transit             1.0               1          0.996863              0.001877
+104      KIC 2715695_4.1  planet_transit             1.0               1          0.996869              0.001747
+310    KIC 8110767_20.49  planet_transit             1.0               1          0.996892              0.001633
+246     KIC 6636320_6.33  planet_transit             1.0               1          0.996898              0.001667
+164     KIC 4857213_8.77  planet_transit             1.0               1          0.996902              0.001725
+275    KIC 7386827_10.42  planet_transit             1.0               1          0.996904              0.001668
+40    KIC 10922659_31.25  planet_transit             1.0               1          0.996906              0.001568
+129      KIC 3645438_7.3  planet_transit             1.0               1          0.996906              0.001695
+58    KIC 11465950_16.06  planet_transit             1.0               1          0.996912              0.001577
+340     KIC 8620402_14.2  planet_transit             1.0               1          0.996920              0.001814
+97     KIC 1872821_10.27  planet_transit             1.0               1          0.996921              0.001670
+163     KIC 4857058_7.33  planet_transit             1.0               1          0.996927              0.001447
+403     KIC 9702006_6.25  planet_transit             1.0               1          0.996939              0.001808
+94      KIC 1717722_4.54  planet_transit             1.0               1          0.996953              0.001887
+39    KIC 10874215_31.03  planet_transit             1.0               1          0.996963              0.001517
+138    KIC 4067925_24.22  planet_transit             1.0               1          0.997007              0.001435
+82     KIC 12017109_9.75  planet_transit             1.0               1          0.997009              0.001645
+234     KIC 6291837_35.6  planet_transit             1.0               1          0.997133              0.001503
+385    KIC 9405595_23.36  planet_transit             1.0               1          0.997141              0.001638
+381     KIC 9269281_5.82  planet_transit             1.0               1          0.997145              0.001857
+240     KIC 6543893_5.94  planet_transit             1.0               1          0.997147              0.001563
+42     KIC 11030475_2.82  planet_transit             1.0               1          0.997148              0.001648
+388     KIC 9475552_6.57  planet_transit             1.0               1          0.997172              0.001851
+133     KIC 3859628_8.17  planet_transit             1.0               1          0.997172              0.001572
+33    KIC 10713616_83.58  planet_transit             1.0               1          0.997199              0.001519
+0     KIC 10015937_59.66  planet_transit             1.0               1          0.997206              0.001771
+21    KIC 10354039_64.62  planet_transit             1.0               1          0.997212              0.001475
+360     KIC 8951205_4.95  planet_transit             1.0               1          0.997217              0.001732
+68     KIC 11705004_9.03  planet_transit             1.0               1          0.997225              0.001708
+371    KIC 9100953_44.99  planet_transit             1.0               1          0.997228              0.001608
+87     KIC 12156347_5.78  planet_transit             1.0               1          0.997247              0.001743
+149    KIC 4385148_24.28  planet_transit             1.0               1          0.997252              0.001616
+354     KIC 8824737_12.9  planet_transit             1.0               1          0.997267              0.001592
+342    KIC 8631504_14.82  planet_transit             1.0               1          0.997274              0.001695
+136      KIC 3967326_4.2  planet_transit             1.0               1          0.997281              0.001927
+271     KIC 7376983_2.35  planet_transit             1.0               1          0.997295              0.001870
+219     KIC 5978361_9.18  planet_transit             1.0               1          0.997307              0.001658
+335    KIC 8578780_13.59  planet_transit             1.0               1          0.997330              0.001704
+261     KIC 7135852_4.22  planet_transit             1.0               1          0.997336              0.001730
+384     KIC 9307509_9.76  planet_transit             1.0               1          0.997355              0.001614
+329     KIC 8480582_18.5  planet_transit             1.0               1          0.997359              0.001695
+198     KIC 5705819_8.78  planet_transit             1.0               1          0.997370              0.001532
+18     KIC 10337517_7.05  planet_transit             1.0               1          0.997380              0.001674
+1     KIC 10028140_19.66  planet_transit             1.0               1          0.997399              0.001568
+380     KIC 9266431_18.4  planet_transit             1.0               1          0.997412              0.001608
+112    KIC 3122913_11.61  planet_transit             1.0               1          0.997423              0.001575
+135     KIC 3940418_4.78  planet_transit             1.0               1          0.997461              0.001719
+128     KIC 3641726_9.03  planet_transit             1.0               1          0.997462              0.001741
+409     KIC 9823487_16.0  planet_transit             1.0               1          0.997464              0.001600
+107    KIC 2832589_10.85  planet_transit             1.0               1          0.997466              0.001753
+410    KIC 9832208_88.07  planet_transit             1.0               1          0.997469              0.001639
+194     KIC 5601258_8.85  planet_transit             1.0               1          0.997476              0.001821
+209    KIC 5906694_13.06  planet_transit             1.0               1          0.997482              0.001660
+85     KIC 12120307_5.61  planet_transit             1.0               1          0.997485              0.001605
+38     KIC 10843431_8.74  planet_transit             1.0               1          0.997486              0.001498
+270   KIC 7364176_135.19  planet_transit             1.0               1          0.997498              0.001637
+23    KIC 10386922_26.63  planet_transit             1.0               1          0.997500              0.001888
+253     KIC 6862721_4.89  planet_transit             1.0               1          0.997503              0.001668
+151    KIC 4473226_14.83  planet_transit             1.0               1          0.997505              0.001483
+292    KIC 7779077_16.84  planet_transit             1.0               1          0.997519              0.001612
+217     KIC 5972334_2.42  planet_transit             1.0               1          0.997594              0.001719
+204    KIC 5786676_11.95  planet_transit             1.0               1          0.997608              0.001671
+170    KIC 5031857_24.81  planet_transit             1.0               1          0.997613              0.001321
+98     KIC 2161536_16.86  planet_transit             1.0               1          0.997630              0.001575
+301     KIC 7941200_65.7  planet_transit             1.0               1          0.997639              0.001570
+256     KIC 6946199_37.1  planet_transit             1.0               1          0.997646              0.001616
+366     KIC 9021075_7.28  planet_transit             1.0               1          0.997682              0.001767
+317     KIC 8261920_7.73  planet_transit             1.0               1          0.997690              0.001515
+272     KIC 7376983_3.65  planet_transit             1.0               1          0.997696              0.001681
+53    KIC 11297236_88.64  planet_transit             1.0               1          0.997711              0.001579
+145    KIC 4173026_10.44  planet_transit             1.0               1          0.997728              0.001654
+43   KIC 11030711_205.91  planet_transit             1.0               1          0.997780              0.001401
+402     KIC 9661979_69.9  planet_transit             1.0               1          0.997784              0.001462
+137     KIC 4061149_2.76  planet_transit             1.0               1          0.997794              0.001725
+100    KIC 2438513_12.18  planet_transit             1.0               1          0.997812              0.001458
+186    KIC 5374854_23.78  planet_transit             1.0               1          0.997813              0.001872
+116    KIC 3247268_12.22  planet_transit             1.0               1          0.997818              0.001344
+243   KIC 6606438_103.43  planet_transit             1.0               1          0.997838              0.001638
+78      KIC 11821363_8.2  planet_transit             1.0               1          0.997840              0.001669
+251    KIC 6803202_21.06  planet_transit             1.0               1          0.997916              0.001527
+181     KIC 5219234_3.21  planet_transit             1.0               1          0.997932              0.001650
+101    KIC 2444412_14.91  planet_transit             1.0               1          0.997958              0.001682
+161     KIC 4770365_9.51  planet_transit             1.0               1          0.998003              0.001742
+401    KIC 9654468_47.71  planet_transit             1.0               1          0.998011              0.001565
+205     KIC 5792202_6.55  planet_transit             1.0               1          0.998037              0.001675
+334    KIC 8558011_39.68  planet_transit             1.0               1          0.998068              0.001655
+349   KIC 8758204_159.39  planet_transit             1.0               1          0.998069              0.001373
+30    KIC 10587105_35.87  planet_transit             1.0               1          0.998120              0.001925
+71    KIC 11752906_20.62  planet_transit             1.0               1          0.998131              0.001617
+115   KIC 3239671_147.97  planet_transit             1.0               1          0.998133              0.001629
+358     KIC 8934495_4.59  planet_transit             1.0               1          0.998139              0.001610
+285    KIC 7700622_35.58  planet_transit             1.0               1          0.998175              0.001622
+81    KIC 11968463_56.42  planet_transit             1.0               1          0.998188              0.001754
+316    KIC 8261920_33.14  planet_transit             1.0               1          0.998190              0.001570
+397    KIC 9634821_73.76  planet_transit             1.0               1          0.998196              0.001752
+84    KIC 12061969_14.09  planet_transit             1.0               1          0.998197              0.001571
+273     KIC 7376983_5.64  planet_transit             1.0               1          0.998217              0.001512
+274     KIC 7376983_8.74  planet_transit             1.0               1          0.998257              0.001537
+294   KIC 7826659_211.03  planet_transit             1.0               1          0.998277              0.001671
+10    KIC 10155434_12.71  planet_transit             1.0               1          0.998287              0.001546
+65    KIC 11601584_13.98  planet_transit             1.0               1          0.998290              0.001704
+175   KIC 5124667_150.88  planet_transit             1.0               1          0.998344              0.001844
+72     KIC 11752906_6.38  planet_transit             1.0               1          0.998394              0.001576
+11    KIC 10189546_24.61  planet_transit             1.0               1          0.998404              0.001808
+297    KIC 7877978_56.57  planet_transit             1.0               1          0.998413              0.001775
+146   KIC 4173026_116.58  planet_transit             1.0               1          0.998455              0.001662
+79    KIC 11852982_13.81  planet_transit             1.0               1          0.998492              0.001559
+50     KIC 11187837_17.6  planet_transit             1.0               1          0.998507              0.001589
+345    KIC 8678594_15.19  planet_transit             1.0               1          0.998538              0.001719
+227   KIC 6149910_131.19  planet_transit             1.0               1          0.998549              0.001448
+332    KIC 8540376_10.69  planet_transit             1.0               1          0.998564              0.001537
+374    KIC 9150827_14.53  planet_transit             1.0               1          0.998606              0.001649
+25    KIC 10460984_94.89  planet_transit             1.0               1          0.998615              0.001504
+86     KIC 12121570_91.5  planet_transit             1.0               1          0.998617              0.001721
+199    KIC 5709725_86.49  planet_transit             1.0               1          0.998641              0.001651
+241   KIC 6587002_122.08  planet_transit             1.0               1          0.998656              0.001741
+34     KIC 10788461_9.21  planet_transit             1.0               1          0.998663              0.001519
+412     KIC 9837661_5.72  planet_transit             1.0               1          0.998817              0.001561
+407    KIC 9758089_92.73  planet_transit             1.0               1          0.998825              0.001596
+406    KIC 9758089_32.38  planet_transit             1.0               1          0.999098              0.001465
+
+Process finished with exit code 0

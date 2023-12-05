@@ -9,7 +9,7 @@ authors = [
 ]
 description = "ExoML tools for exoplanet detections"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.10"
 keywords = []
 license = {text = "MIT"}
 dynamic = ["dependencies"]

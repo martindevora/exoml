@@ -1,0 +1,750 @@
+/home/mdevo/anaconda3/envs/exoml/bin/python /tmp/pycharm_project_157/iatson_planet_tces_launch.py
+/home/mdevo/anaconda3/envs/exoml/lib/python3.10/site-packages/lightkurve/config/__init__.py:119: UserWarning: The default Lightkurve cache directory, used by download(), etc., has been moved to /home/mdevo/.lightkurve/cache. Please move all the files in the legacy directory /home/mdevo/.lightkurve-cache to the new location and remove the legacy directory. Refer to https://docs.lightkurve.org/reference/config.html#default-cache-directory-migration for more information.
+  warnings.warn(
+2023-12-04 08:23:23.088791: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2023-12-04 08:23:23.858943: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Could not find TensorRT
+/home/mdevo/anaconda3/envs/exoml/lib/python3.10/site-packages/tensorflow_addons/utils/tfa_eol_msg.py:23: UserWarning:
+
+TensorFlow Addons (TFA) has ended development and introduction of new features.
+TFA has entered a minimal maintenance and release mode until a planned end of life in May 2024.
+Please modify downstream libraries to take dependencies from other repositories in our TensorFlow community (e.g. Keras, Keras-CV, and Keras-NLP).
+
+For more information see: https://github.com/tensorflow/addons/issues/2807
+
+  warnings.warn(
+2023-12-04 08:23:25.367261: E tensorflow/compiler/xla/stream_executor/cuda/cuda_driver.cc:266] failed call to cuInit: CUDA_ERROR_NO_DEVICE: no CUDA-capable device is detected
+2023-12-04 08:23:25.367300: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:168] retrieving CUDA diagnostic information for host: Tiki.Tiki.com
+2023-12-04 08:23:25.367310: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:175] hostname: Tiki.Tiki.com
+2023-12-04 08:23:25.367488: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:199] libcuda reported version is: 525.147.5
+2023-12-04 08:23:25.367522: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:203] kernel reported version is: 525.105.17
+2023-12-04 08:23:25.367537: E tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:312] kernel version 525.105.17 does not match DSO version 525.147.5 -- cannot find working devices in this configuration
+2023-12-04 08:23:26 INFO     Creating model plot and summary
+2023-12-04 08:23:26 ERROR    Can't plot model network.png
+Traceback (most recent call last):
+  File "/tmp/pycharm_project_157/src/ml/model/base_model.py", line 235, in inform
+    plot_model(self.model, dir + '/network.png', show_shapes=True)
+  File "/home/mdevo/anaconda3/envs/exoml/lib/python3.10/site-packages/keras/utils/vis_utils.py", line 464, in plot_model
+    raise ImportError(message)
+ImportError: You must install pydot (`pip install pydot`) and install graphviz (see instructions at https://graphviz.gitlab.io/download/) for plot_model to work.
+Model: "IATSON_planet"
+__________________________________________________________________________________________________
+ Layer (type)                   Output Shape         Param #     Connected to
+==================================================================================================
+ focus_odd_flux_branch (InputLa  [(None, 75, 2)]     0           []
+ yer)
+
+ focus_even_flux_branch (InputL  [(None, 75, 2)]     0           []
+ ayer)
+
+ global_flux_branch (InputLayer  [(None, 300, 2)]    0           []
+ )
+
+ gaussian_noise (GaussianNoise)  (None, 75, 2)       0           ['focus_odd_flux_branch[0][0]']
+
+ gaussian_noise_1 (GaussianNois  (None, 75, 2)       0           ['focus_even_flux_branch[0][0]']
+ e)
+
+ focus_harmonic_odd_flux_branch  [(None, 75, 2)]     0           []
+  (InputLayer)
+
+ focus_harmonic_even_flux_branc  [(None, 75, 2)]     0           []
+ h (InputLayer)
+
+ gn_flux (GaussianNoise)        (None, 300, 2)       0           ['global_flux_branch[0][0]']
+
+ conv1d_4 (Conv1D)              (None, 75, 32)       1312        ['gaussian_noise[0][0]']
+
+ conv1d_7 (Conv1D)              (None, 75, 32)       1312        ['gaussian_noise_1[0][0]']
+
+ gaussian_noise_2 (GaussianNois  (None, 75, 2)       0           ['focus_harmonic_odd_flux_branch[
+ e)                                                              0][0]']
+
+ gaussian_noise_3 (GaussianNois  (None, 75, 2)       0           ['focus_harmonic_even_flux_branch
+ e)                                                              [0][0]']
+
+ centroids_branch (InputLayer)  [(None, 75, 3)]      0           []
+
+ conv1d (Conv1D)                (None, 300, 16)      2896        ['gn_flux[0][0]']
+
+ max_pooling1d_4 (MaxPooling1D)  (None, 71, 32)      0           ['conv1d_4[0][0]']
+
+ max_pooling1d_7 (MaxPooling1D)  (None, 71, 32)      0           ['conv1d_7[0][0]']
+
+ conv1d_10 (Conv1D)             (None, 75, 32)       1312        ['gaussian_noise_2[0][0]']
+
+ conv1d_13 (Conv1D)             (None, 75, 32)       1312        ['gaussian_noise_3[0][0]']
+
+ gaussian_noise_4 (GaussianNois  (None, 75, 3)       0           ['centroids_branch[0][0]']
+ e)
+
+ og_branch (InputLayer)         [(None, 75, 2)]      0           []
+
+ max_pooling1d (MaxPooling1D)   (None, 291, 16)      0           ['conv1d[0][0]']
+
+ spatial_dropout1d_3 (SpatialDr  (None, 71, 32)      0           ['max_pooling1d_4[0][0]']
+ opout1D)
+
+ spatial_dropout1d_5 (SpatialDr  (None, 71, 32)      0           ['max_pooling1d_7[0][0]']
+ opout1D)
+
+ max_pooling1d_10 (MaxPooling1D  (None, 71, 32)      0           ['conv1d_10[0][0]']
+ )
+
+ max_pooling1d_13 (MaxPooling1D  (None, 71, 32)      0           ['conv1d_13[0][0]']
+ )
+
+ conv1d_16 (Conv1D)             (None, 75, 32)       1952        ['gaussian_noise_4[0][0]']
+
+ gaussian_noise_5 (GaussianNois  (None, 75, 2)       0           ['og_branch[0][0]']
+ e)
+
+ spatial_dropout1d (SpatialDrop  (None, 291, 16)     0           ['max_pooling1d[0][0]']
+ out1D)
+
+ conv1d_5 (Conv1D)              (None, 71, 64)       20544       ['spatial_dropout1d_3[0][0]']
+
+ conv1d_8 (Conv1D)              (None, 71, 64)       20544       ['spatial_dropout1d_5[0][0]']
+
+ spatial_dropout1d_7 (SpatialDr  (None, 71, 32)      0           ['max_pooling1d_10[0][0]']
+ opout1D)
+
+ spatial_dropout1d_9 (SpatialDr  (None, 71, 32)      0           ['max_pooling1d_13[0][0]']
+ opout1D)
+
+ max_pooling1d_16 (MaxPooling1D  (None, 71, 32)      0           ['conv1d_16[0][0]']
+ )
+
+ conv1d_19 (Conv1D)             (None, 75, 32)       1312        ['gaussian_noise_5[0][0]']
+
+ conv1d_1 (Conv1D)              (None, 291, 32)      15392       ['spatial_dropout1d[0][0]']
+
+ max_pooling1d_5 (MaxPooling1D)  (None, 69, 64)      0           ['conv1d_5[0][0]']
+
+ max_pooling1d_8 (MaxPooling1D)  (None, 69, 64)      0           ['conv1d_8[0][0]']
+
+ conv1d_11 (Conv1D)             (None, 71, 64)       20544       ['spatial_dropout1d_7[0][0]']
+
+ conv1d_14 (Conv1D)             (None, 71, 64)       20544       ['spatial_dropout1d_9[0][0]']
+
+ spatial_dropout1d_11 (SpatialD  (None, 71, 32)      0           ['max_pooling1d_16[0][0]']
+ ropout1D)
+
+ max_pooling1d_19 (MaxPooling1D  (None, 71, 32)      0           ['conv1d_19[0][0]']
+ )
+
+ max_pooling1d_1 (MaxPooling1D)  (None, 288, 32)     0           ['conv1d_1[0][0]']
+
+ spatial_dropout1d_4 (SpatialDr  (None, 69, 64)      0           ['max_pooling1d_5[0][0]']
+ opout1D)
+
+ spatial_dropout1d_6 (SpatialDr  (None, 69, 64)      0           ['max_pooling1d_8[0][0]']
+ opout1D)
+
+ max_pooling1d_11 (MaxPooling1D  (None, 69, 64)      0           ['conv1d_11[0][0]']
+ )
+
+ max_pooling1d_14 (MaxPooling1D  (None, 69, 64)      0           ['conv1d_14[0][0]']
+ )
+
+ conv1d_17 (Conv1D)             (None, 71, 64)       20544       ['spatial_dropout1d_11[0][0]']
+
+ spatial_dropout1d_13 (SpatialD  (None, 71, 32)      0           ['max_pooling1d_19[0][0]']
+ ropout1D)
+
+ spatial_dropout1d_1 (SpatialDr  (None, 288, 32)     0           ['max_pooling1d_1[0][0]']
+ opout1D)
+
+ conv1d_6 (Conv1D)              (None, 69, 128)      41088       ['spatial_dropout1d_4[0][0]']
+
+ conv1d_9 (Conv1D)              (None, 69, 128)      41088       ['spatial_dropout1d_6[0][0]']
+
+ spatial_dropout1d_8 (SpatialDr  (None, 69, 64)      0           ['max_pooling1d_11[0][0]']
+ opout1D)
+
+ spatial_dropout1d_10 (SpatialD  (None, 69, 64)      0           ['max_pooling1d_14[0][0]']
+ ropout1D)
+
+ max_pooling1d_17 (MaxPooling1D  (None, 69, 64)      0           ['conv1d_17[0][0]']
+ )
+
+ conv1d_20 (Conv1D)             (None, 71, 64)       20544       ['spatial_dropout1d_13[0][0]']
+
+ conv1d_2 (Conv1D)              (None, 288, 64)      30784       ['spatial_dropout1d_1[0][0]']
+
+ max_pooling1d_6 (MaxPooling1D)  (None, 67, 128)     0           ['conv1d_6[0][0]']
+
+ transit_params (InputLayer)    [(None, 6, 1)]       0           []
+
+ max_pooling1d_9 (MaxPooling1D)  (None, 67, 128)     0           ['conv1d_9[0][0]']
+
+ conv1d_12 (Conv1D)             (None, 69, 128)      41088       ['spatial_dropout1d_8[0][0]']
+
+ conv1d_15 (Conv1D)             (None, 69, 128)      41088       ['spatial_dropout1d_10[0][0]']
+
+ spatial_dropout1d_12 (SpatialD  (None, 69, 64)      0           ['max_pooling1d_17[0][0]']
+ ropout1D)
+
+ max_pooling1d_20 (MaxPooling1D  (None, 69, 64)      0           ['conv1d_20[0][0]']
+ )
+
+ max_pooling1d_2 (MaxPooling1D)  (None, 143, 64)     0           ['conv1d_2[0][0]']
+
+ flatten (Flatten)              (None, 8576)         0           ['max_pooling1d_6[0][0]']
+
+ flatten_1 (Flatten)            (None, 6)            0           ['transit_params[0][0]']
+
+ flatten_2 (Flatten)            (None, 8576)         0           ['max_pooling1d_9[0][0]']
+
+ flatten_3 (Flatten)            (None, 6)            0           ['transit_params[0][0]']
+
+ max_pooling1d_12 (MaxPooling1D  (None, 67, 128)     0           ['conv1d_12[0][0]']
+ )
+
+ max_pooling1d_15 (MaxPooling1D  (None, 67, 128)     0           ['conv1d_15[0][0]']
+ )
+
+ conv1d_18 (Conv1D)             (None, 69, 128)      41088       ['spatial_dropout1d_12[0][0]']
+
+ spatial_dropout1d_14 (SpatialD  (None, 69, 64)      0           ['max_pooling1d_20[0][0]']
+ ropout1D)
+
+ spatial_dropout1d_2 (SpatialDr  (None, 143, 64)     0           ['max_pooling1d_2[0][0]']
+ opout1D)
+
+ concatenate (Concatenate)      (None, 8582)         0           ['flatten[0][0]',
+                                                                  'flatten_1[0][0]']
+
+ concatenate_1 (Concatenate)    (None, 8582)         0           ['flatten_2[0][0]',
+                                                                  'flatten_3[0][0]']
+
+ flatten_4 (Flatten)            (None, 8576)         0           ['max_pooling1d_12[0][0]']
+
+ flatten_5 (Flatten)            (None, 8576)         0           ['max_pooling1d_15[0][0]']
+
+ max_pooling1d_18 (MaxPooling1D  (None, 67, 128)     0           ['conv1d_18[0][0]']
+ )
+
+ offset_params (InputLayer)     [(None, 2, 1)]       0           []
+
+ conv1d_21 (Conv1D)             (None, 69, 128)      41088       ['spatial_dropout1d_14[0][0]']
+
+ conv1d_3 (Conv1D)              (None, 143, 128)     65664       ['spatial_dropout1d_2[0][0]']
+
+ dense_1 (Dense)                (None, 64)           549312      ['concatenate[0][0]']
+
+ dense_2 (Dense)                (None, 64)           549312      ['concatenate_1[0][0]']
+
+ dense_3 (Dense)                (None, 64)           548928      ['flatten_4[0][0]']
+
+ dense_4 (Dense)                (None, 64)           548928      ['flatten_5[0][0]']
+
+ flatten_6 (Flatten)            (None, 8576)         0           ['max_pooling1d_18[0][0]']
+
+ flatten_7 (Flatten)            (None, 2)            0           ['offset_params[0][0]']
+
+ max_pooling1d_21 (MaxPooling1D  (None, 67, 128)     0           ['conv1d_21[0][0]']
+ )
+
+ max_pooling1d_3 (MaxPooling1D)  (None, 71, 128)     0           ['conv1d_3[0][0]']
+
+ adaptive_std_dropout_1 (Adapti  (None, 64)          0           ['dense_1[0][0]']
+ veStdDropout)
+
+ adaptive_std_dropout_2 (Adapti  (None, 64)          0           ['dense_2[0][0]']
+ veStdDropout)
+
+ adaptive_std_dropout_3 (Adapti  (None, 64)          0           ['dense_3[0][0]']
+ veStdDropout)
+
+ adaptive_std_dropout_4 (Adapti  (None, 64)          0           ['dense_4[0][0]']
+ veStdDropout)
+
+ concatenate_2 (Concatenate)    (None, 8578)         0           ['flatten_6[0][0]',
+                                                                  'flatten_7[0][0]']
+
+ flatten_8 (Flatten)            (None, 8576)         0           ['max_pooling1d_21[0][0]']
+
+ dense (Dense)                  (None, 71, 64)       8256        ['max_pooling1d_3[0][0]']
+
+ layer_normalization_1 (LayerNo  (None, 64)          128         ['adaptive_std_dropout_1[0][0]']
+ rmalization)
+
+ layer_normalization_2 (LayerNo  (None, 64)          128         ['adaptive_std_dropout_2[0][0]']
+ rmalization)
+
+ layer_normalization_3 (LayerNo  (None, 64)          128         ['adaptive_std_dropout_3[0][0]']
+ rmalization)
+
+ layer_normalization_4 (LayerNo  (None, 64)          128         ['adaptive_std_dropout_4[0][0]']
+ rmalization)
+
+ dense_5 (Dense)                (None, 64)           549056      ['concatenate_2[0][0]']
+
+ dense_6 (Dense)                (None, 64)           548928      ['flatten_8[0][0]']
+
+ adaptive_std_dropout (Adaptive  (None, 71, 64)      0           ['dense[0][0]']
+ StdDropout)
+
+ add (Add)                      (None, 64)           0           ['layer_normalization_1[0][0]',
+                                                                  'layer_normalization_2[0][0]']
+
+ add_1 (Add)                    (None, 64)           0           ['layer_normalization_3[0][0]',
+                                                                  'layer_normalization_4[0][0]']
+
+ adaptive_std_dropout_5 (Adapti  (None, 64)          0           ['dense_5[0][0]']
+ veStdDropout)
+
+ adaptive_std_dropout_6 (Adapti  (None, 64)          0           ['dense_6[0][0]']
+ veStdDropout)
+
+ stellar_model (InputLayer)     [(None, 3, 1)]       0           []
+
+ layer_normalization (LayerNorm  (None, 71, 64)      128         ['adaptive_std_dropout[0][0]']
+ alization)
+
+ add_2 (Add)                    (None, 64)           0           ['add[0][0]',
+                                                                  'add_1[0][0]']
+
+ layer_normalization_5 (LayerNo  (None, 64)          128         ['adaptive_std_dropout_5[0][0]']
+ rmalization)
+
+ layer_normalization_6 (LayerNo  (None, 64)          128         ['adaptive_std_dropout_6[0][0]']
+ rmalization)
+
+ flatten_9 (Flatten)            (None, 3)            0           ['stellar_model[0][0]']
+
+ flatten_10 (Flatten)           (None, 4544)         0           ['layer_normalization[0][0]']
+
+ flatten_11 (Flatten)           (None, 64)           0           ['add_2[0][0]']
+
+ flatten_12 (Flatten)           (None, 64)           0           ['layer_normalization_5[0][0]']
+
+ flatten_13 (Flatten)           (None, 64)           0           ['layer_normalization_6[0][0]']
+
+ concatenate_3 (Concatenate)    (None, 4739)         0           ['flatten_9[0][0]',
+                                                                  'flatten_10[0][0]',
+                                                                  'flatten_11[0][0]',
+                                                                  'flatten_12[0][0]',
+                                                                  'flatten_13[0][0]']
+
+ final-dense2 (Dense)           (None, 1000)         4740000     ['concatenate_3[0][0]']
+
+ final-dropout2 (AdaptiveStdDro  (None, 1000)        0           ['final-dense2[0][0]']
+ pout)
+
+ final-dense3 (Dense)           (None, 250)          250250      ['final-dropout2[0][0]']
+
+ final-dropout3 (AdaptiveStdDro  (None, 250)         0           ['final-dense3[0][0]']
+ pout)
+
+ final-dense4 (Dense)           (None, 75)           18825       ['final-dropout3[0][0]']
+
+ final-dropout4 (AdaptiveStdDro  (None, 75)          0           ['final-dense4[0][0]']
+ pout)
+
+ final-dense5 (Dense)           (None, 35)           2660        ['final-dropout4[0][0]']
+
+ final-dropout5 (AdaptiveStdDro  (None, 35)          0           ['final-dense5[0][0]']
+ pout)
+
+ final-dense6 (Dense)           (None, 16)           576         ['final-dropout5[0][0]']
+
+ final-dropout6 (AdaptiveStdDro  (None, 16)          0           ['final-dense6[0][0]']
+ pout)
+
+ logits (Dense)                 (None, 1)            17          ['final-dropout6[0][0]']
+
+==================================================================================================
+Total params: 8,808,984
+Trainable params: 8,808,984
+Non-trainable params: 0
+__________________________________________________________________________________________________
+2023-12-04 08:23:26 INFO     Min weights: -0.53080827 from layer logits
+2023-12-04 08:23:26 INFO     Max weights: 1.0 from layer layer_normalization_6
+/tmp/pycharm_project_157/iatson_planet_tces_launch.py:153: DtypeWarning: Columns (70,217,220,221,224,225,230,232,233,234,235,236,237,253,258,263,268,273,278,279,284,289,294,299,304,309,310,316,321,326,331,336,346,374,379,384,389,390,395,400,405,410,426,428,434,444,448,452,456,460,464,468,472,476,480,484,488,492,496,500,504,508,512,516,520,524) have mixed types. Specify dtype option on import or set low_memory=False.
+  candidates_df = pd.read_csv(training_dir + '/q1_q17/injected_objects_candidates.csv')
+2023-12-04 08:23:26 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_0/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 08:24:26.253345: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+45/45 [==============================] - 9s 152ms/step
+2023-12-04 08:24:44 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_1/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 08:25:32.651201: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+45/45 [==============================] - 9s 156ms/step
+2023-12-04 08:25:51 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_2/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 08:26:40.096261: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+45/45 [==============================] - 9s 156ms/step
+2023-12-04 08:26:58 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_3/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 08:27:48.507389: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+45/45 [==============================] - 9s 156ms/step
+2023-12-04 08:28:07 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_4/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 08:28:57.481715: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+45/45 [==============================] - 9s 158ms/step
+2023-12-04 08:29:16 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_5/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 08:30:05.579626: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+45/45 [==============================] - 10s 158ms/step
+2023-12-04 08:30:25 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_6/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 08:31:13.901986: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+45/45 [==============================] - 10s 159ms/step
+2023-12-04 08:31:33 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_7/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 08:32:23.226139: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+45/45 [==============================] - 9s 158ms/step
+2023-12-04 08:32:42 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_8/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 08:33:33.643602: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+45/45 [==============================] - 9s 155ms/step
+2023-12-04 08:33:52 INFO     Loading model from /home/mdevo/exoml/IATSON_planet_model_chk_9/
+WARNING:tensorflow:Unable to restore custom metric. Please ensure that the layer implements `get_config` and `from_config` when saving. In addition, please use the `custom_objects` arg when calling `load_model()`.
+2023-12-04 08:34:42.562239: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+45/45 [==============================] - 9s 157ms/step
+2023-12-04 08:36:17 INFO     Metrics: tps={0.5: 0.0}, fps={0.5: 318.0}, tns={0.5: 8644.0}, fns={0.5: 0.0},precision=0.0, recall=0.0, accuracy=0.9645168781280518
+2023-12-04 08:36:17 INFO     TCEs predicted as positive:
+               object_id           type  expected_class predicted_class  prediction_value  prediction_value_std
+8952   KIC 9972385_23.23  tce_candidate             0.0               1          0.501910              0.343441
+2821    KIC 3962715_4.07  tce_candidate             0.0               1          0.570139              0.146553
+6801    KIC 8233504_3.87  tce_candidate             0.0               1          0.577732              0.185157
+3630    KIC 5177859_5.56  tce_candidate             0.0               1          0.589249              0.241368
+5650   KIC 7115785_15.46  tce_candidate             0.0               1          0.710309              0.232546
+6235     KIC 7767559_2.2  tce_candidate             0.0               1          0.735105              0.215000
+5045    KIC 6471490_1.02  tce_candidate             0.0               1          0.815682              0.099394
+2678    KIC 3757709_2.17  tce_candidate             0.0               1          0.874057              0.087172
+474   KIC 10514430_16.12  tce_candidate             0.0               1          0.969954              0.016554
+2023-12-04 08:36:17 INFO     Candidates predicted as positive:
+                object_id       type  expected_class predicted_class  prediction_value  prediction_value_std
+7733     KIC 8956706_8.38  candidate             0.0               1          0.500086              0.280348
+1991     KIC 1996180_5.42  candidate             0.0               1          0.500442              0.197229
+3921      KIC 5457326_2.5  candidate             0.0               1          0.501122              0.185081
+2061     KIC 2303903_3.71  candidate             0.0               1          0.502251              0.186453
+2680    KIC 3758499_14.52  candidate             0.0               1          0.504165              0.166213
+2846     KIC 3972432_2.91  candidate             0.0               1          0.505343              0.136956
+6077     KIC 7601665_3.11  candidate             0.0               1          0.506027              0.156617
+2988   KIC 4270799_115.24  candidate             0.0               1          0.506116              0.300108
+1686   KIC 12016243_11.84  candidate             0.0               1          0.510453              0.206527
+5643     KIC 7107802_5.47  candidate             0.0               1          0.512821              0.130371
+3138     KIC 4548011_4.33  candidate             0.0               1          0.513131              0.207111
+879    KIC 10967168_22.27  candidate             0.0               1          0.515341              0.307718
+1241   KIC 11407847_11.83  candidate             0.0               1          0.516232              0.183164
+5950     KIC 7449554_2.42  candidate             0.0               1          0.516977              0.179297
+128     KIC 10140274_2.44  candidate             0.0               1          0.517399              0.186215
+5098     KIC 6527078_7.58  candidate             0.0               1          0.517546              0.242975
+3359     KIC 4840672_9.23  candidate             0.0               1          0.518465              0.160821
+503     KIC 10536241_7.75  candidate             0.0               1          0.519543              0.131637
+7377     KIC 8636539_6.77  candidate             0.0               1          0.520667              0.184691
+1028   KIC 11135694_19.59  candidate             0.0               1          0.520747              0.172350
+5435     KIC 6887030_5.44  candidate             0.0               1          0.521626              0.179462
+8668    KIC 9716028_17.37  candidate             0.0               1          0.521913              0.281080
+2400    KIC 3245969_11.39  candidate             0.0               1          0.521997              0.251302
+3753    KIC 5299459_23.34  candidate             0.0               1          0.525071              0.173269
+4525    KIC 6032920_10.83  candidate             0.0               1          0.525995              0.349296
+6486     KIC 8008067_7.31  candidate             0.0               1          0.530222              0.196198
+1332    KIC 11520114_7.08  candidate             0.0               1          0.530402              0.167025
+8357    KIC 9474756_17.61  candidate             0.0               1          0.531595              0.160250
+8341     KIC 9468848_5.89  candidate             0.0               1          0.532248              0.161544
+2686    KIC 3761319_16.25  candidate             0.0               1          0.534678              0.221234
+5088     KIC 6523351_6.07  candidate             0.0               1          0.534727              0.182599
+8800     KIC 9836563_6.56  candidate             0.0               1          0.535167              0.158248
+8637     KIC 9702945_3.51  candidate             0.0               1          0.537141              0.139498
+4100     KIC 5613821_5.06  candidate             0.0               1          0.538533              0.163411
+5151     KIC 6593150_5.47  candidate             0.0               1          0.540111              0.156934
+4344    KIC 5859725_18.98  candidate             0.0               1          0.540937              0.161332
+7827    KIC 9026749_17.66  candidate             0.0               1          0.541582              0.233640
+6247     KIC 7778664_5.03  candidate             0.0               1          0.542009              0.085864
+6992    KIC 8355178_13.03  candidate             0.0               1          0.542020              0.169923
+2858    KIC 4048898_13.09  candidate             0.0               1          0.544092              0.265985
+4661    KIC 6131130_10.51  candidate             0.0               1          0.544613              0.214631
+3110    KIC 4474462_12.86  candidate             0.0               1          0.545671              0.170435
+2387    KIC 3239171_43.58  candidate             0.0               1          0.546566              0.121231
+8961    KIC 9995771_15.06  candidate             0.0               1          0.547112              0.137218
+1898    KIC 12600735_6.08  candidate             0.0               1          0.548058              0.123685
+3420     KIC 4919550_2.45  candidate             0.0               1          0.548466              0.154796
+3702      KIC 5253802_8.8  candidate             0.0               1          0.550455              0.256836
+8217    KIC 9349757_17.72  candidate             0.0               1          0.551814              0.205707
+5053    KIC 6508221_31.53  candidate             0.0               1          0.553582              0.205476
+838     KIC 10917681_12.9  candidate             0.0               1          0.553733              0.245578
+4569     KIC 6058816_4.75  candidate             0.0               1          0.555733              0.157163
+5846     KIC 7294743_2.81  candidate             0.0               1          0.556956              0.174108
+8272    KIC 9414417_53.51  candidate             0.0               1          0.556989              0.167364
+6701      KIC 8167504_7.7  candidate             0.0               1          0.559316              0.167603
+2219    KIC 2849140_11.82  candidate             0.0               1          0.560111              0.148393
+2779      KIC 3937814_8.2  candidate             0.0               1          0.560136              0.212800
+508   KIC 10545066_154.61  candidate             0.0               1          0.561822              0.180542
+4260     KIC 5780855_5.68  candidate             0.0               1          0.564322              0.158528
+7912     KIC 9100484_8.75  candidate             0.0               1          0.566744              0.221308
+6800     KIC 8233326_3.74  candidate             0.0               1          0.567649              0.234865
+938     KIC 11030475_0.76  candidate             0.0               1          0.568796              0.150273
+3421     KIC 4919550_5.57  candidate             0.0               1          0.568955              0.205952
+1901    KIC 12602314_1.41  candidate             0.0               1          0.570979              0.188729
+242      KIC 10265898_3.3  candidate             0.0               1          0.571410              0.173325
+6138     KIC 7673841_7.88  candidate             0.0               1          0.572256              0.180853
+8923    KIC 9955262_77.48  candidate             0.0               1          0.572357              0.242125
+3244     KIC 4735826_4.02  candidate             0.0               1          0.572482              0.186050
+2434    KIC 3346543_12.47  candidate             0.0               1          0.572531              0.199104
+6204    KIC 7748487_15.58  candidate             0.0               1          0.572793              0.182351
+2722     KIC 3848083_8.48  candidate             0.0               1          0.572988              0.179552
+8146     KIC 9283156_5.22  candidate             0.0               1          0.574072              0.109490
+2026     KIC 2161949_4.78  candidate             0.0               1          0.575999              0.176293
+7678     KIC 8894646_3.56  candidate             0.0               1          0.581091              0.072496
+1214   KIC 11361283_16.48  candidate             0.0               1          0.581215              0.192874
+3881     KIC 5431027_8.82  candidate             0.0               1          0.585170              0.191189
+996     KIC 11098013_7.51  candidate             0.0               1          0.586644              0.292612
+3709     KIC 5263167_3.39  candidate             0.0               1          0.587018              0.153125
+1787   KIC 12253769_20.55  candidate             0.0               1          0.589434              0.262834
+4170     KIC 5687700_6.36  candidate             0.0               1          0.589673              0.186786
+6079    KIC 7602351_17.58  candidate             0.0               1          0.591394              0.236297
+4823     KIC 6290935_5.53  candidate             0.0               1          0.591590              0.166588
+7977     KIC 9153823_1.44  candidate             0.0               1          0.592076              0.210905
+3476     KIC 4951877_24.8  candidate             0.0               1          0.592402              0.179993
+8634      KIC 9697131_3.1  candidate             0.0               1          0.593040              0.266735
+2102    KIC 2449245_18.18  candidate             0.0               1          0.596870              0.112730
+5428    KIC 6879183_20.55  candidate             0.0               1          0.597262              0.203558
+5302     KIC 6719086_3.01  candidate             0.0               1          0.597504              0.223294
+1947    KIC 1429589_38.17  candidate             0.0               1          0.598446              0.191961
+6178     KIC 7700500_4.61  candidate             0.0               1          0.598741              0.233608
+8372     KIC 9489524_4.79  candidate             0.0               1          0.602051              0.192288
+4073     KIC 5602588_6.31  candidate             0.0               1          0.602147              0.174864
+7574    KIC 8811490_21.74  candidate             0.0               1          0.602425              0.220276
+5788      KIC 7266212_7.8  candidate             0.0               1          0.603144              0.130444
+4345     KIC 5860347_2.56  candidate             0.0               1          0.604196              0.200240
+6244    KIC 7772914_23.13  candidate             0.0               1          0.608795              0.283850
+7375     KIC 8631751_1.53  candidate             0.0               1          0.609178              0.258611
+1560    KIC 11856178_9.13  candidate             0.0               1          0.609242              0.239855
+5896    KIC 7375348_47.74  candidate             0.0               1          0.609653              0.274082
+5608    KIC 7047922_10.52  candidate             0.0               1          0.609782              0.217435
+2140     KIC 2579043_6.31  candidate             0.0               1          0.610339              0.214215
+652     KIC 10680424_0.93  candidate             0.0               1          0.611993              0.251445
+8851     KIC 9883606_2.58  candidate             0.0               1          0.612038              0.116493
+4139     KIC 5645170_5.39  candidate             0.0               1          0.612545              0.158154
+6463    KIC 7983117_25.09  candidate             0.0               1          0.614053              0.277172
+1950      KIC 1431122_4.3  candidate             0.0               1          0.615285              0.189921
+6170    KIC 7697103_13.92  candidate             0.0               1          0.617700              0.139116
+5165     KIC 6607286_3.17  candidate             0.0               1          0.617985              0.253256
+2742     KIC 3854496_9.46  candidate             0.0               1          0.618465              0.144385
+1058    KIC 11176166_4.27  candidate             0.0               1          0.619161              0.258013
+5378     KIC 6839010_4.84  candidate             0.0               1          0.620539              0.108068
+6156    KIC 7692093_11.17  candidate             0.0               1          0.621641              0.212228
+8542     KIC 9634821_8.56  candidate             0.0               1          0.623899              0.237106
+6817    KIC 8241079_10.92  candidate             0.0               1          0.625471              0.122001
+3890     KIC 5437762_4.04  candidate             0.0               1          0.626210              0.177311
+659     KIC 10717241_9.34  candidate             0.0               1          0.627492              0.179616
+5204    KIC 6665860_10.47  candidate             0.0               1          0.629983              0.229287
+6399    KIC 7918652_11.46  candidate             0.0               1          0.630609              0.162689
+3631     KIC 5177859_8.76  candidate             0.0               1          0.630947              0.223682
+6886    KIC 8278073_12.07  candidate             0.0               1          0.631138              0.173537
+1718    KIC 12071754_5.47  candidate             0.0               1          0.631598              0.188859
+377     KIC 10397751_4.29  candidate             0.0               1          0.631691              0.135478
+5465   KIC 6946199_104.82  candidate             0.0               1          0.633360              0.331851
+134     KIC 10146103_7.58  candidate             0.0               1          0.633469              0.089447
+2130     KIC 2572029_6.01  candidate             0.0               1          0.633939              0.130645
+2728      KIC 3849187_6.6  candidate             0.0               1          0.637341              0.178827
+1141    KIC 11290515_5.89  candidate             0.0               1          0.640234              0.211505
+376     KIC 10397751_2.91  candidate             0.0               1          0.642781              0.122236
+5201     KIC 6664842_5.21  candidate             0.0               1          0.643869              0.155711
+4446    KIC 5954001_11.69  candidate             0.0               1          0.644597              0.139557
+7450    KIC 8695311_31.03  candidate             0.0               1          0.645435              0.213968
+6878    KIC 8265218_12.83  candidate             0.0               1          0.646161              0.197314
+2624     KIC 3648437_17.5  candidate             0.0               1          0.647554              0.248640
+1790    KIC 12256520_7.25  candidate             0.0               1          0.650593              0.113853
+977     KIC 11080702_8.67  candidate             0.0               1          0.650857              0.155268
+2980    KIC 4262040_92.46  candidate             0.0               1          0.651543              0.188549
+8378     KIC 9509343_6.39  candidate             0.0               1          0.651744              0.181729
+3605    KIC 5131180_14.85  candidate             0.0               1          0.654531              0.299135
+7173     KIC 8488381_4.74  candidate             0.0               1          0.655490              0.130018
+2451     KIC 3356193_5.82  candidate             0.0               1          0.656308              0.133577
+3386    KIC 4851530_23.08  candidate             0.0               1          0.657503              0.167971
+4114    KIC 5621333_11.55  candidate             0.0               1          0.658078              0.173571
+5627     KIC 7100673_7.24  candidate             0.0               1          0.662080              0.134075
+1811    KIC 12304728_3.15  candidate             0.0               1          0.665305              0.267761
+2321    KIC 3115833_10.18  candidate             0.0               1          0.666454              0.157780
+6489    KIC 8013419_12.73  candidate             0.0               1          0.667373              0.272791
+1201    KIC 11350118_12.0  candidate             0.0               1          0.667460              0.190467
+1884    KIC 12554212_4.77  candidate             0.0               1          0.673172              0.173979
+1585    KIC 11904835_9.46  candidate             0.0               1          0.674575              0.150325
+2215     KIC 2834805_25.0  candidate             0.0               1          0.674777              0.264732
+7837     KIC 9031703_9.33  candidate             0.0               1          0.675419              0.158707
+939     KIC 11030475_2.65  candidate             0.0               1          0.676001              0.154788
+8547     KIC 9639106_3.58  candidate             0.0               1          0.677658              0.125218
+7314     KIC 8581240_4.33  candidate             0.0               1          0.678111              0.154070
+7313    KIC 8581240_10.77  candidate             0.0               1          0.680095              0.147125
+2613     KIC 3642741_7.26  candidate             0.0               1          0.680143              0.186960
+5353     KIC 6779260_2.22  candidate             0.0               1          0.681384              0.287317
+6246     KIC 7778427_5.38  candidate             0.0               1          0.685016              0.131672
+8483     KIC 9581589_5.19  candidate             0.0               1          0.685281              0.107871
+3495     KIC 5008245_2.61  candidate             0.0               1          0.685696              0.359349
+8541     KIC 9634821_5.48  candidate             0.0               1          0.692507              0.238018
+5538     KIC 7021681_7.73  candidate             0.0               1          0.692865              0.176640
+8502     KIC 9596064_1.74  candidate             0.0               1          0.696743              0.259261
+1388    KIC 11599038_9.28  candidate             0.0               1          0.700226              0.184070
+6225     KIC 7765528_9.39  candidate             0.0               1          0.703763              0.277399
+8808    KIC 9839030_27.29  candidate             0.0               1          0.707111              0.291209
+1377    KIC 11570749_46.3  candidate             0.0               1          0.711709              0.249660
+6789     KIC 8227464_4.26  candidate             0.0               1          0.713169              0.162620
+3137    KIC 4548011_13.95  candidate             0.0               1          0.715135              0.184156
+378     KIC 10397751_5.43  candidate             0.0               1          0.715362              0.129527
+2650    KIC 3733638_10.07  candidate             0.0               1          0.716001              0.156161
+7738     KIC 8958811_2.53  candidate             0.0               1          0.717607              0.160379
+4705    KIC 6185476_17.71  candidate             0.0               1          0.718558              0.185315
+2273     KIC 2984990_3.79  candidate             0.0               1          0.720140              0.155743
+6664     KIC 8145958_3.08  candidate             0.0               1          0.720376              0.171664
+6011     KIC 7515336_5.66  candidate             0.0               1          0.721209              0.165977
+6766     KIC 8212002_9.55  candidate             0.0               1          0.723795              0.162685
+3139     KIC 4548011_9.09  candidate             0.0               1          0.724071              0.145717
+2939     KIC 4172746_17.7  candidate             0.0               1          0.724919              0.294077
+688     KIC 10747501_4.73  candidate             0.0               1          0.728692              0.179718
+1711    KIC 12067960_5.61  candidate             0.0               1          0.728866              0.122456
+2245     KIC 2860656_4.11  candidate             0.0               1          0.729186              0.089763
+5069    KIC 6516185_47.37  candidate             0.0               1          0.729698              0.218786
+6590     KIC 8094120_5.68  candidate             0.0               1          0.736860              0.132514
+1112    KIC 11241560_6.96  candidate             0.0               1          0.737810              0.150186
+3098    KIC 4466677_21.01  candidate             0.0               1          0.742066              0.165508
+363     KIC 10384298_3.44  candidate             0.0               1          0.742564              0.165220
+3450     KIC 4939533_5.77  candidate             0.0               1          0.744215              0.195386
+4024     KIC 5551672_2.18  candidate             0.0               1          0.745753              0.199346
+5054     KIC 6508221_9.75  candidate             0.0               1          0.748495              0.173253
+6272     KIC 7816935_6.88  candidate             0.0               1          0.750166              0.139724
+7913    KIC 9100953_14.75  candidate             0.0               1          0.753611              0.223636
+4500     KIC 5985713_8.95  candidate             0.0               1          0.754987              0.162931
+475    KIC 10514430_20.72  candidate             0.0               1          0.756167              0.214471
+6855     KIC 8261920_3.02  candidate             0.0               1          0.756754              0.151331
+1933   KIC 12785320_57.38  candidate             0.0               1          0.758530              0.148219
+4520    KIC 6026737_10.17  candidate             0.0               1          0.760890              0.104504
+2345     KIC 3128552_6.13  candidate             0.0               1          0.764578              0.129681
+1232   KIC 11395587_12.99  candidate             0.0               1          0.764661              0.236172
+2578     KIC 3557560_7.43  candidate             0.0               1          0.766548              0.148336
+6720     KIC 8176564_6.57  candidate             0.0               1          0.767540              0.265454
+2191     KIC 2716801_9.48  candidate             0.0               1          0.767921              0.084520
+1211   KIC 11358389_28.23  candidate             0.0               1          0.768859              0.267427
+2702    KIC 3765917_11.82  candidate             0.0               1          0.772146              0.173932
+6265    KIC 7811537_16.93  candidate             0.0               1          0.772158              0.244125
+8901     KIC 9938836_7.27  candidate             0.0               1          0.773519              0.124336
+57      KIC 10073672_2.25  candidate             0.0               1          0.774643              0.214881
+837     KIC 10917433_6.91  candidate             0.0               1          0.781883              0.138967
+6199    KIC 7747091_14.27  candidate             0.0               1          0.782564              0.154093
+2973    KIC 4252671_23.27  candidate             0.0               1          0.782745              0.149786
+5630    KIC 7106173_10.18  candidate             0.0               1          0.783007              0.125576
+4120    KIC 5629353_11.87  candidate             0.0               1          0.790606              0.157564
+708     KIC 10793172_7.98  candidate             0.0               1          0.795784              0.111182
+5632     KIC 7106173_8.29  candidate             0.0               1          0.795833              0.142648
+6365     KIC 7902003_7.13  candidate             0.0               1          0.797593              0.189510
+1645    KIC 11967788_7.24  candidate             0.0               1          0.799652              0.194287
+6007      KIC 7512982_7.0  candidate             0.0               1          0.806284              0.074592
+3120     KIC 4478168_8.03  candidate             0.0               1          0.806644              0.100656
+7778     KIC 9002538_6.88  candidate             0.0               1          0.808803              0.137588
+1570    KIC 11870545_0.84  candidate             0.0               1          0.810383              0.154513
+4417     KIC 5903749_6.35  candidate             0.0               1          0.810429              0.102360
+7777     KIC 9002538_4.96  candidate             0.0               1          0.811171              0.220035
+7455     KIC 8702537_7.48  candidate             0.0               1          0.813438              0.088212
+7843     KIC 9043947_1.04  candidate             0.0               1          0.814647              0.121744
+827     KIC 10907132_5.89  candidate             0.0               1          0.815348              0.134385
+1652   KIC 11968463_86.43  candidate             0.0               1          0.820859              0.120553
+7645    KIC 8873090_10.16  candidate             0.0               1          0.825063              0.110935
+5409    KIC 6867219_11.85  candidate             0.0               1          0.825490              0.106914
+4792    KIC 6268648_94.09  candidate             0.0               1          0.826283              0.134872
+6347     KIC 7891294_3.08  candidate             0.0               1          0.828520              0.101132
+25      KIC 10016874_16.3  candidate             0.0               1          0.832363              0.199448
+2874     KIC 4060815_4.29  candidate             0.0               1          0.833637              0.121998
+5631     KIC 7106173_6.23  candidate             0.0               1          0.835335              0.122865
+473    KIC 10514429_20.72  candidate             0.0               1          0.838107              0.201978
+5537     KIC 7021681_13.6  candidate             0.0               1          0.840858              0.069568
+3070     KIC 4384909_6.41  candidate             0.0               1          0.841344              0.148598
+8213    KIC 9345933_13.02  candidate             0.0               1          0.842968              0.090845
+4000     KIC 5531694_8.11  candidate             0.0               1          0.843072              0.083925
+4522     KIC 6029239_5.52  candidate             0.0               1          0.847193              0.156944
+6297     KIC 7833305_8.31  candidate             0.0               1          0.847425              0.258172
+5681     KIC 7134626_2.52  candidate             0.0               1          0.851807              0.130113
+7800    KIC 9015738_34.78  candidate             0.0               1          0.853665              0.206430
+7846     KIC 9047416_9.01  candidate             0.0               1          0.855274              0.244461
+1644    KIC 11967788_4.93  candidate             0.0               1          0.857249              0.100741
+5121     KIC 6543893_3.81  candidate             0.0               1          0.859330              0.134861
+6101     KIC 7625138_5.72  candidate             0.0               1          0.859649              0.110353
+6816    KIC 8240904_92.78  candidate             0.0               1          0.860180              0.083434
+3414    KIC 4918303_21.16  candidate             0.0               1          0.862108              0.052454
+1842    KIC 12401132_7.63  candidate             0.0               1          0.863209              0.126720
+4521     KIC 6026737_3.75  candidate             0.0               1          0.865956              0.082963
+967    KIC 11074835_26.12  candidate             0.0               1          0.867724              0.109247
+8476     KIC 9579208_4.12  candidate             0.0               1          0.867911              0.141870
+3980    KIC 5513648_32.86  candidate             0.0               1          0.870500              0.073782
+7538     KIC 8773015_6.32  candidate             0.0               1          0.871496              0.106263
+7806    KIC 9017682_11.31  candidate             0.0               1          0.871994              0.063944
+3543      KIC 5039228_7.8  candidate             0.0               1          0.874300              0.093214
+5840     KIC 7289338_5.77  candidate             0.0               1          0.885382              0.052022
+4013     KIC 5542466_4.75  candidate             0.0               1          0.892714              0.064696
+8838     KIC 9872283_1.75  candidate             0.0               1          0.894955              0.071783
+6343     KIC 7887791_2.23  candidate             0.0               1          0.896447              0.054768
+5416    KIC 6871071_11.93  candidate             0.0               1          0.897195              0.088153
+6492     KIC 8016692_6.61  candidate             0.0               1          0.899214              0.071808
+1226   KIC 11391755_25.11  candidate             0.0               1          0.901692              0.062319
+1507     KIC 11773625_7.2  candidate             0.0               1          0.901937              0.078514
+6856     KIC 8261920_6.69  candidate             0.0               1          0.902427              0.071039
+2571    KIC 3554031_14.86  candidate             0.0               1          0.904398              0.083935
+4894     KIC 6359320_2.84  candidate             0.0               1          0.904702              0.052011
+3       KIC 10000941_2.57  candidate             0.0               1          0.905128              0.099118
+4334    KIC 5819801_11.83  candidate             0.0               1          0.909779              0.073163
+7122     KIC 8443527_22.6  candidate             0.0               1          0.911274              0.065094
+448    KIC 10471621_10.27  candidate             0.0               1          0.913189              0.089851
+7334      KIC 8607720_4.0  candidate             0.0               1          0.914794              0.082485
+5523     KIC 7017372_5.24  candidate             0.0               1          0.915099              0.083507
+940     KIC 11030475_9.49  candidate             0.0               1          0.915127              0.044488
+2651     KIC 3734418_6.63  candidate             0.0               1          0.917720              0.067480
+2095    KIC 2446113_23.14  candidate             0.0               1          0.923638              0.053233
+7370      KIC 8628761_6.3  candidate             0.0               1          0.925061              0.115535
+6935    KIC 8313667_30.59  candidate             0.0               1          0.925874              0.030686
+4012    KIC 5542466_12.89  candidate             0.0               1          0.927147              0.050769
+3531     KIC 5031857_7.14  candidate             0.0               1          0.927284              0.039020
+982     KIC 11081504_9.62  candidate             0.0               1          0.927503              0.071908
+8478     KIC 9579641_3.44  candidate             0.0               1          0.931694              0.049524
+1285   KIC 11462341_42.34  candidate             0.0               1          0.933721              0.037615
+8548     KIC 9640123_8.26  candidate             0.0               1          0.934060              0.049093
+3387     KIC 4851530_4.78  candidate             0.0               1          0.936884              0.060737
+1234    KIC 11401253_4.97  candidate             0.0               1          0.941712              0.048543
+981    KIC 11081504_13.12  candidate             0.0               1          0.944856              0.042805
+6891    KIC 8280511_21.72  candidate             0.0               1          0.945725              0.053451
+2921    KIC 4157325_24.84  candidate             0.0               1          0.948997              0.025836
+3448     KIC 4939265_4.85  candidate             0.0               1          0.949594              0.036404
+8215     KIC 9347899_9.62  candidate             0.0               1          0.955402              0.022910
+8515     KIC 9602613_7.57  candidate             0.0               1          0.956659              0.024309
+8839    KIC 9872292_10.19  candidate             0.0               1          0.957632              0.024303
+3552     KIC 5080636_6.36  candidate             0.0               1          0.957913              0.025935
+3674     KIC 5211199_6.68  candidate             0.0               1          0.958042              0.027963
+3082    KIC 4450844_56.34  candidate             0.0               1          0.959540              0.025518
+1650    KIC 11968463_27.9  candidate             0.0               1          0.959907              0.018144
+1436    KIC 11650543_7.21  candidate             0.0               1          0.961990              0.016833
+5417     KIC 6871071_7.66  candidate             0.0               1          0.962597              0.017031
+6137    KIC 7673192_16.53  candidate             0.0               1          0.964864              0.021014
+274     KIC 10290666_6.87  candidate             0.0               1          0.967677              0.015250
+7782     KIC 9006186_2.19  candidate             0.0               1          0.968210              0.021004
+1107   KIC 11237332_19.31  candidate             0.0               1          0.968489              0.027905
+2313     KIC 3109550_4.88  candidate             0.0               1          0.971628              0.021081
+1651    KIC 11968463_6.06  candidate             0.0               1          0.971903              0.013298
+4791    KIC 6268648_20.61  candidate             0.0               1          0.973641              0.010893
+6288    KIC 7825899_28.87  candidate             0.0               1          0.973871              0.010062
+7413     KIC 8672910_5.71  candidate             0.0               1          0.974634              0.008754
+6890    KIC 8280511_17.45  candidate             0.0               1          0.978559              0.015376
+2914     KIC 4144236_10.0  candidate             0.0               1          0.983934              0.004918
+2023-12-04 08:37:33 INFO     Metrics: tps={0.99: 0.0}, fps={0.99: 0.0}, tns={0.99: 8962.0}, fns={0.99: 0.0},precision=0.0, recall=0.0, accuracy=1.0
+2023-12-04 08:37:33 INFO     TCEs predicted as positive:
+Empty DataFrame
+Columns: [object_id, type, expected_class, predicted_class, prediction_value, prediction_value_std]
+Index: []
+2023-12-04 08:37:33 INFO     Candidates predicted as positive:
+Empty DataFrame
+Columns: [object_id, type, expected_class, predicted_class, prediction_value, prediction_value_std]
+Index: []
+
+Process finished with exit code 0

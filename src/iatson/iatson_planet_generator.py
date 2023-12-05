@@ -7,8 +7,8 @@ import foldedleastsquares
 import wotan
 from lcbuilder.helper import LcbuilderHelper
 from numpy.random import default_rng
-from ete6.ete6_generator import Ete6ModelGenerator
-from ml.encoding.time_position import value_encode_times
+from src.ete6.ete6_generator import Ete6ModelGenerator
+from src.ml.encoding.time_position import value_encode_times
 from sklearn.utils import shuffle
 import numpy as np
 import pandas as pd
