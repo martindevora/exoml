@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools", "setuptools-scm"]
+requires = ["setuptools"]#, "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -21,7 +21,7 @@ version = "0.0.4"
 #my-script = "my_package.module:function"
 
 [tool.setuptools]
-include-package-data = true
+include-package-data = false
 
 [tool.setuptools.dynamic]
 dependencies = {file = ["requirements.txt"]}
@@ -30,6 +30,11 @@ dependencies = {file = ["requirements.txt"]}
 where = ["src"]
 
 [tool.setuptools.package-data]
+"*" = ["*.md", "*.txt"]
+#mypkg1 = ["data1.rst"]
 #"models" = ["**"]
 #"q1_q17" = ["q1_q17"]
 #"ete6" = ["ete6"]
+
+#[tool.setuptools.exclude-package-data]
+#resources = ["*"]
