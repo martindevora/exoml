@@ -8,7 +8,6 @@ rm -r .pytest_cache
 rm -r build
 rm -r exoml-reqs
 rm -R *egg-info
-rm -R src/*egg-info
 git_tag=$1
 echo "GIT TAG IS " ${git_tag}
 echo "Run all tests"
@@ -23,7 +22,6 @@ if ! [[ -z ${tests_results} ]]; then
   rm -r build
   rm -r exoml-reqs
   rm -R *egg-info
-  rm -R src/*egg-info
   set -e
   python3 -m venv exoml-reqs
   source exoml-reqs/bin/activate
@@ -48,4 +46,3 @@ rm -r .tox
 rm -r .pytest_cache
 rm -r build
 rm -R *egg-info
-rm -R src/*egg-info
