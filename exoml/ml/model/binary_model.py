@@ -4,10 +4,10 @@ from keras.losses import BinaryCrossentropy
 from keras.metrics import Precision, Recall, AUC, BinaryAccuracy, RecallAtPrecision
 from tensorflow_addons.metrics import F1Score
 
-from src.ml.loss.cross_entropy import binary_focal_loss
-from src.ml.metrics.auc import precision_at_k, mean_true_positive_value, mean_true_negative_value, \
+from exoml.ml.loss.cross_entropy import binary_focal_loss
+from exoml.ml.metrics.auc import precision_at_k, mean_true_positive_value, mean_true_negative_value, \
     mean_false_negative_value, mean_false_positive_value, ThresholdAtPrecision
-from src.ml.model.base_model import BaseModel
+from exoml.ml.model.base_model import BaseModel
 import pandas as pd
 import matplotlib.pyplot as plt
 

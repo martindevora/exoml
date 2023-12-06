@@ -6,7 +6,7 @@ from lcbuilder.star.KicStarCatalog import KicStarCatalog
 from lcbuilder.star.TicStarCatalog import TicStarCatalog
 from watson.watson import Watson
 
-from src.ml.model.base_model import HyperParams
+from exoml.ml.model.base_model import HyperParams
 from preparation.parser_utils import create_star_csv, CreateStarCsvInput
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -16,7 +16,7 @@ os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 import os
 import pandas as pd
-from src.iatson.IATSON_planet import IATSON_planet
+from exoml.iatson.IATSON_planet import IATSON_planet
 
 
 if not isinstance(logging.root, logging.RootLogger):

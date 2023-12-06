@@ -16,19 +16,19 @@ from abc import abstractmethod
 from keras.utils import plot_model
 from sklearn.utils import shuffle
 
-from src.ml.callback.checkpoint import ModelCheckpointCallback
-from src.ml.callback.learning_rate import WarmUpAndLinDecreaseCallback
-from src.ml.callback.basemodel_aware_callback import MetricsPlotCallback
-from src.ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
-from src.ml.callback.early_stopping import ExoMlEarlyStopping
-from src.ml.callback.get_weights import GetWeights
-from src.ml.callback.training_data_aware import ValidationDataAwareCallback, ModelDirDataAwareCallback
-from src.ml.learning_rate.schedulers import ExponentialRescaleDecay
-from src.ml.log.get_weights_logger import ModelWeightsLogger
-from src.ml.log.with_logging import WithLogging
+from exoml.ml.callback.checkpoint import ModelCheckpointCallback
+from exoml.ml.callback.learning_rate import WarmUpAndLinDecreaseCallback
+from exoml.ml.callback.basemodel_aware_callback import MetricsPlotCallback
+from exoml.ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
+from exoml.ml.callback.early_stopping import ExoMlEarlyStopping
+from exoml.ml.callback.get_weights import GetWeights
+from exoml.ml.callback.training_data_aware import ValidationDataAwareCallback, ModelDirDataAwareCallback
+from exoml.ml.learning_rate.schedulers import ExponentialRescaleDecay
+from exoml.ml.log.get_weights_logger import ModelWeightsLogger
+from exoml.ml.log.with_logging import WithLogging
 from keras.optimizers.schedules.learning_rate_schedule import LearningRateSchedule
 
-from src.ml.metrics.auc import precision_at_k, mean_positive_value, mean_true_positive_value, mean_false_positive_value, \
+from exoml.ml.metrics.auc import precision_at_k, mean_positive_value, mean_true_positive_value, mean_false_positive_value, \
     mean_true_negative_value, ThresholdAtPrecision
 import tensorflow_addons as tfa
 
