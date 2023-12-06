@@ -16,7 +16,7 @@ import pandas as pd
 
 class WatsonPlanetModelGenerator(Ete6ModelGenerator):
     def __init__(self, injected_objects_df, lcs_dir, star_filename, lc_filename,
-                 batch_size, input_sizes, zero_epsilon=1e-7,
+                 batch_size, input_sizes, transits_mask=None, zero_epsilon=1e-7,
                  measurements_per_point=2, plot_inputs=False):
         super().__init__(zero_epsilon, shuffle_batch=False)
         self.injected_objects_df = injected_objects_df
@@ -25,6 +25,7 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
         self.lc_filename = lc_filename
         self.batch_size = batch_size
         self.input_sizes = input_sizes
+        self.transit_masks = transits_mask
         self.random_number_generator = default_rng()
         self.measurements_per_point = measurements_per_point
         self.plot_inputs = plot_inputs
@@ -172,6 +173,14 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
         plt.clf()
         plt.close()
 
+    def mask_other_signals(self, data_df, transits_mask, time_key='#time'):
+        if transits_mask is not None:
+            for item_mask in transits_mask:
+                mask = foldedleastsquares.transit_mask(data_df[time_key].to_numpy(), item_mask['P'],
+                                                       2 * item_mask['D'] / 60 / 24, item_mask['T0'])
+                data_df = data_df[~mask]
+        return data_df
+
     def __getitem__(self, idx):
         max_index = (idx + 1) * self.batch_size
         max_index = len(self.injected_objects_df) if max_index > len(self.injected_objects_df) else max_index
@@ -226,6 +235,9 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                 logging.warning("No curve for target " + file_prefix)
                 raise ValueError("No curve for target " + file_prefix)
             lc_df = lc_df.sort_values(by=['#time'])
+            lc_df = self.mask_other_signals(lc_df, transits_mask=self.transit_masks, time_key='#time')
+            centroids_df = self.mask_other_signals(centroids_df, target_row, time_key='time')
+            og_df = self.mask_other_signals(og_df, target_row, time_key='time')
             lc_df['flux'] = wotan.flatten(lc_df['#time'].to_numpy(), lc_df['flux'].to_numpy(), duration * 4, method='biweight')
             centroids_df = centroids_df.sort_values(by=['time'])
             centroids_df['centroids_ra'] = wotan.flatten(centroids_df['time'].to_numpy(), centroids_df['centroids_ra'].to_numpy(), duration * 4, method='biweight')

@@ -986,7 +986,7 @@ class IATSON_planet(ImbalancedBinaryModel):
                                              predictions_df)
 
     def predict_watson(self, target_id, period, duration, epoch, depth_ppt, watson_dir, star_filename, lc_filename,
-                      plot_inputs=False, cv_dir=None, calibrator_path=None):
+                       transits_mask=None, plot_inputs=False, cv_dir=None, calibrator_path=None):
         df = pd.DataFrame(columns=['object_id', 'period', 'duration(h)', 'depth_primary', 'radius(earth)', 'type'])
         star_df = pd.read_csv(star_filename)
         df = pd.concat([df, pd.DataFrame.from_dict(
@@ -999,7 +999,8 @@ class IATSON_planet(ImbalancedBinaryModel):
             orient='columns')], ignore_index=True)
         testing_batch_generator = WatsonPlanetModelGenerator(df, watson_dir, star_filename,
                                                              lc_filename, 1,
-                                                             self.input_size, 1e-6, plot_inputs=plot_inputs)
+                                                             self.input_size, 1e-6,
+                                                             transits_mask=transits_mask, plot_inputs=plot_inputs)
         if cv_dir:
             return self.predict_cv(testing_batch_generator, cv_dir, calibrator_path=calibrator_path)
         else:
