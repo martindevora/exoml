@@ -27,7 +27,7 @@ include-package-data = false
 dependencies = {file = ["requirements.txt"]}
 
 [tool.setuptools.packages.find]
-where = ["src"]
+where = [""]
 
 [tool.setuptools.package-data]
 "*" = ["*.md", "*.txt"]
