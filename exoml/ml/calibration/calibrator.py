@@ -9,7 +9,7 @@ __all__ = [
     'PlattHistogramCalibrator'
 ]
 
-from ml.calibration.utils import create_binned_data, get_bin_boundaries
+from exoml.ml.calibration.utils import create_binned_data, get_bin_boundaries
 
 
 #File taken from https://github.com/ethen8181/machine-learning/blob/master/model_selection/prob_calibration/calibration_module/utils.py
