@@ -2,9 +2,9 @@ import os
 
 #tf.config.run_functions_eagerly(True)
 # thread_config.setup_threads(1)
-from iatson.IATSON_planet import IATSON_planet
-from ml.loss.cross_entropy import f1_loss
-from ml.model.base_model import HyperParams
+from exoml.iatson.IATSON_planet import IATSON_planet
+from exoml.ml.loss.cross_entropy import f1_loss
+from exoml.ml.model.base_model import HyperParams
 
 training_dir = '/mnt/DATA-2/ete6'
 model_dir = './'

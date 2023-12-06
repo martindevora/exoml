@@ -22,8 +22,8 @@ import astropy.units as u
 import astropy.constants as ac
 from lightkurve import TessLightCurve
 from numpy.random import default_rng
-from ml.physics.transit_functions import t14
-from preparation.parser_utils import CreateTargetInput, create_star_csvs, detrend, prepare_lc_data
+from exoml.ml.physics.transit_functions import t14
+from exoml.preparation.parser_utils import CreateTargetInput, create_star_csvs, detrend, prepare_lc_data
 
 
 def create_injection_dataframe(injections_dir, lcs_dir):

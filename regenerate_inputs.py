@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from pandas import DataFrame
 
-from iatson.iatson_planet_generator import IatsonPlanetModelGenerator
+from exoml.iatson.iatson_planet_generator import IatsonPlanetModelGenerator
 
 
 @dataclasses.dataclass

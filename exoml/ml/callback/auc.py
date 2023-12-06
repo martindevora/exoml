@@ -5,8 +5,8 @@ import numpy as np
 import tensorflow as tf
 import pandas
 
-from ml.callback.training_data_aware import ValidationDataAwareCallback
-from ml.metrics.auc import confusion_matrix_values, area_under_curve
+from exoml.ml.callback.training_data_aware import ValidationDataAwareCallback
+from exoml.ml.metrics.auc import confusion_matrix_values, area_under_curve
 
 
 class ConfusionMatrixStatisticsCallback(ValidationDataAwareCallback):

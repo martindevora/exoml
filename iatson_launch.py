@@ -1,6 +1,6 @@
 import os
 
-from iatson.IATSON import IATSON
+from exoml.iatson.IATSON import IATSON
 
 #tf.config.run_functions_eagerly(True)
 # thread_config.setup_threads(1)

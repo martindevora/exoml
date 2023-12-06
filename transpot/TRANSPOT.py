@@ -6,8 +6,8 @@ import keras
 from keras.layers import LeakyReLU
 from sklearn.utils import shuffle
 
-from ml.model.base_model import CategoricalPredictionSetStats
-from ml.model.imbalanced_binary_model import ImbalancedBinaryModel
+from exoml.ml.model.base_model import CategoricalPredictionSetStats
+from exoml.ml.model.imbalanced_binary_model import ImbalancedBinaryModel
 from transpot.transpot_generator import TranspotModelGenerator
 
 class TRANSPOT(ImbalancedBinaryModel):

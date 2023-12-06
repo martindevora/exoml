@@ -7,9 +7,9 @@ from keras.layers import LeakyReLU
 from keras.utils import losses_utils
 from sklearn.utils import shuffle
 
-from iatson.iatson_generator import IatsonModelGenerator
-from ml.model.base_model import CategoricalPredictionSetStats
-from ml.model.imbalanced_categorical_model import ImbalancedCategoricalModel
+from exoml.iatson.iatson_generator import IatsonModelGenerator
+from exoml.ml.model.base_model import CategoricalPredictionSetStats
+from exoml.ml.model.imbalanced_categorical_model import ImbalancedCategoricalModel
 
 
 class IATSON(ImbalancedCategoricalModel):

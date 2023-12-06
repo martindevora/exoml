@@ -6,12 +6,12 @@ import keras
 from keras import Model
 from keras.layers import LeakyReLU
 
-from ml import thread_config
-from detrend.detrend_generator import DetrendModelGenerator
-from ml.loss.unsupervised import intransit_weighted_mean_squared_error
-from ml.metrics.fixed_mean import FixedMean
+from exoml.ml import thread_config
+from exoml.detrend.detrend_generator import DetrendModelGenerator
+from exoml.ml.loss.unsupervised import intransit_weighted_mean_squared_error
+from exoml.ml.metrics.fixed_mean import FixedMean
 
-from ml.model.base_model import BaseModel, HyperParams
+from exoml.ml.model.base_model import BaseModel, HyperParams
 
 thread_config.setup_threads(5)
 

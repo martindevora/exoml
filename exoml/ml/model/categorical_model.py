@@ -4,7 +4,7 @@ from keras.losses import CategoricalCrossentropy
 from keras.metrics import CategoricalAccuracy, Precision, Recall, AUC, RecallAtPrecision
 from tensorflow_addons.metrics import F1Score
 import pandas as pd
-from ml.model.base_model import BaseModel
+from exoml.ml.model.base_model import BaseModel
 import matplotlib.pyplot as plt
 from matplotlib.pyplot import cm
 import numpy as np

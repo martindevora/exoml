@@ -1,7 +1,7 @@
 import logging
 
-from ete6.ete6_generator import Ete6ModelGenerator
-from ml.encoding.time_position import value_encode_times
+from exoml.ete6.ete6_generator import Ete6ModelGenerator
+from exoml.ml.encoding.time_position import value_encode_times
 from sklearn.utils import shuffle
 import tensorflow as tf
 import numpy as np

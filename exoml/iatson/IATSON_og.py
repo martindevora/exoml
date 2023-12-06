@@ -13,11 +13,11 @@ from keras.utils.generic_utils import to_list
 from sklearn.utils import shuffle
 from keras import backend as K
 
-from iatson.iatson_og_generator import IatsonOgModelGenerator
-from ml.layers.dropout import AdaptiveStdDropout
-from ml.layers.transformer_classifier import ClassToken, AddPositionEmbs, TransformerClassifier
-from ml.model.base_model import CategoricalPredictionSetStats
-from ml.model.imbalanced_binary_model import ImbalancedBinaryModel
+from exoml.iatson.iatson_og_generator import IatsonOgModelGenerator
+from exoml.ml.layers.dropout import AdaptiveStdDropout
+from exoml.ml.layers.transformer_classifier import ClassToken, AddPositionEmbs, TransformerClassifier
+from exoml.ml.model.base_model import CategoricalPredictionSetStats
+from exoml.ml.model.imbalanced_binary_model import ImbalancedBinaryModel
 
 
 class IATSON_og(ImbalancedBinaryModel):

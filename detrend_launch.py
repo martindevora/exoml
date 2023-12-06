@@ -2,8 +2,8 @@ import os
 
 #tf.config.run_functions_eagerly(True)
 # thread_config.setup_threads(1)
-from detrend.DETREND import DETREND
-from ml.model.base_model import HyperParams
+from exoml.detrend.DETREND import DETREND
+from exoml.ml.model.base_model import HyperParams
 
 training_dir = '/mnt/DATA-2/ete6/lcs/'
 model_dir = './'

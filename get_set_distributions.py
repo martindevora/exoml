@@ -5,7 +5,7 @@ import os
 import numpy as np
 import datetime
 
-from ml.model.base_model import BaseModel
+from exoml.ml.model.base_model import BaseModel
 
 logging.basicConfig(level=logging.DEBUG)
 folds = 10

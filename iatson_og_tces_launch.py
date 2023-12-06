@@ -8,9 +8,9 @@ import shutil
 from keras.callbacks import ReduceLROnPlateau, ModelCheckpoint
 import tensorflow_addons as tfa
 
-from iatson.IATSON_og import IATSON_og
-from ml.callback.learning_rate import WarmUpAndLinDecreaseCallback
-from ml.model.base_model import HyperParams
+from exoml.iatson.IATSON_og import IATSON_og
+from exoml.ml.callback.learning_rate import WarmUpAndLinDecreaseCallback
+from exoml.ml.model.base_model import HyperParams
 
 training_dir = '/data/scratch/ml/'
 model_dir = './'

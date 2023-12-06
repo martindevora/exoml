@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 import foldedleastsquares
 from numpy.random import default_rng
-from ete6.ete6_generator import Ete6ModelGenerator
-from ml.encoding.time_position import value_encode_times
+from exoml.ete6.ete6_generator import Ete6ModelGenerator
+from exoml.ml.encoding.time_position import value_encode_times
 from sklearn.utils import shuffle
 import numpy as np
 import pandas as pd

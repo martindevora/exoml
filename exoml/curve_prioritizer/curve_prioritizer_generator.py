@@ -11,13 +11,13 @@ from numpy.random import default_rng
 from scipy import stats
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
-from ml.encoding.time_position import value_encode_times
+from exoml.ml.encoding.time_position import value_encode_times
 from sklearn.utils import shuffle
 import tensorflow as tf
 import numpy as np
 import pandas as pd
 
-from ml.functions.functions import sigmoid
+from exoml.ml.functions.functions import sigmoid
 
 
 class CurvePrioritizerGenerator(tf.keras.utils.Sequence):

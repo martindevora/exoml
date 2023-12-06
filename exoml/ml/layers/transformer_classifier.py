@@ -4,7 +4,7 @@ import tensorflow_addons as tfa
 from keras.regularizers import L2
 from tensorflow_addons.layers import GELU
 
-from ml.layers.dropout import AdaptiveStdDropout
+from exoml.ml.layers.dropout import AdaptiveStdDropout
 
 
 @tf.keras.utils.register_keras_serializable()

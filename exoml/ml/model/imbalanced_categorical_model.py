@@ -1,6 +1,6 @@
 from keras.metrics import CategoricalAccuracy
-from ml.loss.cross_entropy import categorical_focal_loss
-from ml.model.categorical_model import CategoricalModel
+from exoml.ml.loss.cross_entropy import categorical_focal_loss
+from exoml.ml.model.categorical_model import CategoricalModel
 
 
 class ImbalancedCategoricalModel(CategoricalModel):
