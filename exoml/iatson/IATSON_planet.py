@@ -999,7 +999,7 @@ class IATSON_planet(ImbalancedBinaryModel):
             orient='columns')], ignore_index=True)
         testing_batch_generator = WatsonPlanetModelGenerator(df, watson_dir, star_filename,
                                                              lc_filename, 1,
-                                                             self.input_size, 1e-6,
+                                                             self.input_size, zero_epsilon=1e-6,
                                                              transits_mask=transits_mask, plot_inputs=plot_inputs)
         if cv_dir:
             return self.predict_cv(testing_batch_generator, cv_dir, calibrator_path=calibrator_path)
