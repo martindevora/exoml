@@ -159,6 +159,8 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
             # axs[5][1].set_title("Motion Y")
             fig.suptitle(type + " " + scenario)
             if save_dir:
+                if not os.path.exists(save_dir):
+                    os.mkdir(save_dir)
                 plt.savefig(f'{save_dir}/{type}_{scenario}.png')
             else:
                 plt.show()
@@ -188,7 +190,7 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
         injected_objects_df = self.injected_objects_df.iloc[target_indexes]
         if self.shuffle_batch:
             injected_objects_df = shuffle(injected_objects_df)
-        star_array = np.empty((len(target_indexes), self.input_sizes[0], 1))
+        star_array = np.empty((len(target_indexes), 3, 1))
         star_neighbours_array = np.empty((len(target_indexes), self.input_sizes[1], 1))
         #[period, planet radius, number of transits, ratio of good transits, transit depth, transit_offset_pos - transit_offset_err]
         scalar_values = np.empty((len(target_indexes), 8, 1))
@@ -236,8 +238,8 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                 raise ValueError("No curve for target " + file_prefix)
             lc_df = lc_df.sort_values(by=['#time'])
             lc_df = self.mask_other_signals(lc_df, transits_mask=self.transit_masks, time_key='#time')
-            centroids_df = self.mask_other_signals(centroids_df, target_row, time_key='time')
-            og_df = self.mask_other_signals(og_df, target_row, time_key='time')
+            centroids_df = self.mask_other_signals(centroids_df, transits_mask=self.transit_masks, time_key='time')
+            og_df = self.mask_other_signals(og_df, transits_mask=self.transit_masks, time_key='time')
             lc_df['flux'] = wotan.flatten(lc_df['#time'].to_numpy(), lc_df['flux'].to_numpy(), duration * 4, method='biweight')
             centroids_df = centroids_df.sort_values(by=['time'])
             centroids_df['centroids_ra'] = wotan.flatten(centroids_df['time'].to_numpy(), centroids_df['centroids_ra'].to_numpy(), duration * 4, method='biweight')
@@ -260,10 +262,10 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
             folded_centroids_array[i], folded_centroids_array_err[i] = self.bin_by_time(centroids_df.to_numpy(), self.input_sizes[3], target_row['object_id'])
             folded_og_array[i], folded_og_array_err[i] = self.bin_by_time(og_df.to_numpy(), self.input_sizes[3], target_row['object_id'])
             #TODO refactor to use mission for star files
-            star_df = pd.read_csv(self.star_filename, index_col=False)
+            star_df = pd.read_csv(self.star_filename, usecols=['Teff', 'radius', 'mass', 'ra', 'dec'],
+                                  index_col=False)
             star_neighbours_df = pd.read_csv(self.star_filename,
-                                             usecols=['Teff', 'lum', 'v', 'j', 'k', 'h', 'radius', 'mass',
-                                                      'dist_arcsec'], index_col=False)
+                                             usecols=['Teff', 'lum', 'v', 'j', 'k', 'h', 'radius', 'mass'], index_col=False)
             star_neighbours_df = self._prepare_input_neighbour_stars(star_neighbours_df)
             star_df, ra, dec = self._prepare_input_star(star_df)
             lc_df, good_transits_count, transits_count = self._prepare_input_lc(lc_df, period, epoch, duration,
@@ -297,8 +299,8 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                                               offset_err]])
             #['ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k'])
             neighbours_array = star_neighbours_df.to_numpy().flatten()
-            star_neighbours_array[i] = np.transpose([neighbours_array if len(neighbours_array) == 9 * 15 \
-                else neighbours_array + np.zeros(9 * 15 - len(neighbours_array))])
+            #star_neighbours_array[i] = np.transpose([neighbours_array if len(neighbours_array) == 9 * 15 \
+            #    else neighbours_array + np.zeros(9 * 15 - len(neighbours_array))])
             star_array[i] = np.transpose([star_df.to_numpy()])
             time = lc_df['#time'].to_numpy()
             # Global flux
@@ -374,19 +376,20 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
             self.assert_in_range(object_id, folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i])
             self.assert_in_range(object_id, folded_centroids_array[i], folded_centroids_array_err[i])
             self.assert_in_range(object_id, folded_og_array[i], folded_og_array_err[i])
-            self._plot_input(global_flux_array[i], global_flux_array_err[i], target_row['object_id'], "global", save_dir=self.lcs_dir)
-            self._plot_input(folded_flux_even_array[i], folded_flux_even_array_err[i], target_row['object_id'], "even", save_dir=self.lcs_dir)
-            self._plot_input(folded_flux_odd_array[i], folded_flux_odd_array_err[i], target_row['object_id'], "odd", save_dir=self.lcs_dir)
-            self._plot_input(folded_flux_even_har_array[i], folded_flux_even_har_array_err[i], target_row['object_id'], "even_har", save_dir=self.lcs_dir)
-            self._plot_input(folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i], target_row['object_id'], "odd_har", save_dir=self.lcs_dir)
+            inputs_save_dir = f'{self.lcs_dir}/iatson/'
+            self._plot_input(global_flux_array[i], global_flux_array_err[i], target_row['object_id'], "global", save_dir=inputs_save_dir)
+            self._plot_input(folded_flux_even_array[i], folded_flux_even_array_err[i], target_row['object_id'], "even", save_dir=inputs_save_dir)
+            self._plot_input(folded_flux_odd_array[i], folded_flux_odd_array_err[i], target_row['object_id'], "odd", save_dir=inputs_save_dir)
+            self._plot_input(folded_flux_even_har_array[i], folded_flux_even_har_array_err[i], target_row['object_id'], "even_har", save_dir=inputs_save_dir)
+            self._plot_input(folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i], target_row['object_id'], "odd_har", save_dir=inputs_save_dir)
             # self._plot_input(folded_flux_even_subhar_array[i], folded_flux_even_subhar_array_err[i], target_row['object_id'], "even_subhar")
             # self._plot_input(folded_flux_odd_subhar_array[i], folded_flux_odd_subhar_array_err[i], target_row['object_id'], "odd_subhar")
-            self._plot_input(folded_og_array[i], folded_og_array_err[i], target_row['object_id'], "OG", save_dir=self.lcs_dir)
-            self._plot_input(folded_centroids_array[i], folded_centroids_array_err[i], target_row['object_id'], "CENTROIDS", save_dir=self.lcs_dir)
+            self._plot_input(folded_og_array[i], folded_og_array_err[i], target_row['object_id'], "OG", save_dir=inputs_save_dir)
+            self._plot_input(folded_centroids_array[i], folded_centroids_array_err[i], target_row['object_id'], "CENTROIDS", save_dir=inputs_save_dir)
             i = i + 1
         filter_channels = np.array([0, 1, 6, 7, 8, 9, 10, 11])
         return [scalar_values[:, [0, 1, 2, 3, 4, 5]], scalar_values[:, [6, 7]],
-                star_array[:, [2, 5, 6]], #Only Teff, Rad and Mass
+                star_array, #Only Teff, Rad and Mass
                 # star_neighbours_array,
                 global_flux_array,
                 folded_flux_even_array,

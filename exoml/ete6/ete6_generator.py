@@ -184,37 +184,60 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         return input_df, len(good_quality_t0s), len(t0s_with_data)
 
     def _prepare_input_star(self, star_df):
-        ra = star_df['ra'].iloc[0]
-        dec = star_df['dec'].iloc[0]
-        star_df.drop('id', inplace=True, axis=1)
-        star_df.drop('Unnamed: 0', inplace=True, axis=1)
-        star_df.drop('ra', inplace=True, axis=1)
+        if 'ra' in star_df.columns:
+            ra = star_df['ra'].iloc[0]
+        if 'dec' in star_df.columns:
+            dec = star_df['dec'].iloc[0]
+        if 'id' in star_df.columns:
+            star_df.drop('id', inplace=True, axis=1)
+        elif 'obj_id' in star_df.columns:
+            star_df.drop('obj_id', inplace=True, axis=1)
+        if 'Unnamed: 0' in star_df.columns:
+            star_df.drop('Unnamed: 0', inplace=True, axis=1)
+        if 'ra' in star_df.columns:
+            star_df.drop('ra', inplace=True, axis=1)
         if pd.Series(['ra,']).isin(star_df.columns).any():
             star_df.drop('ra,', inplace=True, axis=1)
-        star_df.drop('dec', inplace=True, axis=1)
-        star_df.drop('dist_arcsec', inplace=True, axis=1)
-        star_df['ld_a'] = star_df['ld_a'].fillna(0.25)
-        star_df['ld_b'] = star_df['ld_b'].fillna(0.25)
+        if 'dec' in star_df.columns:
+            star_df.drop('dec', inplace=True, axis=1)
+        if 'dist_arcsec' in star_df.columns:
+            star_df.drop('dist_arcsec', inplace=True, axis=1)
+        if 'ld_a' in star_df.columns:
+            star_df['ld_a'] = star_df['ld_a'].fillna(0.25)
+        if 'ld_a' in star_df.columns:
+            star_df['ld_b'] = star_df['ld_b'].fillna(0.25)
         star_df['Teff'] = star_df['Teff'].fillna(6000)
         star_df['radius'] = star_df['radius'].fillna(1)
         star_df['mass'] = star_df['mass'].fillna(1)
-        star_df['lum'] = star_df['lum'].fillna(1)
-        star_df['logg'] = star_df['logg'].fillna(1)
-        star_df['v'] = star_df['v'].fillna(-10)
-        star_df['j'] = star_df['j'].fillna(-10)
-        star_df['k'] = star_df['k'].fillna(-10)
-        star_df['h'] = star_df['h'].fillna(-10)
+        if 'lum' in star_df.columns:
+            star_df['lum'] = star_df['lum'].fillna(1)
+        if 'logg' in star_df.columns:
+            star_df['logg'] = star_df['logg'].fillna(1)
+        if 'v' in star_df.columns:
+            star_df['v'] = star_df['v'].fillna(-10)
+        if 'j' in star_df.columns:
+            star_df['j'] = star_df['j'].fillna(-10)
+        if 'k' in star_df.columns:
+            star_df['k'] = star_df['k'].fillna(-10)
+        if 'h' in star_df.columns:
+            star_df['h'] = star_df['h'].fillna(-10)
         star_df['Teff'] = star_df['Teff'] / 60000
         star_df['radius'] = star_df['radius'] / 3
         star_df['radius'] = star_df['radius'] if star_df['radius'].iloc[0] <= 1 else 1
         star_df['mass'] = star_df['mass'] / 3
         star_df['mass'] = star_df['mass'] if star_df['mass'].iloc[0] <= 1 else 1
-        star_df['lum'] = sigmoid(star_df['lum'])
-        star_df['logg'] = sigmoid(star_df['logg'])
-        star_df['v'] = (30 - star_df['v']) / 40
-        star_df['j'] = (30 - star_df['j']) / 40
-        star_df['k'] = (30 - star_df['k']) / 40
-        star_df['h'] = (30 - star_df['h']) / 40
+        if 'lum' in star_df.columns:
+            star_df['lum'] = sigmoid(star_df['lum'])
+        if 'logg' in star_df.columns:
+            star_df['logg'] = sigmoid(star_df['logg'])
+        if 'v' in star_df.columns:
+            star_df['v'] = (30 - star_df['v']) / 40
+        if 'j' in star_df.columns:
+            star_df['j'] = (30 - star_df['j']) / 40
+        if 'k' in star_df.columns:
+            star_df['k'] = (30 - star_df['k']) / 40
+        if 'h' in star_df.columns:
+            star_df['h'] = (30 - star_df['h']) / 40
         return star_df.iloc[0], ra, dec
 
     def _prepare_input_neighbour_stars(self, star_df):
@@ -223,26 +246,28 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         max_distance = search_radius * pixel_size
         # Limiting the set to 15 stars, removing the first one, which is the target star
         star_df = star_df.iloc[1:16, :].copy()
-        star_df['Teff'] = star_df['Teff'].fillna(6000)
-        star_df['radius'] = star_df['radius'].fillna(1)
-        star_df['mass'] = star_df['mass'].fillna(1)
-        star_df['lum'] = star_df['lum'].fillna(1)
-        star_df['v'] = star_df['v'].fillna(-10)
-        star_df['j'] = star_df['j'].fillna(-10)
-        star_df['k'] = star_df['k'].fillna(-10)
-        star_df['h'] = star_df['h'].fillna(-10)
-        star_df['Teff'] = star_df['Teff'] / 40000
-        star_df['radius'] = star_df['radius'] / 3
-        star_df['radius'] = star_df['radius'] if star_df['radius'].iloc[0] <= 1 else 1
-        star_df['mass'] = star_df['mass'] / 3
-        star_df['mass'] = star_df['mass'] if star_df['mass'].iloc[0] <= 1 else 1
-        star_df['lum'] = star_df['mass'] / 1000
-        star_df['v'] = (30 - star_df['v']) / 40
-        star_df['j'] = (30 - star_df['j']) / 40
-        star_df['k'] = (30 - star_df['k']) / 40
-        star_df['h'] = (30 - star_df['h']) / 40
-        star_df['dist_arcsec'] = star_df['dist_arcsec'] / max_distance
-        star_df['dist_arcsec'] = star_df['dist_arcsec'].fillna(max_distance)
+        if len(star_df) > 0:
+            star_df['Teff'] = star_df['Teff'].fillna(6000)
+            star_df['radius'] = star_df['radius'].fillna(1)
+            star_df['mass'] = star_df['mass'].fillna(1)
+            star_df['lum'] = star_df['lum'].fillna(1)
+            star_df['v'] = star_df['v'].fillna(-10)
+            star_df['j'] = star_df['j'].fillna(-10)
+            star_df['k'] = star_df['k'].fillna(-10)
+            star_df['h'] = star_df['h'].fillna(-10)
+            star_df['Teff'] = star_df['Teff'] / 40000
+            star_df['radius'] = star_df['radius'] / 3
+            star_df['radius'] = star_df['radius'] if star_df['radius'].iloc[0] <= 1 else 1
+            star_df['mass'] = star_df['mass'] / 3
+            star_df['mass'] = star_df['mass'] if star_df['mass'].iloc[0] <= 1 else 1
+            star_df['lum'] = star_df['mass'] / 1000
+            star_df['v'] = (30 - star_df['v']) / 40
+            star_df['j'] = (30 - star_df['j']) / 40
+            star_df['k'] = (30 - star_df['k']) / 40
+            star_df['h'] = (30 - star_df['h']) / 40
+            if 'dist_arcsec' in star_df.columns:
+                star_df['dist_arcsec'] = star_df['dist_arcsec'] / max_distance
+                star_df['dist_arcsec'] = star_df['dist_arcsec'].fillna(max_distance)
         return star_df
 
     @abstractmethod
