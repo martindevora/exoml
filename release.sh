@@ -1,5 +1,7 @@
 #!/bin/bash
 
+source ~/anaconda3/etc/profile.d/conda.sh
+conda activate base
 set +e
 rm tests.log
 rm dist* -r
@@ -8,6 +10,7 @@ rm -r .pytest_cache
 rm -r build
 rm -r exoml-reqs
 rm -R *egg-info
+conda remove -n exoml-reqs --all -y
 git_tag=$1
 echo "GIT TAG IS " ${git_tag}
 echo "Run all tests"
@@ -22,15 +25,16 @@ if ! [[ -z ${tests_results} ]]; then
   rm -r build
   rm -r exoml-reqs
   rm -R *egg-info
+  conda remove -n exoml-reqs --all -y
   set -e
-  python3 -m venv exoml-reqs
-  source exoml-reqs/bin/activate
+  conda create -n exoml-reqs python=3.10 -y
+  conda activate exoml-reqs
   python3 -m pip install pip -U
   python3 -m pip install numpy==1.23.5
   sed -i '16s/.*/version = "'${git_tag}'"/' pyproject.toml
   python3 -m pip install -q build
-  python3 -m build
-  deactivate
+  python3 -m pip install .
+  conda deactivate
   git add pyproject.toml
   git commit -m "Preparing release ${git_tag}"
   git tag ${git_tag} -m "New release"
@@ -46,3 +50,4 @@ rm -r .tox
 rm -r .pytest_cache
 rm -r build
 rm -R *egg-info
+conda remove -n exoml-reqs --all -y
