@@ -13,6 +13,7 @@ import pandas as pd
 import ruamel.yaml
 from abc import abstractmethod
 
+from keras.optimizers import Adam
 from keras.utils import plot_model
 from sklearn.utils import shuffle
 
