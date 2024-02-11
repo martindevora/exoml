@@ -27,11 +27,11 @@ from exoml.ml.callback.training_data_aware import ValidationDataAwareCallback, M
 from exoml.ml.learning_rate.schedulers import ExponentialRescaleDecay
 from exoml.ml.log.get_weights_logger import ModelWeightsLogger
 from exoml.ml.log.with_logging import WithLogging
-from keras.optimizers.schedules.learning_rate_schedule import LearningRateSchedule
+from keras.optimizers.schedules import LearningRateSchedule
 
 from exoml.ml.metrics.auc import precision_at_k, mean_positive_value, mean_true_positive_value, mean_false_positive_value, \
     mean_true_negative_value, ThresholdAtPrecision
-import tensorflow_addons as tfa
+from exoml.ml.callback.learning_rate import MultiOptimizer, SWA
 
 
 @dataclasses.dataclass
@@ -469,7 +469,7 @@ class BaseModel(WithLogging):
                 else:
                     standard_layers = standard_layers + [layer]
             optimizers_and_layers = [(optimizer, standard_layers)] + optimizers_and_layers
-            optimizer = tfa.optimizers.MultiOptimizer(optimizers_and_layers)
+            optimizer = MultiOptimizer(optimizers_and_layers)
         return optimizer
 
     def compute_initial_lr(self, hyperparams: HyperParams):
@@ -486,7 +486,7 @@ class BaseModel(WithLogging):
                                                         beta_1=0.9, beta_2=0.98, epsilon=1e-9,
                                                         clipnorm=hyperparams.gradient_clip_norm,
                                                         clipvalue=hyperparams.gradient_clip_value)
-            optimizer = tfa.optimizers.SWA(optimizer,
+            optimizer = SWA(optimizer,
                                            start_averaging=steps_per_epoch * hyperparams.stochastic_weight_average_wait,
                                            average_period=steps_per_epoch)
             if isinstance(lr, (int, float)):

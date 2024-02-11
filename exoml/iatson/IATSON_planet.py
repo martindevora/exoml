@@ -8,7 +8,6 @@ import pandas as pd
 import keras
 import tensorflow as tf
 from keras.layers import LeakyReLU
-from keras.utils import losses_utils
 from sklearn.isotonic import IsotonicRegression
 
 from sklearn.linear_model import LogisticRegression

@@ -3,7 +3,49 @@ import os.path
 import shutil
 
 from keras.callbacks import ModelCheckpoint
-from keras.utils import tf_utils, io_utils
+import tensorflow as tf
+import numpy as np
+
+
+def sync_to_numpy_or_python_type(tensors):
+    """Took this method from abandonned tensorflow_addons
+
+    Syncs and converts a structure of `Tensor`s to `NumPy` arrays or Python
+    scalar types.
+
+    For each tensor, it calls `tensor.numpy()`. If the result is a scalar value,
+    it converts it to a Python type, such as a float or int, by calling
+    `result.item()`.
+
+    Numpy scalars are converted, as Python types are often more convenient to
+    deal with. This is especially useful for bfloat16 Numpy scalars, which don't
+    support as many operations as other Numpy values.
+
+    Async strategies (such as `TPUStrategy` and `ParameterServerStrategy`) are
+    forced to
+    sync during this process.
+
+    Args:
+      tensors: A structure of tensors.
+
+    Returns:
+      `tensors`, but scalar tensors are converted to Python types and non-scalar
+      tensors are converted to Numpy arrays.
+    """
+    if isinstance(tensors, tf.distribute.experimental.coordinator.RemoteValue):
+        tensors = tensors.fetch()
+
+    def _to_single_numpy_or_python_type(t):
+        # Don't turn ragged or sparse tensors to NumPy.
+        if isinstance(t, tf.Tensor):
+            t = t.numpy()
+        # Strings, ragged and sparse tensors don't have .item(). Return them
+        # as-is.
+        if not isinstance(t, (np.ndarray, np.generic)):
+            return t
+        return t.item() if np.ndim(t) == 0 else t
+
+    return tf.nest.map_structure(_to_single_numpy_or_python_type, tensors)
 
 
 class ModelCheckpointCallback(ModelCheckpoint):
@@ -48,7 +90,7 @@ class ModelCheckpointCallback(ModelCheckpoint):
                 or self.epochs_since_last_save >= self.period
         ):
             # Block only when saving interval is reached.
-            logs = tf_utils.sync_to_numpy_or_python_type(logs)
+            logs = sync_to_numpy_or_python_type(logs)
             self.epochs_since_last_save = 0
             filepath = self._get_file_path(epoch, batch, logs)
 
@@ -64,7 +106,7 @@ class ModelCheckpointCallback(ModelCheckpoint):
                     else:
                         if self.monitor_op(current, self.best):
                             if self.verbose > 0:
-                                io_utils.print_msg(
+                                logging.info(
                                     f"\nEpoch {epoch + 1}: {self.monitor} "
                                     "improved "
                                     f"from {self.best:.5f} to {current:.5f}, "
@@ -86,14 +128,14 @@ class ModelCheckpointCallback(ModelCheckpoint):
                             self.copy_files()
                         else:
                             if self.verbose > 0:
-                                io_utils.print_msg(
+                                logging.info(
                                     f"\nEpoch {epoch + 1}: "
                                     f"{self.monitor} did not improve "
                                     f"from {self.best:.5f}"
                                 )
                 else:
                     if self.verbose > 0:
-                        io_utils.print_msg(
+                        logging.info(
                             f"\nEpoch {epoch + 1}: saving model to {filepath}"
                         )
                     if self.save_weights_only:

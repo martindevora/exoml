@@ -4,7 +4,7 @@ import csv
 import keras.backend as K
 from keras.callbacks import CSVLogger
 import numpy as np
-import tensorflow_addons as tfa
+from exoml.ml.callback.learning_rate import MultiOptimizer
 
 
 class BatchAwareCsvLogger(CSVLogger):
@@ -44,7 +44,7 @@ class BatchAwareCsvLogger(CSVLogger):
             class CustomDialect(csv.excel):
                 delimiter = self.sep
             lr_fieldnames = ['lr']
-            if isinstance(self.model.optimizer, tfa.optimizers.MultiOptimizer):
+            if isinstance(self.model.optimizer, MultiOptimizer):
                 lr_fieldnames = lr_fieldnames + ['lr_last']
             fieldnames = ['epoch', 'batch'] + lr_fieldnames +  metric_fieldnames
             self.writer = csv.DictWriter(
@@ -54,7 +54,7 @@ class BatchAwareCsvLogger(CSVLogger):
             if self.append_header:
                 self.writer.writeheader()
         row_dict = {}
-        if isinstance(self.model.optimizer, tfa.optimizers.MultiOptimizer):
+        if isinstance(self.model.optimizer, MultiOptimizer):
             learning_rate = K.eval(K.eval(self.model.optimizer.optimizer_specs[0]['optimizer'].lr))
             last_learning_rate = K.eval(K.eval(self.model.optimizer.optimizer_specs[-1]['optimizer'].lr))
             row_dict['lr_last'] = last_learning_rate

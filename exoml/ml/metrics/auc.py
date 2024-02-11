@@ -1,9 +1,169 @@
+import abc
 import tensorflow as tf
 import numpy as np
 import tensorflow.keras.backend as K
-from keras.metrics import TopKCategoricalAccuracy, SensitivitySpecificityBase
+from keras.metrics import Metric
+from keras.metrics import TopKCategoricalAccuracy
 from tensorflow.python.ops.metrics_impl import precision
-from keras.dtensor import utils as dtensor_utils
+
+
+def inject_mesh(init_method):
+    """Inject DTensor mesh information to an object.
+
+    This is useful for keras object like `Metric` and `Optimizer` which need
+    DTensor mesh to create the weights, but doesn't want to change the current
+    public API interface.
+
+    This is for temporary usage and eventually the mesh/layout information will
+    be public arguments in the `__init__` method.
+
+    Sample usage:
+    ```python
+    class Accuracy(tf.keras.metrics.Metric):
+
+      @inject_mesh
+      def __init__(self, name='accuracy', dtype=None):
+         super().__init__(**kwargs)
+
+      acc = Accuracy(mesh=mesh)
+      assert acc._mesh == mesh
+    ```
+
+    Args:
+      init_method: the `__init__` method of the Keras class to annotate.
+
+    Returns:
+      the annotated __init__ method.
+    """
+
+    def _wrap_function(instance, *args, **kwargs):
+        mesh = kwargs.pop("mesh", None)
+        # Note that the injection of _mesh need to happen before the invocation
+        # of __init__, since the class might need the mesh to create weights in
+        # the __init__.
+        if mesh is not None:
+            instance._mesh = mesh
+        init_method(instance, *args, **kwargs)
+
+    return tf.__internal__.decorator.make_decorator(
+        target=init_method, decorator_func=_wrap_function
+    )
+
+
+class SensitivitySpecificityBase(Metric, metaclass=abc.ABCMeta):
+    """Abstract base class for computing sensitivity and specificity.
+
+    For additional information about specificity and sensitivity, see
+    [the following](https://en.wikipedia.org/wiki/Sensitivity_and_specificity).
+    """
+
+    def __init__(
+        self, value, num_thresholds=200, class_id=None, name=None, dtype=None
+    ):
+        super().__init__(name=name, dtype=dtype)
+        if num_thresholds <= 0:
+            raise ValueError(
+                "Argument `num_thresholds` must be an integer > 0. "
+                f"Received: num_thresholds={num_thresholds}"
+            )
+        self.value = value
+        self.class_id = class_id
+        self.true_positives = self.add_weight(
+            "true_positives", shape=(num_thresholds,), initializer="zeros"
+        )
+        self.true_negatives = self.add_weight(
+            "true_negatives", shape=(num_thresholds,), initializer="zeros"
+        )
+        self.false_positives = self.add_weight(
+            "false_positives", shape=(num_thresholds,), initializer="zeros"
+        )
+        self.false_negatives = self.add_weight(
+            "false_negatives", shape=(num_thresholds,), initializer="zeros"
+        )
+
+        # Compute `num_thresholds` thresholds in [0, 1]
+        if num_thresholds == 1:
+            self.thresholds = [0.5]
+            self._thresholds_distributed_evenly = False
+        else:
+            thresholds = [
+                (i + 1) * 1.0 / (num_thresholds - 1)
+                for i in range(num_thresholds - 2)
+            ]
+            self.thresholds = [0.0] + thresholds + [1.0]
+            self._thresholds_distributed_evenly = True
+
+    def update_state(self, y_true, y_pred, sample_weight=None):
+        """Accumulates confusion matrix statistics.
+
+        Args:
+          y_true: The ground truth values.
+          y_pred: The predicted values.
+          sample_weight: Optional weighting of each example. Defaults to 1. Can
+            be a `Tensor` whose rank is either 0, or the same rank as `y_true`,
+            and must be broadcastable to `y_true`.
+
+        Returns:
+          Update op.
+        """
+        return metrics_utils.update_confusion_matrix_variables(
+            {
+                metrics_utils.ConfusionMatrix.TRUE_POSITIVES: self.true_positives,  # noqa: E501
+                metrics_utils.ConfusionMatrix.TRUE_NEGATIVES: self.true_negatives,  # noqa: E501
+                metrics_utils.ConfusionMatrix.FALSE_POSITIVES: self.false_positives,  # noqa: E501
+                metrics_utils.ConfusionMatrix.FALSE_NEGATIVES: self.false_negatives,  # noqa: E501
+            },
+            y_true,
+            y_pred,
+            thresholds=self.thresholds,
+            thresholds_distributed_evenly=self._thresholds_distributed_evenly,
+            class_id=self.class_id,
+            sample_weight=sample_weight,
+        )
+
+    def reset_state(self):
+        num_thresholds = len(self.thresholds)
+        confusion_matrix_variables = (
+            self.true_positives,
+            self.true_negatives,
+            self.false_positives,
+            self.false_negatives,
+        )
+        backend.batch_set_value(
+            [
+                (v, np.zeros((num_thresholds,)))
+                for v in confusion_matrix_variables
+            ]
+        )
+
+    def get_config(self):
+        config = {"class_id": self.class_id}
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+    def _find_max_under_constraint(self, constrained, dependent, predicate):
+        """Returns the maximum of dependent_statistic that satisfies the
+        constraint.
+
+        Args:
+          constrained: Over these values the constraint
+            is specified. A rank-1 tensor.
+          dependent: From these values the maximum that satiesfies the
+            constraint is selected. Values in this tensor and in
+            `constrained` are linked by having the same threshold at each
+            position, hence this tensor must have the same shape.
+          predicate: A binary boolean functor to be applied to arguments
+          `constrained` and `self.value`, e.g. `tf.greater`.
+
+        Returns:
+          maximal dependent value, if no value satiesfies the constraint 0.0.
+        """
+        feasible = tf.where(predicate(constrained, self.value))
+        feasible_exists = tf.greater(tf.size(feasible), 0)
+        max_dependent = tf.reduce_max(tf.gather(dependent, feasible))
+
+        return tf.where(feasible_exists, max_dependent, 0.0)
+
 
 
 class ThresholdAtPrecision(SensitivitySpecificityBase):
@@ -58,7 +218,7 @@ class ThresholdAtPrecision(SensitivitySpecificityBase):
     ```
     """
 
-    @dtensor_utils.inject_mesh
+    @inject_mesh
     def __init__(
         self,
         precision,

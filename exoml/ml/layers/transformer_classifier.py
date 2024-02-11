@@ -2,8 +2,6 @@ import tensorflow as tf
 from keras.layers import MultiHeadAttention, LeakyReLU
 import tensorflow_addons as tfa
 from keras.regularizers import L2
-from tensorflow_addons.layers import GELU
-
 from exoml.ml.layers.dropout import AdaptiveStdDropout
 
 
@@ -84,14 +82,14 @@ class TransformerEncoder(tf.keras.layers.Layer):
         )
         self.mlpblock = tf.keras.Sequential(
             [
-                tf.keras.layers.Dense(self.mlp_dim, activation=GELU(), name=f"{self.name}/Dense_0",
+                tf.keras.layers.Dense(self.mlp_dim, activation=LeakyReLU(), name=f"{self.name}/Dense_0",
                                       activity_regularizer=tf.keras.regularizers.L1L2(
                                           l1=self.hyperparams.l1_regularization,
                                           l2=self.hyperparams.l2_regularization)
                                       ),
                 AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
                                    max_rate=self.hyperparams.dropout_max_rate),
-                tf.keras.layers.Dense(input_shape[-1], name=f"{self.name}/Dense_1", activation=GELU(),
+                tf.keras.layers.Dense(input_shape[-1], name=f"{self.name}/Dense_1", activation=LeakyReLU(),
                                       activity_regularizer=tf.keras.regularizers.L1L2(
                                           l1=self.hyperparams.l1_regularization,
                                           l2=self.hyperparams.l2_regularization)
@@ -212,7 +210,7 @@ class TransformerClassifier(tf.keras.layers.Layer):
                                        hyperparams=self.hyperparams, num_blocks=self.num_blocks)
         self.layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-6, name="Transformer/encoder_norm")
         #activation = "softmax" if self.classes > 1 else "sigmoid"
-        self.head = tf.keras.layers.Dense(self.classes, name="head", activation=GELU(),
+        self.head = tf.keras.layers.Dense(self.classes, name="head", activation=LeakyReLU(),
                                           activity_regularizer=tf.keras.regularizers.L1L2(
                                               l1=self.hyperparams.l1_regularization,
                                               l2=self.hyperparams.l2_regularization)
