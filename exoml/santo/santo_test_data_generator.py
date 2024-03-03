@@ -1,5 +1,4 @@
 import logging
-import os
 import sys
 
 import matplotlib.pyplot as plt
@@ -20,7 +19,6 @@ class SantoTestDataGenerator:
     def __init__(self, output_dir: str, curves_len_boundaries: Tuple[int],
                  transit_depth_boundaries: Tuple[float],
                  transit_period_avg_std: Tuple[float],
-                 max_number_of_planets: int,
                  white_noise_power_boundaries: Tuple[float],
                  red_noise_frequency_boundaries: Tuple[float],
                  red_noise_power_boundaries: Tuple[float],
@@ -62,15 +60,13 @@ class SantoTestDataGenerator:
                     timeseries_rn[time_index] = rn_value
                 flux[0] = flux[0] + timeseries_rn
             number_of_planets = random.uniform(0, 100)
-            if number_of_planets < 80:
-                number_of_planets = 0
-            elif number_of_planets < 95:
+            if number_of_planets < 50:
                 number_of_planets = 1
-            elif number_of_planets < 97:
+            elif number_of_planets < 80:
                 number_of_planets = 2
             else:
-                number_of_planets = int(random.uniform(3, max_number_of_planets))
-            curves_with_planets = curves_with_planets if number_of_planets == 0 else curves_with_planets + 1
+                number_of_planets = 3
+            curves_with_planets = curves_with_planets + 1
             star_radius = 1
             star_mass = 1
             for index in range(0, number_of_planets):
@@ -146,7 +142,6 @@ SantoTestDataGenerator(output_dir="/data/scratch/ml/santo/training_data/",
                        curves_cadence=120,
                        transit_depth_boundaries=(0.0001, 0.05),
                        transit_period_avg_std=(7.5, 6),
-                       max_number_of_planets=6,
                        red_noise_frequency_boundaries=(0.01, 10),
                        red_noise_power_boundaries=(0.001, 0.05),
                        white_noise_power_boundaries=(0.001, 0.05),
