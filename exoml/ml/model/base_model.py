@@ -1,16 +1,12 @@
 import copy
 import dataclasses
-import json
 import logging
 import os
-import shutil
-from copy import deepcopy
 from typing import List, Dict, Union, Any, Optional, Literal
 
 import numpy as np
 import tensorflow as tf
 import pandas as pd
-import ruamel.yaml
 from abc import abstractmethod
 
 from keras.optimizers import Adam
@@ -22,7 +18,6 @@ from exoml.ml.callback.learning_rate import WarmUpAndLinDecreaseCallback
 from exoml.ml.callback.basemodel_aware_callback import MetricsPlotCallback
 from exoml.ml.callback.batch_aware_csv_logger import BatchAwareCsvLogger
 from exoml.ml.callback.early_stopping import ExoMlEarlyStopping
-from exoml.ml.callback.get_weights import GetWeights
 from exoml.ml.callback.training_data_aware import ValidationDataAwareCallback, ModelDirDataAwareCallback
 from exoml.ml.learning_rate.schedulers import ExponentialRescaleDecay
 from exoml.ml.log.get_weights_logger import ModelWeightsLogger
