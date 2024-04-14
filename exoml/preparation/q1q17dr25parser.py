@@ -1,9 +1,13 @@
+import gzip
 import multiprocessing
+import os
+import re
+import shutil
 from multiprocessing import Pool
 import pandas as pd
 import numpy as np
 
-from preparation.parser_utils import CreateTargetInput, create_target_csv, create_triceratops_prob
+from exoml.preparation.parser_utils import CreateTargetInput, create_target_csv, create_triceratops_prob
 
 def create_targets_df(tces_dir):
     # Merge TCEs DF and cumulative DF ignoring everything not from Kepler or K2
@@ -264,6 +268,51 @@ def create_targets_multi_df(tces_dir):
     result_df.to_csv(tces_dir + '/injected_objects_tces_multi.csv')
 
 
+def create_synth_targets_df(tces_dir):
+    inj1_df = pd.read_csv(tces_dir + '/kplr_dr25_inj1_tces.csv', comment='#')
+    inj1_df['type'] = 'inj1'
+    inj2_df = pd.read_csv(tces_dir + '/kplr_dr25_inj2_tces.csv', comment='#')
+    inj2_df['type'] = 'inj2'
+    inj3_df = pd.read_csv(tces_dir + '/kplr_dr25_inj3_tces.csv', comment='#')
+    inj3_df['type'] = 'inj3'
+    inv_df = pd.read_csv(tces_dir + '/kplr_dr25_inv_tces.csv', comment='#')
+    inv_df['type'] = 'inv'
+    scr1_df = pd.read_csv(tces_dir + '/kplr_dr25_scr1_tces.csv', comment='#')
+    scr1_df['type'] = 'scr1'
+    scr2_df = pd.read_csv(tces_dir + '/kplr_dr25_scr2_tces.csv', comment='#')
+    scr2_df['type'] = 'scr2'
+    scr3_df = pd.read_csv(tces_dir + '/kplr_dr25_scr3_tces.csv', comment='#')
+    scr3_df['type'] = 'scr3'
+    synth_df = pd.concat([inj1_df, inj2_df, inj3_df, inv_df, scr1_df, scr2_df, scr3_df], ignore_index=True)
+    synth_df['duration(h)'] = synth_df['duration']
+    synth_df['depth_primary'] = synth_df['depth']
+    synth_df['radius(earth)'] = synth_df['Rp']
+    synth_df.to_csv(tces_dir + '/classified_tces_synthetic.csv')
+
+def download_synth_targets(download_dir, wget_files, df_file):
+    df = pd.read_csv(df_file, comment='#')
+    os.chdir(download_dir)
+    pattern = r'kplr(\d+).*'
+    for wget_file in wget_files:
+        with open(wget_file, 'r') as file:
+            for line in file:
+                match = re.search(pattern, line)
+                if match is not None:
+                    kepid = int(match.group(1))
+                    rows = df[df['KIC'] == kepid]
+                    for index, row in rows.iterrows():
+                        if 'inj' in row['type']:
+                            print(f"Downloading: {line}")
+                            os.system(line)
+                            lc_file = f'{download_dir}/kplr{kepid:09}-2011271113734_INJECTED-' + row['type'] + '_llc.fits'
+                            compressed_file = f'{lc_file}.gz'
+                            if os.path.exists(compressed_file):
+                                with gzip.open(compressed_file, 'rb') as f_in:
+                                    with open(lc_file, 'wb') as f_out:
+                                        shutil.copyfileobj(f_in, f_out)
+                                        os.remove(compressed_file)
+
+
 def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_count() - 1, force=False, ids=None,
                        mode='all'):
     tces_df = pd.read_csv(csv, comment='#')
@@ -280,6 +329,25 @@ def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_cou
     for index in ranges:
         tce_row = tces_df.iloc[index]
         inputs = inputs + [CreateTargetInput('KIC', tce_row['object_id'], None, target_dir, None, tce_row, cache_dir, index, force=force, mode=mode)]
+    with Pool(processes=cores, maxtasksperchild=1) as pool:
+        pool.map(create_target_csv, inputs, chunksize=1)
+
+
+def create_synth_curves(csv, lcs_dir, target_dir, cache_dir, cores=multiprocessing.cpu_count() - 1, force=False, ids=None, mode='all'):
+    synth_df = pd.read_csv(csv, comment='#')
+    synth_df = synth_df.sort_values(by=["TCE_ID"], ascending=True)
+    inputs = []
+    if ids is not None:
+        synth_df = synth_df[synth_df['TCE_ID'].isin(ids)]
+    synth_df = synth_df.reset_index(drop=True)
+    ranges = range(0, len(synth_df))
+    print("Total number of targets is " + str(len(synth_df)))
+    for index in ranges:
+        tce_row = synth_df.iloc[index]
+        kepid = int(tce_row['KIC'])
+        lc_file = None if 'inj' not in tce_row['type'] \
+            else f'{lcs_dir}/kplr{kepid:09}-2011271113734_INJECTED-' + tce_row['type'] + '_llc.fits'
+        inputs = inputs + [CreateTargetInput('KIC', kepid, lc_file, target_dir, None, tce_row, cache_dir, index, force=force, mode=mode)]
     with Pool(processes=cores, maxtasksperchild=1) as pool:
         pool.map(create_target_csv, inputs, chunksize=1)
 

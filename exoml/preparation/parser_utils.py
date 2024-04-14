@@ -8,6 +8,8 @@ import re
 from itertools import chain
 from multiprocessing import Pool
 
+import gzip
+import shutil
 import lcbuilder.constants
 import triceratops.triceratops as tr
 import astropy.units as u
@@ -22,7 +24,9 @@ from astropy.wcs import WCS
 from astroquery.mast import Catalogs, TesscutClass
 from lcbuilder.helper import LcbuilderHelper
 from lcbuilder.lcbuilder_class import LcBuilder
+from lcbuilder.objectinfo.MissionInputObjectInfo import MissionInputObjectInfo
 from lcbuilder.objectinfo.MissionObjectInfo import MissionObjectInfo
+from lcbuilder.objectinfo.preparer.MissionInputLightcurveBuilder import MissionInputLightcurveBuilder
 from lcbuilder.objectinfo.preparer.MissionLightcurveBuilder import MissionLightcurveBuilder
 from lcbuilder.photometry.aperture_extractor import ApertureExtractor
 from lcbuilder.star.HabitabilityCalculator import HabitabilityCalculator
@@ -379,6 +383,7 @@ class CreateTargetInput:
 
 def create_target_csv(create_target_input):
     mission_lightcurve_builder = MissionLightcurveBuilder()
+    mission_input_lightcurve_builder = MissionInputLightcurveBuilder()
     mission_id = create_target_input.id
     file_id = mission_id.replace(' ', '_')
     file_prefix = create_target_input.target_dir + file_id
@@ -390,13 +395,27 @@ def create_target_csv(create_target_input):
         logging.info("PID %s: Trying to get short cadence info for %s", pid, file_planet_prefix)
         file_name = file_planet_prefix + '_metrics_short.csv'
         if create_target_input.force or not os.path.exists(file_name):
-            lcbuild_short = \
-                mission_lightcurve_builder.build(MissionObjectInfo('all', mission_id, cadence='short', high_rms_enabled=False),
-                                                 create_target_input.target_dir,
-                                                 create_target_input.cache_dir)
-            if os.path.exists(tpfs_dir):
-                for f in glob.glob(tpfs_dir + f"*{mission_id}*.fits"):
-                    os.remove(f)
+            if create_target_input.lc_file is None:
+                lcbuild_short = \
+                    mission_lightcurve_builder.build(MissionObjectInfo('all', mission_id, cadence='short', high_rms_enabled=False),
+                                                     create_target_input.target_dir,
+                                                     create_target_input.cache_dir)
+                if os.path.exists(tpfs_dir):
+                    for f in glob.glob(tpfs_dir + f"*{mission_id}*.fits"):
+                        os.remove(f)
+            else:
+                lc = KeplerLightCurve.read(create_target_input.lc_file)
+                lc_df = pd.DataFrame(columns=['#time', 'flux', 'flux_err'])
+                lc_df['#time'] = lc.time
+                lc_df['flux'] = lc.PDCSAP_FLUX
+                lc_df['flux_err'] = lc.flux_err
+                csv_filename = os.path.splitext(create_target_input.lc_file)[0] + '.csv'
+                lc_df.to_csv(csv_filename, index=False)
+                lcbuild_short = \
+                    mission_input_lightcurve_builder.build(
+                        MissionInputObjectInfo(mission_id, input_file=csv_filename, high_rms_enabled=False),
+                        create_target_input.target_dir,
+                        create_target_input.cache_dir)
             prepare_lc_data(file_planet_prefix, mission_id, lcbuild_short.lc_data,
                             create_target_input.injected_files_df['duration(h)'] / 24,
                             create_target_input.injected_files_df['period'],
@@ -408,26 +427,27 @@ def create_target_csv(create_target_input):
         logging.info("PID %s: Finished to get short cadence info for %s", pid, file_planet_prefix)
     except Exception as e:
         logging.exception("PID %s: Failed short cadence for %s", pid, file_planet_prefix)
-    try:
-        logging.info("PID %s: Trying to get long cadence info for %s", pid, file_planet_prefix)
-        file_name = file_planet_prefix + '_metrics_long.csv'
-        if create_target_input.force or not os.path.exists(file_name):
-            lcbuild_long = \
-                mission_lightcurve_builder.build(MissionObjectInfo('all', mission_id, cadence='long', high_rms_enabled=False),
-                                                     create_target_input.target_dir,
-                                                     create_target_input.cache_dir)
-            prepare_lc_data(file_planet_prefix, mission_id, lcbuild_long.lc_data,
-                            create_target_input.injected_files_df['duration(h)'] / 24,
-                            create_target_input.injected_files_df['period'],
-                            create_target_input.injected_files_df['epoch'],
-                            lcbuild_long.star_info.ra, lcbuild_long.star_info.dec, lcbuild_long.star_info, True,
-                            modes=create_target_input.mode)
-            for f in pathlib.Path(tpfs_dir).glob(f"*{file_id.split('_')[1]}*"):
-                os.remove(f)
-        logging.info("PID %s: Finished to get long cadence info for index %s for file %s", pid,
-                     create_target_input.index, file_planet_prefix)
-    except Exception as e:
-        logging.exception("PID %s: Failed long cadence for %s", pid, file_planet_prefix)
+    if create_target_input.lc_file is not None:
+        try:
+            logging.info("PID %s: Trying to get long cadence info for %s", pid, file_planet_prefix)
+            file_name = file_planet_prefix + '_metrics_long.csv'
+            if create_target_input.force or not os.path.exists(file_name):
+                lcbuild_long = \
+                    mission_lightcurve_builder.build(MissionObjectInfo('all', mission_id, cadence='long', high_rms_enabled=False),
+                                                         create_target_input.target_dir,
+                                                         create_target_input.cache_dir)
+                prepare_lc_data(file_planet_prefix, mission_id, lcbuild_long.lc_data,
+                                create_target_input.injected_files_df['duration(h)'] / 24,
+                                create_target_input.injected_files_df['period'],
+                                create_target_input.injected_files_df['epoch'],
+                                lcbuild_long.star_info.ra, lcbuild_long.star_info.dec, lcbuild_long.star_info, True,
+                                modes=create_target_input.mode)
+                for f in pathlib.Path(tpfs_dir).glob(f"*{file_id.split('_')[1]}*"):
+                    os.remove(f)
+            logging.info("PID %s: Finished to get long cadence info for index %s for file %s", pid,
+                         create_target_input.index, file_planet_prefix)
+        except Exception as e:
+            logging.exception("PID %s: Failed long cadence for %s", pid, file_planet_prefix)
 
 def create_triceratops_prob(create_target_input):
     object_id = create_target_input.id
