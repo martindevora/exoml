@@ -293,6 +293,7 @@ def download_synth_targets(download_dir, wget_files, df_file):
     df = pd.read_csv(df_file, comment='#')
     os.chdir(download_dir)
     pattern = r'kplr(\d+).*'
+    pattern_date = r'(\d+)\_INJECTED.*'
     for wget_file in wget_files:
         with open(wget_file, 'r') as file:
             for line in file:
@@ -304,7 +305,8 @@ def download_synth_targets(download_dir, wget_files, df_file):
                         if 'inj' in row['type']:
                             print(f"Downloading: {line}")
                             os.system(line)
-                            lc_file = f'{download_dir}/kplr{kepid:09}-2011271113734_INJECTED-' + row['type'] + '_llc.fits'
+                            match_date = re.search(pattern_date, line)
+                            lc_file = f'{download_dir}/kplr{kepid:09}-{match_date.group(1)}_INJECTED-' + row['type'] + '_llc.fits'
                             compressed_file = f'{lc_file}.gz'
                             if os.path.exists(compressed_file):
                                 with gzip.open(compressed_file, 'rb') as f_in:
