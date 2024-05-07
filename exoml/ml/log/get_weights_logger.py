@@ -1,6 +1,7 @@
 import logging
 
 import numpy as np
+from keras_core import Layer
 
 
 class ModelWeightsLogger:
@@ -32,5 +33,7 @@ class ModelWeightsLogger:
                 if nan_weight_indexes_count > 0 or nan_bias_indexes_count > 0:
                     logging.warning('Layer ' + str(layer_i) + ' with name ' + model.layers[layer_i].name + ' has ' + str(nan_weight_indexes_count) +
                           ' nan weights and ' + str(nan_bias_indexes_count) + ' nan biases')
-        logging.info("Min weights: %s from layer %s", min_w, min_layer.name)
-        logging.info("Max weights: %s from layer %s", max_w, max_layer.name)
+        if isinstance(min_layer, Layer):
+            logging.info("Min weights: %s from layer %s", min_w, min_layer.name)
+        if isinstance(max_layer, Layer):
+            logging.info("Max weights: %s from layer %s", max_w, max_layer.name)
