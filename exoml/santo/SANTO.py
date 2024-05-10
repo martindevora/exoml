@@ -14,16 +14,18 @@ import tensorflow as tf
 import time
 
 from keras.src.losses import BinaryCrossentropy
-from keras.src.metrics import BinaryAccuracy, Precision, Recall, AUC, PrecisionAtRecall
+from keras.src.metrics import BinaryAccuracy, Precision, Recall, AUC, PrecisionAtRecall, RecallAtPrecision
 from keras.src.optimizers import Adam
 from keras.utils import plot_model
 from keras.src.layers import LeakyReLU
+from keras_nlp.src.layers import TransformerEncoder
 from numpy import ndarray
 from sklearn.utils import shuffle
 
 from exoml.ml.callback.early_stopping import ExoMlEarlyStopping
 from exoml.ml.callback.learning_rate import SWA, MultiOptimizer
 from exoml.ml.callback.training_data_aware import ModelDirDataAwareCallback, ValidationDataAwareCallback
+from exoml.ml.layers.transformer_classifier import TransformerClassifier
 from exoml.ml.log.get_weights_logger import ModelWeightsLogger
 from exoml.ml.log.with_logging import WithLogging
 from exoml.ml.model.base_model import HyperParams
@@ -43,10 +45,12 @@ class SANTO(WithLogging):
     """
     Self-Attention Neural Network for Transiting Objects
     """
-    def __init__(self) -> None:
+    def __init__(self, transformer_layers=0, transformer_heads=1, name="SANTO") -> None:
         super().__init__()
         self.name = "SANTO"
         self.steps_per_epoch = 1
+        self.transformer_layers = transformer_layers
+        self.transformer_heads = transformer_heads
 
     def load(self, dir, hyperparams: HyperParams):
         self.model = tf.keras.models.load_model(dir,
@@ -78,59 +82,85 @@ class SANTO(WithLogging):
         print("Begin training")
         tf.keras.backend.clear_session()
         input_layer = keras.Input(shape=(input_dim, 1), name="input")
-        # outputs = TransformerClassifier(transformer_input_size=input_dim, patch_size=input_dim,
-        #                                     num_heads=1, mlp_dim=input_dim, hyperparams=hyperparams, num_blocks=1,
-        #                                     classes=1)(input_layer)
-        leaky_relu_alpha = 0.01
-        flux_branch: keras.layers.Layer = input_layer
-        # flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
-        flux_branch = keras.layers.Conv1D(filters=16, kernel_size=90, padding="same",
-                                          activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
-        flux_branch = keras.layers.MaxPooling1D(pool_size=10, strides=1)(flux_branch)
-        # flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
-        flux_branch = keras.layers.SpatialDropout1D(rate=hyperparams.spatial_dropout_rate)(flux_branch)
-        conv1_branch: keras.layers.Layer = keras.layers.Flatten()(flux_branch)
-        conv1_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha),
-                                          kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(conv1_branch)
-        conv1_branch = keras.layers.Dropout(hyperparams.dropout_rate)(conv1_branch)
-        flux_branch = keras.layers.Conv1D(filters=32, kernel_size=30, padding="same",
-                                          activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
-        flux_branch = keras.layers.MaxPooling1D(pool_size=4, strides=1)(flux_branch)
-        # flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
-        flux_branch = keras.layers.SpatialDropout1D(rate=hyperparams.spatial_dropout_rate)(flux_branch)
-        conv2_branch: keras.layers.Layer = keras.layers.Flatten()(flux_branch)
-        conv2_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha), kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(conv2_branch)
-        conv2_branch = keras.layers.Dropout(hyperparams.dropout_rate)(conv2_branch)
-        flux_branch = keras.layers.Conv1D(filters=64, kernel_size=15, padding="same",
-                                          activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
-        flux_branch = keras.layers.MaxPooling1D(pool_size=3, strides=2)(flux_branch)
-        # flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
-        flux_branch = keras.layers.SpatialDropout1D(rate=hyperparams.spatial_dropout_rate)(flux_branch)
-        conv3_branch: keras.layers.Layer = keras.layers.Flatten()(flux_branch)
-        conv3_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha), kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(conv3_branch)
-        conv3_branch = keras.layers.Dropout(hyperparams.dropout_rate)(conv3_branch)
-        flux_branch = keras.layers.Conv1D(filters=128, kernel_size=8, padding="same",
-                                          activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
-        flux_branch = keras.layers.MaxPooling1D(pool_size=2, strides=2)(flux_branch)
-        conv4_branch: keras.layers.Layer = keras.layers.Flatten()(flux_branch)
-        conv4_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha), kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(conv4_branch)
-        conv4_branch = keras.layers.Dropout(hyperparams.dropout_rate)(conv4_branch)
-        flux_branch = keras.layers.Concatenate(axis=1)([
-            conv1_branch, conv2_branch, conv3_branch, conv4_branch])
-        flux_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha),
-                          kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(flux_branch)
-        flux_branch = keras.layers.Dropout(hyperparams.dropout_rate)(flux_branch)
-        flux_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha),
-                          kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(flux_branch)
-        flux_branch = keras.layers.Dropout(hyperparams.dropout_rate)(flux_branch)
-        outputs: keras.layers.Layer = keras.layers.Dense(1, activation="sigmoid")(flux_branch)
+        if self.transformer_layers > 0:
+            # outputs = TransformerClassifier(transformer_input_size=input_dim, patch_size=input_dim,
+            #                                 num_heads=self.transformer_heads, mlp_dim=input_dim,
+            #                                 hyperparams=hyperparams, num_blocks=self.transformer_layers,
+            #                                 classes=1)(input_layer)
+            flux_branch: keras.layers.Layer = input_layer
+            for _ in range(self.transformer_layers):
+                flux_branch = TransformerEncoder(
+                    intermediate_dim=input_dim,
+                    num_heads=self.transformer_heads,
+                    dropout=hyperparams.dropout_rate,
+                    activation=LeakyReLU(),
+                    layer_norm_epsilon=1e-05,
+                    kernel_initializer="glorot_uniform",
+                    bias_initializer="zeros",
+                    normalize_first=False
+                )(flux_branch)
+                # flux_branch = keras.layers.MultiHeadAttention(
+                #     key_dim=input_dim, num_heads=self.transformer_heads, dropout=hyperparams.dropout_rate
+                # )(input_layer, input_layer)
+                # flux_branch = keras.layers.Dropout(hyperparams.dropout_rate)(flux_branch)
+                # flux_branch = keras.layers.LayerNormalization(epsilon=1e-6)(flux_branch)
+                # res = flux_branch + input_layer
+                # # Feed Forward Part
+                # flux_branch = keras.layers.Conv1D(filters=input_dim, kernel_size=1, activation="relu")(res)
+                # flux_branch = keras.layers.Dropout(hyperparams.dropout_rate)(flux_branch)
+                # flux_branch = keras.layers.Conv1D(filters=input_layer.shape[-1], kernel_size=1)(flux_branch)
+                # flux_branch = keras.layers.LayerNormalization(epsilon=1e-6)(flux_branch)
+                # flux_branch = flux_branch + res
+            flux_branch = keras.layers.GlobalAveragePooling1D(data_format="channels_last")(flux_branch)
+            flux_branch = keras.layers.Dense(input_dim, activation="relu")(flux_branch)
+            flux_branch = keras.layers.Dropout(hyperparams.dropout_rate)(flux_branch)
+            outputs = keras.layers.Dense(1, activation="sigmoid")(flux_branch)
+        else:
+            leaky_relu_alpha = 0.01
+            flux_branch: keras.layers.Layer = input_layer
+            # flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
+            flux_branch = keras.layers.Conv1D(filters=16, kernel_size=90, padding="same",
+                                              activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
+            flux_branch = keras.layers.MaxPooling1D(pool_size=10, strides=1)(flux_branch)
+            # flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
+            flux_branch = keras.layers.SpatialDropout1D(rate=hyperparams.spatial_dropout_rate)(flux_branch)
+            conv1_branch: keras.layers.Layer = keras.layers.Flatten()(flux_branch)
+            conv1_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha),
+                                              kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(conv1_branch)
+            conv1_branch = keras.layers.Dropout(hyperparams.dropout_rate)(conv1_branch)
+            flux_branch = keras.layers.Conv1D(filters=32, kernel_size=30, padding="same",
+                                              activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
+            flux_branch = keras.layers.MaxPooling1D(pool_size=4, strides=1)(flux_branch)
+            # flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
+            flux_branch = keras.layers.SpatialDropout1D(rate=hyperparams.spatial_dropout_rate)(flux_branch)
+            conv2_branch: keras.layers.Layer = keras.layers.Flatten()(flux_branch)
+            conv2_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha), kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(conv2_branch)
+            conv2_branch = keras.layers.Dropout(hyperparams.dropout_rate)(conv2_branch)
+            flux_branch = keras.layers.Conv1D(filters=64, kernel_size=15, padding="same",
+                                              activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
+            flux_branch = keras.layers.MaxPooling1D(pool_size=3, strides=2)(flux_branch)
+            # flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
+            flux_branch = keras.layers.SpatialDropout1D(rate=hyperparams.spatial_dropout_rate)(flux_branch)
+            conv3_branch: keras.layers.Layer = keras.layers.Flatten()(flux_branch)
+            conv3_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha), kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(conv3_branch)
+            conv3_branch = keras.layers.Dropout(hyperparams.dropout_rate)(conv3_branch)
+            flux_branch = keras.layers.Conv1D(filters=128, kernel_size=8, padding="same",
+                                              activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
+            flux_branch = keras.layers.MaxPooling1D(pool_size=2, strides=2)(flux_branch)
+            conv4_branch: keras.layers.Layer = keras.layers.Flatten()(flux_branch)
+            conv4_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha), kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(conv4_branch)
+            conv4_branch = keras.layers.Dropout(hyperparams.dropout_rate)(conv4_branch)
+            flux_branch = keras.layers.Concatenate(axis=1)([
+                conv1_branch, conv2_branch, conv3_branch, conv4_branch])
+            flux_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha),
+                              kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(flux_branch)
+            flux_branch = keras.layers.Dropout(hyperparams.dropout_rate)(flux_branch)
+            flux_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha),
+                              kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(flux_branch)
+            flux_branch = keras.layers.Dropout(hyperparams.dropout_rate)(flux_branch)
+            outputs: keras.layers.Layer = keras.layers.Dense(1, activation="sigmoid")(flux_branch)
         print("Preparing data sets")
         target_files: List[str] = os.listdir(lcs_dir)
-        target_files = shuffle(target_files)
-        target_files_partition_index = int(len(target_files) * (1 - validation_set_percent))
-        train_target_files = target_files[0:target_files_partition_index]
-        train_target_files = train_target_files[0:hyperparams.training_set_limit - 1] \
-            if hyperparams.training_set_limit is not None and hyperparams.training_set_limit < len(train_target_files) else train_target_files
         self.model: keras.Model = keras.Model(inputs=input_layer, outputs=outputs)
         self.model.run_eagerly = hyperparams.run_eagerly
         self.inform(output_dir)
@@ -183,61 +213,6 @@ class SANTO(WithLogging):
             fit_history = self.fit_model(hyperparams, training_batch_generator, steps_per_epoch, class_weights,
                                          validation_batch_generator, model_validation_steps)
             self.save(output_dir)
-
-
-
-#        if load_checkpoint and ckpt_manager.latest_checkpoint:
-#            print("Restoring last checkpoint.")
-#            ckpt.restore(ckpt_manager.latest_checkpoint)
-#            print("Last checkpoint restored.")
-#         losses = []
-#         accuracies = []
-#         precisions = []
-#         recalls = []
-#         pr99s = []
-#         val_losses = []
-#         val_accuracies = []
-#         val_precisions = []
-#         val_recalls = []
-#         val_pr99s = []
-#         file_flux_len = len(np.loadtxt(f'{lcs_dir}/{train_target_files[0]}', delimiter=',')[1])
-#         steps_per_file = file_flux_len - hyperparams.batch_size
-#         steps_per_file = steps_per_file if steps_per_file >= 1 else 1
-#         self.steps_per_epoch = train_dataset_size * steps_per_file
-#         training_log_df = pd.DataFrame(columns=['epoch', 'batch', 'loss', 'lr', 'accuracy', 'p@r99', 'precision', 'recall',
-#                                                 'val_accuracy', 'val_p@r99', 'val_precision', 'val_recall'])
-#         for epoch in range(hyperparams.epochs):
-#             print(f"Epoch {epoch + 1}/{hyperparams.epochs}")
-#             train_target_files = shuffle(train_target_files)
-#             start = time.time()
-#             epoch_losses, epoch_accuracies, epoch_precisions, epoch_recalls, epoch_pr99s, training_log_df = \
-#                 self.run_epoch(epoch, lcs_dir, model_dir, train_target_files, hyperparams, input_dim, self.model,
-#                                optimizer, training=True, cores=cores, training_log_df=training_log_df)
-#             losses = losses + epoch_losses
-#             accuracies = accuracies + epoch_accuracies
-#             precisions = precisions + epoch_precisions
-#             recalls = recalls + epoch_recalls
-#             pr99s = pr99s + epoch_pr99s
-#             val_epoch_losses, val_epoch_accuracies, val_epoch_precisions, val_epoch_recalls, val_epoch_pr99s, training_log_df = \
-#                 self.run_epoch(epoch, lcs_dir, model_dir, validation_target_files, hyperparams, input_dim, self.model,
-#                                optimizer, cores=cores, training=False, training_log_df=training_log_df)
-#             val_losses = val_losses + val_epoch_losses
-#             val_accuracies = val_accuracies + val_epoch_accuracies
-#             val_precisions = val_precisions + val_epoch_precisions
-#             val_recalls = val_recalls + val_epoch_recalls
-#             val_pr99s = val_pr99s + val_epoch_pr99s
-#             # Checkpoint the model on every epoch
-#             ckpt_save_path = ckpt_manager.save()
-#             print("Saving checkpoint for epoch {} in {}".format(epoch + 1, ckpt_save_path))
-#             print("Time for 1 epoch: {} secs\n".format(time.time() - start))
-#             self.plot_metrics(model_dir, self.steps_per_epoch,
-#                               training_metrics=[('lr', 'black', (0, 0)), ('loss', 'blue', (0, 1))],
-#                               validation_metrics=[('precision', 'red', (1, 0)), ('recall', 'blue', (1, 0)),
-#                                                   ('p@r99', 'green', (1, 0)), ('accuracy', 'red', (1, 1))])
-#         print(f"Saving model into {model_dir}")
-#         self.model.save(model_dir)
-#         print("Saved model")
-#         return losses, accuracies
 
     def _get_model_dir(self):
         return self.name + '_model/'
