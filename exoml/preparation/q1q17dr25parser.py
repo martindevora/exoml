@@ -1,3 +1,4 @@
+import glob
 import gzip
 import multiprocessing
 import os
@@ -287,6 +288,8 @@ def create_synth_targets_df(tces_dir):
     synth_df['duration(h)'] = synth_df['duration']
     synth_df['depth_primary'] = synth_df['depth']
     synth_df['radius(earth)'] = synth_df['Rp']
+    synth_df.rename(columns={'KIC': 'kepid'}, inplace=True)
+    synth_df['object_id'] = 'KIC ' + synth_df.loc[:, 'kepid'].astype(str)
     synth_df.to_csv(tces_dir + '/classified_tces_synthetic.csv')
 
 def download_synth_targets(download_dir, wget_files, df_file):
@@ -335,21 +338,23 @@ def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_cou
         pool.map(create_target_csv, inputs, chunksize=1)
 
 
-def create_synth_curves(csv, lcs_dir, target_dir, cache_dir, cores=multiprocessing.cpu_count() - 1, force=False, ids=None, mode='all'):
+def create_synth_csvs(csv, lcs_dir, target_dir, cache_dir, cores=multiprocessing.cpu_count() - 1, force=False, ids=None, mode='all'):
     synth_df = pd.read_csv(csv, comment='#')
-    synth_df = synth_df.sort_values(by=["TCE_ID"], ascending=True)
+    synth_df = synth_df.sort_values(by=["kepid"], ascending=True)
     inputs = []
     if ids is not None:
-        synth_df = synth_df[synth_df['TCE_ID'].isin(ids)]
+        synth_df = synth_df[synth_df['kepid'].isin(int(id) for id in ids)]
     synth_df = synth_df.reset_index(drop=True)
     ranges = range(0, len(synth_df))
     print("Total number of targets is " + str(len(synth_df)))
     for index in ranges:
         tce_row = synth_df.iloc[index]
-        kepid = int(tce_row['KIC'])
-        lc_file = None if 'inj' not in tce_row['type'] \
-            else f'{lcs_dir}/kplr{kepid:09}-2011271113734_INJECTED-' + tce_row['type'] + '_llc.fits'
-        inputs = inputs + [CreateTargetInput('KIC', kepid, lc_file, target_dir, None, tce_row, cache_dir, index, force=force, mode=mode)]
+        kepid = int(tce_row['kepid'])
+        matching_files = None
+        if 'inj' in tce_row['type']:
+            path_pattern = f"{lcs_dir}/kplr{kepid:09}-*.fits"
+            matching_files = sorted(glob.glob(path_pattern))
+        inputs = inputs + [CreateTargetInput('KIC', 'KIC ' + str(kepid), matching_files, target_dir, None, tce_row, cache_dir, index, force=force, mode=mode)]
     with Pool(processes=cores, maxtasksperchild=1) as pool:
         pool.map(create_target_csv, inputs, chunksize=1)
 

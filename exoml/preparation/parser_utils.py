@@ -404,12 +404,21 @@ def create_target_csv(create_target_input):
                     for f in glob.glob(tpfs_dir + f"*{mission_id}*.fits"):
                         os.remove(f)
             else:
-                lc = KeplerLightCurve.read(create_target_input.lc_file)
+                if isinstance(create_target_input.lc_file, (list, np.ndarray)):
+                    lc = None
+                    for file in create_target_input.lc_file:
+                        if lc is None:
+                            lc = KeplerLightCurve.read(file)
+                            csv_filename = os.path.splitext(file)[0] + '.csv'
+                        else:
+                            lc.append(KeplerLightCurve.read(file))
+                else:
+                    lc = KeplerLightCurve.read(create_target_input.lc_file)
+                    csv_filename = os.path.splitext(create_target_input.lc_file)[0] + '.csv'
                 lc_df = pd.DataFrame(columns=['#time', 'flux', 'flux_err'])
                 lc_df['#time'] = lc.time
                 lc_df['flux'] = lc.PDCSAP_FLUX
-                lc_df['flux_err'] = lc.flux_err
-                csv_filename = os.path.splitext(create_target_input.lc_file)[0] + '.csv'
+                lc_df['flux_err'] = np.nan_to_num(np.array(lc.flux_err.value), np.nanstd(lc.flux_err.value))
                 lc_df.to_csv(csv_filename, index=False)
                 lcbuild_short = \
                     mission_input_lightcurve_builder.build(
