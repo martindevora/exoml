@@ -1,11 +1,11 @@
-#keras==2.15.0
-#tensorflow==2.15.0
+keras==2.15.0
+tensorflow==2.15.0
 keras-nlp==0.8.1
 typeguard==4.1.5
 #tensorflow-addons==0.21.0
 ellc==1.8.8
 #dearwatson==0.7.15
-lcbuilder==0.18.0
+lcbuilder==0.18.1
 #timesynth @ git+https://github.com/TimeSynth/TimeSynth.git
 ruamel.yaml==0.17.32
 #debugpy
