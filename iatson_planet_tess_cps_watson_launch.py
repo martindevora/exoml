@@ -53,7 +53,7 @@ for index, row in tois_df.iterrows():
             os.makedirs(watson_dir, exist_ok=True)
         lc_filename = f'{watson_dir}/lc.csv'
         period = row['Period (days)']
-        epoch = row['Epoch (BJD)']
+        epoch = row['Epoch (BJD)'] - 2457000
         duration = row['Duration (hours)']
         depth_ppt = row['Depth (ppm)'] / 1000
         run_watson = False
