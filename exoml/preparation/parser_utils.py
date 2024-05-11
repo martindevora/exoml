@@ -30,7 +30,8 @@ from lcbuilder.objectinfo.preparer.MissionInputLightcurveBuilder import MissionI
 from lcbuilder.objectinfo.preparer.MissionLightcurveBuilder import MissionLightcurveBuilder
 from lcbuilder.photometry.aperture_extractor import ApertureExtractor
 from lcbuilder.star.HabitabilityCalculator import HabitabilityCalculator
-from lightkurve import TessLightCurve, KeplerLightCurve
+from lcbuilder.star.starinfo import StarInfo
+from lightkurve import TessLightCurve, KeplerLightCurve, LightCurveCollection
 from watson.watson import Watson
 
 
@@ -164,7 +165,7 @@ def create_star_csv(create_star_input):
         star_df.to_csv(star_file)
     logging.info('Processed object id ' + str(create_star_input.object_id))
 
-def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_period, epoch, ra, dec, star_info,
+def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_period, epoch, ra, dec, star_info: StarInfo,
                     long_cadence, tpf_files=None, modes=['all']):
     lc_df = None
     cadence = 'long' if long_cadence else 'short'
@@ -225,131 +226,136 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
     og_core_flux_list = []
     og_halo_flux_list = []
     logging.info("Computing TPFs data for %s", object_id)
-    for tpf in tpfs:
-        sector_name, sector = LcbuilderHelper.mission_lightkurve_sector_extraction(mission, tpf)
-        logging.info("Computing TPF data for %s sector %s", object_id, sector)
-        aperture = tpf.pipeline_mask
-        cadence_s = np.round(np.nanmedian(tpf.time.value[1:] - tpf.time.value[:-1]) * 3600 * 24)
-        cadences_per_transit = LcbuilderHelper.estimate_transit_cadences(cadence_s, transit_duration * 2)
-        t0s_in_tpf_indexes = np.argwhere((t0s_list > tpf.time.value[0] - transit_duration) &
-                                         (t0s_list < tpf.time.value[-1] + transit_duration)).flatten()
-        if len(t0s_in_tpf_indexes) == 0:
-            continue
-        tpf_t0s_list = t0s_list[t0s_in_tpf_indexes]
-        good_quality_t0s = []
-        for t0 in tpf_t0s_list:
-            t0_in_tpf_indexes = \
-                np.argwhere((tpf.time.value > t0 - transit_duration) & (tpf.time.value < t0 + transit_duration)).flatten()
-            cadences_ratio = len(t0_in_tpf_indexes) / cadences_per_transit
-            if cadences_ratio >= 0.75:
-                good_quality_t0s.append(t0)
-            else:
-                try:
-                    tpf = tpf[(tpf.time.value < t0 - transit_duration) | (tpf.time.value > t0 + transit_duration)]
-                    trash = tpf[0] #we try to make it crash and if so, we discard the TPF
-                except:
-                    logging.exception("TPF filtering error for %s and T0 %.02f", object_id, t0)
-                    continue
-        if len(good_quality_t0s) == 0:
-            continue
-        hdu = tpf.hdu[2].header
-        wcs = WCS(hdu)
-        if 'all' in modes or 'centroids' in modes:
-            logging.info("Computing TPF data centroids for %s sector %s", object_id, sector)
-            centroids_drift = \
-                Watson.compute_centroids_for_tpf(ra, dec, lc_data, tpf, wcs, transit_period, epoch, duration_to_period)
-            centroids_offsets_time_list.append(centroids_drift[0])
-            centroids_offsets_ra_list.append(centroids_drift[1])
-            centroids_offsets_dec_list.append(centroids_drift[2])
+    if tpfs is not None:
+        for tpf in tpfs:
+            sector_name, sector = LcbuilderHelper.mission_lightkurve_sector_extraction(mission, tpf)
+            logging.info("Computing TPF data for %s sector %s", object_id, sector)
+            aperture = tpf.pipeline_mask
+            cadence_s = np.round(np.nanmedian(tpf.time.value[1:] - tpf.time.value[:-1]) * 3600 * 24)
+            cadences_per_transit = LcbuilderHelper.estimate_transit_cadences(cadence_s, transit_duration * 2)
+            t0s_in_tpf_indexes = np.argwhere((t0s_list > tpf.time.value[0] - transit_duration) &
+                                             (t0s_list < tpf.time.value[-1] + transit_duration)).flatten()
+            if len(t0s_in_tpf_indexes) == 0:
+                continue
+            tpf_t0s_list = t0s_list[t0s_in_tpf_indexes]
+            good_quality_t0s = []
+            for t0 in tpf_t0s_list:
+                t0_in_tpf_indexes = \
+                    np.argwhere((tpf.time.value > t0 - transit_duration) & (tpf.time.value < t0 + transit_duration)).flatten()
+                cadences_ratio = len(t0_in_tpf_indexes) / cadences_per_transit
+                if cadences_ratio >= 0.75:
+                    good_quality_t0s.append(t0)
+                else:
+                    try:
+                        tpf = tpf[(tpf.time.value < t0 - transit_duration) | (tpf.time.value > t0 + transit_duration)]
+                        trash = tpf[0] #we try to make it crash and if so, we discard the TPF
+                    except:
+                        logging.exception("TPF filtering error for %s and T0 %.02f", object_id, t0)
+                        continue
+            if len(good_quality_t0s) == 0:
+                continue
+            hdu = tpf.hdu[2].header
+            wcs = WCS(hdu)
+            if 'all' in modes or 'centroids' in modes:
+                logging.info("Computing TPF data centroids for %s sector %s", object_id, sector)
+                centroids_drift = \
+                    Watson.compute_centroids_for_tpf(ra, dec, lc_data, tpf, wcs, transit_period, epoch, duration_to_period)
+                centroids_offsets_time_list.append(centroids_drift[0])
+                centroids_offsets_ra_list.append(centroids_drift[1])
+                centroids_offsets_dec_list.append(centroids_drift[2])
+            if 'all' in modes or 'og' in modes:
+                logging.info("Computing TPF data og for %s sector %s", object_id, sector)
+                optical_ghost_data = Watson.compute_optical_ghost_data(tpf, aperture, transit_period, epoch, transit_duration)
+                og_time_list.append(optical_ghost_data[0])
+                og_core_flux_list.append(optical_ghost_data[1])
+                og_halo_flux_list.append(optical_ghost_data[2])
+            if 'all' in modes or 'source_offset' in modes:
+                pixel_values_i = np.array(range(tpf.shape[1]))
+                pixel_values_j = np.array(range(tpf.shape[2]))
+                logging.info("Computing TPF data per-pixel BLS for %s sector %s", object_id, sector)
+                snr_map, ax = Watson.plot_pixels(tpf, title=mission_prefix + ' ' + str(id) + ' ' + sector_name + ' ' + str(sector) + ' TPF BLS Analysis',
+                                                 period=transit_period, epoch=epoch, duration=transit_duration, aperture_mask=aperture, dry=True)
+                source_offset_px = Watson.light_centroid(snr_map, pixel_values_i, pixel_values_j)
+                source_offset_bls = wcs.pixel_to_world(source_offset_px[1], source_offset_px[0])
+                source_offsets_bls.append((source_offset_bls.ra.value, source_offset_bls.dec.value))
+                logging.info("Computing TPF data differential image for %s sector %s", object_id, sector)
+                tpf_sub = Watson.compute_tpf_diff_image(tpf, transit_period, epoch, transit_duration)
+                source_offset_diffimg_px = Watson.light_centroid(tpf_sub, pixel_values_i, pixel_values_j)
+                source_offset_diffimg = wcs.pixel_to_world(source_offset_diffimg_px[1], source_offset_diffimg_px[0])
+                source_offsets_diffimg.append((source_offset_diffimg.ra.value, source_offset_diffimg.dec.value))
         if 'all' in modes or 'og' in modes:
-            logging.info("Computing TPF data og for %s sector %s", object_id, sector)
-            optical_ghost_data = Watson.compute_optical_ghost_data(tpf, aperture, transit_period, epoch, transit_duration)
-            og_time_list.append(optical_ghost_data[0])
-            og_core_flux_list.append(optical_ghost_data[1])
-            og_halo_flux_list.append(optical_ghost_data[2])
+            og_df = pd.DataFrame(columns=['time', 'core_flux', 'halo_flux', 'og_flux'])
+            og_df['time'] = list(chain.from_iterable(og_time_list))
+            og_df['core_flux'] = list(chain.from_iterable(og_core_flux_list))
+            og_df['halo_flux'] = list(chain.from_iterable(og_halo_flux_list))
+            og_df['og_flux'] = og_df['halo_flux'] - og_df['core_flux']
+            og_df.fillna(0)
+            og_df.to_csv(file_prefix + '_og_' + str(cadence) + '.csv')
+        if 'all' in modes or 'centroids' in modes:
+            centroid_coords_df = pd.DataFrame(columns=['time', 'centroids_ra', 'centroids_dec'])
+            centroid_coords_df['centroids_ra'] = list(chain.from_iterable(centroids_offsets_ra_list))
+            centroid_coords_df['centroids_dec'] = list(chain.from_iterable(centroids_offsets_dec_list))
+            centroid_coords_df['time'] = list(chain.from_iterable(centroids_offsets_time_list))
+            centroid_coords_df.fillna(0)
+            centroid_coords_df.to_csv(file_prefix + '_cent_' + str(cadence) + '.csv')
         if 'all' in modes or 'source_offset' in modes:
-            pixel_values_i = np.array(range(tpf.shape[1]))
-            pixel_values_j = np.array(range(tpf.shape[2]))
-            logging.info("Computing TPF data per-pixel BLS for %s sector %s", object_id, sector)
-            snr_map, ax = Watson.plot_pixels(tpf, title=mission_prefix + ' ' + str(id) + ' ' + sector_name + ' ' + str(sector) + ' TPF BLS Analysis',
-                                             period=transit_period, epoch=epoch, duration=transit_duration, aperture_mask=aperture, dry=True)
-            source_offset_px = Watson.light_centroid(snr_map, pixel_values_i, pixel_values_j)
-            source_offset_bls = wcs.pixel_to_world(source_offset_px[1], source_offset_px[0])
-            source_offsets_bls.append((source_offset_bls.ra.value, source_offset_bls.dec.value))
-            logging.info("Computing TPF data differential image for %s sector %s", object_id, sector)
-            tpf_sub = Watson.compute_tpf_diff_image(tpf, transit_period, epoch, transit_duration)
-            source_offset_diffimg_px = Watson.light_centroid(tpf_sub, pixel_values_i, pixel_values_j)
-            source_offset_diffimg = wcs.pixel_to_world(source_offset_diffimg_px[1], source_offset_diffimg_px[0])
-            source_offsets_diffimg.append((source_offset_diffimg.ra.value, source_offset_diffimg.dec.value))
-    if 'all' in modes or 'og' in modes:
-        og_df = pd.DataFrame(columns=['time', 'core_flux', 'halo_flux', 'og_flux'])
-        og_df['time'] = list(chain.from_iterable(og_time_list))
-        og_df['core_flux'] = list(chain.from_iterable(og_core_flux_list))
-        og_df['halo_flux'] = list(chain.from_iterable(og_halo_flux_list))
-        og_df['og_flux'] = og_df['halo_flux'] - og_df['core_flux']
-        og_df.fillna(0)
-        og_df.to_csv(file_prefix + '_og_' + str(cadence) + '.csv')
-    if 'all' in modes or 'centroids' in modes:
-        centroid_coords_df = pd.DataFrame(columns=['time', 'centroids_ra', 'centroids_dec'])
-        centroid_coords_df['centroids_ra'] = list(chain.from_iterable(centroids_offsets_ra_list))
-        centroid_coords_df['centroids_dec'] = list(chain.from_iterable(centroids_offsets_dec_list))
-        centroid_coords_df['time'] = list(chain.from_iterable(centroids_offsets_time_list))
-        centroid_coords_df.fillna(0)
-        centroid_coords_df.to_csv(file_prefix + '_cent_' + str(cadence) + '.csv')
-    if 'all' in modes or 'source_offset' in modes:
-        if len(source_offsets_diffimg) > 0:
-            source_offset_diffimg_ra = np.nanmedian(np.array(source_offsets_diffimg)[:, 0])
-            source_offset_diffimg_dec = np.nanmedian(np.array(source_offsets_diffimg)[:, 1])
-            source_offset_diffimg_ra_err = np.nanstd(np.array(source_offsets_diffimg)[:, 0])
-            source_offset_diffimg_dec_err = np.nanstd(np.array(source_offsets_diffimg)[:, 1])
-        else:
-            source_offset_diffimg_ra = ra
-            source_offset_diffimg_dec = dec
-            source_offset_diffimg_ra_err = 0
-            source_offset_diffimg_dec_err = 0
-        if len(source_offsets_bls) > 0:
-            source_offset_bls_ra = np.nanmedian(np.array(source_offsets_bls)[:, 0])
-            source_offset_bls_dec = np.nanmedian(np.array(source_offsets_bls)[:, 1])
-            source_offset_bls_ra_err = np.nanstd(np.array(source_offsets_bls)[:, 0])
-            source_offset_bls_dec_err = np.nanstd(np.array(source_offsets_bls)[:, 1])
-        else:
-            source_offset_bls_ra = ra
-            source_offset_bls_dec = dec
-            source_offset_bls_ra_err = 0
-            source_offset_bls_dec_err = 0
-        offset_ra = np.mean([source_offset_bls_ra, source_offset_diffimg_ra])
-        offset_dec = np.mean([source_offset_bls_dec, source_offset_diffimg_dec])
-        offset_ra_err = 1/2 * np.sqrt(source_offset_bls_ra_err ** 2 + source_offset_diffimg_ra_err ** 2)
-        offset_dec_err = 1/2 * np.sqrt(source_offset_bls_dec_err ** 2 + source_offset_diffimg_dec_err ** 2)
-        if np.isnan(offset_ra_err) or offset_ra_err == 0.0:
-            offset_ra_err = np.nanstd([source_offset_bls_ra, source_offset_diffimg_ra])
-        if np.isnan(offset_dec_err) or offset_dec_err == 0.0:
-            offset_dec_err = np.nanstd([source_offset_bls_dec, source_offset_diffimg_dec])
-        offsets_df = pd.DataFrame(columns=['name', 'ra', 'dec', 'ra_err', 'dec_err'])
-        offsets_df = offsets_df.append({'name': 'diff_img', 'ra': source_offset_diffimg_ra, 'dec': source_offset_diffimg_dec,
-                           'ra_err': source_offset_diffimg_ra_err, 'dec_err': source_offset_diffimg_dec_err}, ignore_index=True)
-        offsets_df = offsets_df.append({'name': 'px_bls', 'ra': source_offset_bls_ra, 'dec': source_offset_bls_dec,
-                           'ra_err': source_offset_bls_ra_err, 'dec_err': source_offset_bls_dec_err}, ignore_index=True)
-        offsets_df = offsets_df.append({'name': 'mean', 'ra': offset_ra, 'dec': offset_dec,
-                           'ra_err': offset_ra_err, 'dec_err': offset_dec_err}, ignore_index=True)
-        offsets_df.to_csv(file_prefix + '_offset_' + str(cadence) + '.csv')
+            if len(source_offsets_diffimg) > 0:
+                source_offset_diffimg_ra = np.nanmedian(np.array(source_offsets_diffimg)[:, 0])
+                source_offset_diffimg_dec = np.nanmedian(np.array(source_offsets_diffimg)[:, 1])
+                source_offset_diffimg_ra_err = np.nanstd(np.array(source_offsets_diffimg)[:, 0])
+                source_offset_diffimg_dec_err = np.nanstd(np.array(source_offsets_diffimg)[:, 1])
+            else:
+                source_offset_diffimg_ra = ra
+                source_offset_diffimg_dec = dec
+                source_offset_diffimg_ra_err = 0
+                source_offset_diffimg_dec_err = 0
+            if len(source_offsets_bls) > 0:
+                source_offset_bls_ra = np.nanmedian(np.array(source_offsets_bls)[:, 0])
+                source_offset_bls_dec = np.nanmedian(np.array(source_offsets_bls)[:, 1])
+                source_offset_bls_ra_err = np.nanstd(np.array(source_offsets_bls)[:, 0])
+                source_offset_bls_dec_err = np.nanstd(np.array(source_offsets_bls)[:, 1])
+            else:
+                source_offset_bls_ra = ra
+                source_offset_bls_dec = dec
+                source_offset_bls_ra_err = 0
+                source_offset_bls_dec_err = 0
+            offset_ra = np.mean([source_offset_bls_ra, source_offset_diffimg_ra])
+            offset_dec = np.mean([source_offset_bls_dec, source_offset_diffimg_dec])
+            offset_ra_err = 1/2 * np.sqrt(source_offset_bls_ra_err ** 2 + source_offset_diffimg_ra_err ** 2)
+            offset_dec_err = 1/2 * np.sqrt(source_offset_bls_dec_err ** 2 + source_offset_diffimg_dec_err ** 2)
+            if np.isnan(offset_ra_err) or offset_ra_err == 0.0:
+                offset_ra_err = np.nanstd([source_offset_bls_ra, source_offset_diffimg_ra])
+            if np.isnan(offset_dec_err) or offset_dec_err == 0.0:
+                offset_dec_err = np.nanstd([source_offset_bls_dec, source_offset_diffimg_dec])
+            offsets_df = pd.DataFrame(columns=['name', 'ra', 'dec', 'ra_err', 'dec_err'])
+            offsets_df = offsets_df.append({'name': 'diff_img', 'ra': source_offset_diffimg_ra, 'dec': source_offset_diffimg_dec,
+                               'ra_err': source_offset_diffimg_ra_err, 'dec_err': source_offset_diffimg_dec_err}, ignore_index=True)
+            offsets_df = offsets_df.append({'name': 'px_bls', 'ra': source_offset_bls_ra, 'dec': source_offset_bls_dec,
+                               'ra_err': source_offset_bls_ra_err, 'dec_err': source_offset_bls_dec_err}, ignore_index=True)
+            offsets_df = offsets_df.append({'name': 'mean', 'ra': offset_ra, 'dec': offset_dec,
+                               'ra_err': offset_ra_err, 'dec_err': offset_dec_err}, ignore_index=True)
+            offsets_df.to_csv(file_prefix + '_offset_' + str(cadence) + '.csv')
     if 'all' in modes or 'metrics' in modes:
         logging.info("Computing metrics for %s", object_id)
         lc_df['time_folded'] = foldedleastsquares.fold(lc_df['#time'].to_numpy(), transit_period, epoch + transit_period / 2)
         lc_df['time_folded_sec'] = foldedleastsquares.fold(lc_df['#time'].to_numpy(), transit_period, epoch)
         lc_df_secit = lc_df[(lc_df['time_folded_sec'] > 0.5 - duration_to_period / 2) & (lc_df['time_folded_sec'] < 0.5 + duration_to_period / 2)]
-        sec_depth = 1 - lc_df_secit['flux_0'].median()
-        sec_depth_err = lc_df_secit['flux_0'].std()
+        sec_depth = 1 - lc_df_secit['flux_0'].dropna().median()
+        sec_depth_err = lc_df_secit['flux_0'].dropna().std()
         lc_df_it = lc_df[(lc_df['time_folded'] > 0.5 - duration_to_period / 2) & (lc_df['time_folded'] < 0.5 + duration_to_period / 2)]
-        depth = 1 - lc_df_it['flux_0'].median()
+        depth = 1 - lc_df_it['flux_0'].dropna().median()
         rp = np.sqrt(depth * (star_info.radius ** 2))
         rp_rs = rp / star_info.radius
-        depth_err = lc_df_it['flux_0'].std()
+        depth_err = lc_df_it['flux_0'].dropna().std()
+        habitability_calculator = HabitabilityCalculator()
         semimajor_axis = \
-            HabitabilityCalculator().calculate_semi_major_axis(transit_period, star_info.mass) * 215.032 #sun radii in au
+            habitability_calculator.calculate_semi_major_axis(transit_period, star_info.mass) * 215.032 #sun radii in au
         geom_albedo = sec_depth * (semimajor_axis / rp)
         albedo = 0.5
-        planet_eq_temp = star_info.teff * ((star_info.radius / (2 * semimajor_axis)) ** (1 / 2)) * ((1 - albedo) ** (1 / 4))
+        planet_eq_temp, _, _ = habitability_calculator.calculate_teq(star_info.mass, star_info.mass - star_info.mass_min, star_info.mass_max - star_info.mass,
+                                                               star_info.radius, star_info.radius - star_info.radius_min, star_info.radius_max - star_info.radius,
+                                                               transit_period, 0.0001, 0.0001, star_info.teff, star_info.teff / 100, star_info.teff / 100)
+        #planet_eq_temp = star_info.teff * ((star_info.radius / (2 * semimajor_axis)) ** (1 / 2)) * ((1 - albedo) ** (1 / 4))
         if sec_depth < 0 or rp_rs < 0:
             planet_eff_temp = np.nan
         else:
@@ -415,11 +421,9 @@ def create_target_csv(create_target_input):
                 else:
                     lc = KeplerLightCurve.read(create_target_input.lc_file)
                     csv_filename = os.path.splitext(create_target_input.lc_file)[0] + '.csv'
-                lc_df = pd.DataFrame(columns=['#time', 'flux', 'flux_err'])
-                lc_df['#time'] = lc.time
-                lc_df['flux'] = lc.PDCSAP_FLUX
-                lc_df['flux_err'] = np.nan_to_num(np.array(lc.flux_err.value), np.nanstd(lc.flux_err.value))
-                lc_df.to_csv(csv_filename, index=False)
+                lc_data = mission_input_lightcurve_builder.extract_lc_data(LightCurveCollection([lc]))
+                lc_data['#time'] = lc_data['time']
+                lc_data.to_csv(csv_filename, index=False)
                 lcbuild_short = \
                     mission_input_lightcurve_builder.build(
                         MissionInputObjectInfo(mission_id, input_file=csv_filename, high_rms_enabled=False),
