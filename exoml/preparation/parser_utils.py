@@ -95,13 +95,13 @@ def create_star_csv(create_star_input):
                     columns=['id', 'ra', 'dec', 'ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h',
                              'k',
                              'dist_arcsec'])
-                star_df = star_df.append({'id': create_star_input.object_id, 'ra': star_info[11], 'dec': star_info[12],
-                                          'ld_a': star_info[0][0],
-                                          'ld_b': star_info[0][1], 'Teff': star_info[1],
-                                          'lum': star_info[2], 'logg': star_info[3], 'radius': star_info[5],
-                                          'mass': star_info[8], 'v': star_info[13], 'j': star_info[15],
-                                          'h': star_info[17],
-                                          'k': star_info[19], 'dist_arcsec': 0}, ignore_index=True)
+                star_df = pd.concat([star_df, pd.DataFrame.from_dict({'id': [create_star_input.object_id], 'ra': [star_info[11]], 'dec': [star_info[12]],
+                                          'ld_a': [star_info[0][0]],
+                                          'ld_b': [star_info[0][1]], 'Teff': [star_info[1]],
+                                          'lum': [star_info[2]], 'logg': [star_info[3]], 'radius': [star_info[5]],
+                                          'mass': [star_info[8]], 'v': [star_info[13]], 'j': [star_info[15]],
+                                          'h': [star_info[17]],
+                                          'k': [star_info[19]], 'dist_arcsec': [0]}, orient='columns')], ignore_index=True)
                 break
             except Exception as e:
                 logging.exception("Failed object %s try", create_star_input.object_id)
