@@ -17,7 +17,7 @@ import pandas as pd
 class WatsonPlanetModelGenerator(Ete6ModelGenerator):
     def __init__(self, injected_objects_df, lcs_dir, star_filename, lc_filename,
                  batch_size, input_sizes, transits_mask=None, zero_epsilon=1e-7,
-                 measurements_per_point=2, plot_inputs=False):
+                 measurements_per_point=2, plot_inputs=False, use_csvs=False):
         super().__init__(zero_epsilon, shuffle_batch=False)
         self.injected_objects_df = injected_objects_df
         self.lcs_dir = lcs_dir
@@ -29,6 +29,7 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
         self.random_number_generator = default_rng()
         self.measurements_per_point = measurements_per_point
         self.plot_inputs = plot_inputs
+        self.use_csvs = use_csvs
 
     def __len__(self):
         return (np.ceil(len(self.injected_objects_df) / float(self.batch_size))).astype(int)
@@ -225,146 +226,169 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
             duration_to_period = duration / period
             batch_data_values[i] = [0]
             file_prefix = self.lcs_dir + '/' #+ mission_id + '_' + str(target_id)
-            #TODO refactor to use mission for _lc files
-            lc_filename = self.lc_filename
-            centroids_filename = file_prefix + 'centroids.csv'
-            og_filename = file_prefix + 'og_dg.csv'
-            lc_df = pd.read_csv(lc_filename, usecols=['#time', 'flux'], low_memory=True)
-            centroids_df = pd.read_csv(centroids_filename, usecols=['time', 'centroids_ra', 'centroids_dec'],
-                                                low_memory=True)
-            og_df = pd.read_csv(og_filename, usecols=['time', 'og_flux', 'halo_flux', 'core_flux'], low_memory=True)
-            if lc_df is None:
-                logging.warning("No curve for target " + file_prefix)
-                raise ValueError("No curve for target " + file_prefix)
-            lc_df = lc_df.sort_values(by=['#time'])
-            lc_df = self.mask_other_signals(lc_df, transits_mask=self.transit_masks, time_key='#time')
-            centroids_df = self.mask_other_signals(centroids_df, transits_mask=self.transit_masks, time_key='time')
-            og_df = self.mask_other_signals(og_df, transits_mask=self.transit_masks, time_key='time')
-            lc_df['flux'] = wotan.flatten(lc_df['#time'].to_numpy(), lc_df['flux'].to_numpy(), duration * 4, method='biweight')
-            centroids_df = centroids_df.sort_values(by=['time'])
-            centroids_df['centroids_ra'] = wotan.flatten(centroids_df['time'].to_numpy(), centroids_df['centroids_ra'].to_numpy(), duration * 4, method='biweight')
-            centroids_df['centroids_dec'] = wotan.flatten(centroids_df['time'].to_numpy(), centroids_df['centroids_dec'].to_numpy(), duration * 4, method='biweight')
-            centroids_df['time'] = self.fold(centroids_df['time'].to_numpy(), period, epoch + period / 2)
-            og_df = og_df.sort_values(by=['time'])
-            og_df['halo_flux'] = wotan.flatten(og_df['time'].to_numpy(), og_df['halo_flux'].to_numpy(), duration * 4, method='biweight')
-            og_df['core_flux'] = wotan.flatten(og_df['time'].to_numpy(), og_df['core_flux'].to_numpy(), duration * 4, method='biweight')
-            og_df['og_flux'] = og_df['halo_flux'] - og_df['core_flux']
-            og_df = og_df.drop(columns=['halo_flux', 'core_flux'])
-            og_df['time'] = self.fold(og_df['time'].to_numpy(), period, epoch + period / 2)
-            centroids_df = centroids_df.sort_values(by=['time'])
-            og_df = og_df.sort_values(by=['time'])
-            centroids_df = self._prepare_input_centroids(centroids_df)
-            og_df = self._prepare_input_og(og_df)
-            og_df = og_df[(og_df['time'] > 0.5 - duration_to_period * 3) & (
-                    og_df['time'] < 0.5 + duration_to_period * 3)]
-            centroids_df = centroids_df[(centroids_df['time'] > 0.5 - duration_to_period * 3) & (
-                    centroids_df['time'] < 0.5 + duration_to_period * 3)]
-            folded_centroids_array[i], folded_centroids_array_err[i] = self.bin_by_time(centroids_df.to_numpy(), self.input_sizes[3], target_row['object_id'])
-            folded_og_array[i], folded_og_array_err[i] = self.bin_by_time(og_df.to_numpy(), self.input_sizes[3], target_row['object_id'])
-            #TODO refactor to use mission for star files
-            star_df = pd.read_csv(self.star_filename, usecols=['Teff', 'radius', 'mass', 'ra', 'dec'],
-                                  index_col=False)
-            star_neighbours_df = pd.read_csv(self.star_filename,
-                                             usecols=['Teff', 'lum', 'v', 'j', 'k', 'h', 'radius', 'mass'], index_col=False)
-            star_neighbours_df = self._prepare_input_neighbour_stars(star_neighbours_df)
-            star_df, ra, dec = self._prepare_input_star(star_df)
-            lc_df, good_transits_count, transits_count = self._prepare_input_lc(lc_df, period, epoch, duration,
-                                                                                time_key='#time', flux_key='flux')
-            not_null_times_args = np.argwhere(lc_df['#time'].to_numpy() > 0).flatten()
-            lc_df = lc_df.iloc[not_null_times_args]
-            offset_filename = file_prefix + 'source_offsets.csv'
-            offset_df = pd.read_csv(offset_filename, low_memory=True)
-            row = offset_df[offset_df['name'] == 'mean'].iloc[0]
-            offset_ra = row['ra']
-            offset_dec = row['dec']
-            offset_ra_err = row['ra_err']
-            offset_dec_err = row['dec_err']
-            offset_err = offset_ra_err if offset_ra_err > offset_dec_err else offset_dec_err
-            offset_err = offset_err * 60 * 60
-            target_dist = np.sqrt((offset_ra - ra) ** 2 + (offset_dec - dec) ** 2)
-            offset_err = offset_err if offset_err > 0 else target_dist * 2
-            offset_err = offset_err if offset_err < 1 else 1 - self.zero_epsilon
-            good_transits_count_norm = good_transits_count / 20
-            good_transits_count_norm = good_transits_count_norm if good_transits_count_norm < 1 else 1 - self.zero_epsilon
-            good_transits_ratio = good_transits_count / transits_count if transits_count > 0 else self.zero_epsilon
-            good_transits_ratio = good_transits_ratio if good_transits_ratio < 1 else 1 - self.zero_epsilon
-            planet_radius = target_row['radius(earth)'] / 300
-            planet_radius = planet_radius if planet_radius < 1 else 1 - self.zero_epsilon
-            depth = target_row['depth_primary'] / 1e3
-            depth = depth if depth < 1 else 1 - self.zero_epsilon
-            scalar_values[i] = np.transpose([[period / 1200 if period < 1200 else 1, duration / 15, depth,
-                                              planet_radius, good_transits_count_norm,
-                                              good_transits_ratio,
-                                              target_dist if not np.isnan(target_dist) else self.zero_epsilon,
-                                              offset_err]])
-            #['ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k'])
-            neighbours_array = star_neighbours_df.to_numpy().flatten()
-            #star_neighbours_array[i] = np.transpose([neighbours_array if len(neighbours_array) == 9 * 15 \
-            #    else neighbours_array + np.zeros(9 * 15 - len(neighbours_array))])
-            star_array[i] = np.transpose([star_df.to_numpy()])
-            time = lc_df['#time'].to_numpy()
-            # Global flux
-            # Shifting data 1/4 so that main transit and possible occultation don't get cut by the borders
-            lc_df_sorted_fold = lc_df.copy()
-            lc_df_sorted_fold['#time'] = self.fold(time, period, epoch + period / 4)
-            lc_df_sorted_fold = lc_df_sorted_fold.sort_values(by=['#time'])
-            global_flux_array[i], global_flux_array_err[i] = \
-                self.bin_by_time(lc_df_sorted_fold.to_numpy(), self.input_sizes[2], target_row['object_id'])
-            # Focus flux even
-            lc_df_focus = lc_df.copy()
-            lc_df_focus['#time'] = self.fold(time, period, epoch)
-            lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-            lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                      (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-            folded_flux_even_array[i], folded_flux_even_array_err[i] = \
-                self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[3], target_row['object_id'])
-            # Focus flux odd
-            lc_df_focus = lc_df.copy()
-            lc_df_focus['#time'] = self.fold(time, period, epoch + period / 2)
-            lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-            lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                      (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-            folded_flux_odd_array[i], folded_flux_odd_array_err[i] = \
-                self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[4], target_row['object_id'])
-            # Focus flux harmonic even
-            lc_df_focus = lc_df.copy()
-            lc_df_focus['#time'] = self.fold(time, period * 2, epoch)
-            lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-            lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                      (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-            folded_flux_even_har_array[i], folded_flux_even_har_array_err[i] = \
-                self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[7], target_row['object_id'])
-            # Focus flux harmonic odd
-            lc_df_focus = lc_df.copy()
-            lc_df_focus['#time'] = self.fold(time, period * 2, epoch + period)
-            lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-            lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                      (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-            folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i] = \
-                self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[8], target_row['object_id'])
-            # Focus flux sub-harmonic even
-            lc_df_focus = pd.DataFrame(columns=['#time', 'flux'])
-            time, flux0, _ = LcbuilderHelper.mask_transits(time,
-                                                            lc_df.copy()['flux'].to_numpy(), period, duration * 2,
-                                                            epoch)
-            lc_df_focus['#time'] = time
-            lc_df_focus['flux'] = flux0
-            lc_df_focus['#time'] = self.fold(time, period / 2, epoch)
-            lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-            lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                      (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-            folded_flux_even_subhar_array[i], folded_flux_even_subhar_array_err[i] = \
-                self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[5], target_row['object_id'])
-            # Focus flux sub-harmonic odd
-            lc_df_focus = pd.DataFrame(columns=['#time', 'flux'])
-            lc_df_focus['#time'] = time
-            lc_df_focus['flux'] = flux0
-            lc_df_focus['#time'] = self.fold(time, period / 2, epoch + period / 4)
-            lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-            lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                      (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-            folded_flux_odd_subhar_array[i], folded_flux_odd_subhar_array_err[i] = \
-                self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[6], target_row['object_id'])
+            if not self.use_csvs:
+                #TODO refactor to use mission for _lc files
+                lc_filename = self.lc_filename
+                centroids_filename = file_prefix + 'centroids.csv'
+                og_filename = file_prefix + 'og_dg.csv'
+                lc_df = pd.read_csv(lc_filename, usecols=['#time', 'flux'], low_memory=True)
+                centroids_df = pd.read_csv(centroids_filename, usecols=['time', 'centroids_ra', 'centroids_dec'],
+                                                    low_memory=True)
+                og_df = pd.read_csv(og_filename, usecols=['time', 'og_flux', 'halo_flux', 'core_flux'], low_memory=True)
+                if lc_df is None:
+                    logging.warning("No curve for target " + file_prefix)
+                    raise ValueError("No curve for target " + file_prefix)
+                lc_df = lc_df.sort_values(by=['#time'])
+                lc_df = self.mask_other_signals(lc_df, transits_mask=self.transit_masks, time_key='#time')
+                centroids_df = self.mask_other_signals(centroids_df, transits_mask=self.transit_masks, time_key='time')
+                og_df = self.mask_other_signals(og_df, transits_mask=self.transit_masks, time_key='time')
+                lc_df['flux'] = wotan.flatten(lc_df['#time'].to_numpy(), lc_df['flux'].to_numpy(), duration * 4, method='biweight')
+                centroids_df = centroids_df.sort_values(by=['time'])
+                centroids_df['centroids_ra'] = wotan.flatten(centroids_df['time'].to_numpy(), centroids_df['centroids_ra'].to_numpy(), duration * 4, method='biweight')
+                centroids_df['centroids_dec'] = wotan.flatten(centroids_df['time'].to_numpy(), centroids_df['centroids_dec'].to_numpy(), duration * 4, method='biweight')
+                centroids_df['time'] = self.fold(centroids_df['time'].to_numpy(), period, epoch + period / 2)
+                og_df = og_df.sort_values(by=['time'])
+                og_df['halo_flux'] = wotan.flatten(og_df['time'].to_numpy(), og_df['halo_flux'].to_numpy(), duration * 4, method='biweight')
+                og_df['core_flux'] = wotan.flatten(og_df['time'].to_numpy(), og_df['core_flux'].to_numpy(), duration * 4, method='biweight')
+                og_df['og_flux'] = og_df['halo_flux'] - og_df['core_flux']
+                og_df = og_df.drop(columns=['halo_flux', 'core_flux'])
+                og_df['time'] = self.fold(og_df['time'].to_numpy(), period, epoch + period / 2)
+                centroids_df = centroids_df.sort_values(by=['time'])
+                og_df = og_df.sort_values(by=['time'])
+                centroids_df = self._prepare_input_centroids(centroids_df)
+                og_df = self._prepare_input_og(og_df)
+                og_df = og_df[(og_df['time'] > 0.5 - duration_to_period * 3) & (
+                        og_df['time'] < 0.5 + duration_to_period * 3)]
+                centroids_df = centroids_df[(centroids_df['time'] > 0.5 - duration_to_period * 3) & (
+                        centroids_df['time'] < 0.5 + duration_to_period * 3)]
+                folded_centroids_array[i], folded_centroids_array_err[i] = self.bin_by_time(centroids_df.to_numpy(), self.input_sizes[3], target_row['object_id'])
+                folded_og_array[i], folded_og_array_err[i] = self.bin_by_time(og_df.to_numpy(), self.input_sizes[3], target_row['object_id'])
+                #TODO refactor to use mission for star files
+                star_df = pd.read_csv(self.star_filename, usecols=['Teff', 'radius', 'mass', 'ra', 'dec'],
+                                      index_col=False)
+                star_neighbours_df = pd.read_csv(self.star_filename,
+                                                 usecols=['Teff', 'lum', 'v', 'j', 'k', 'h', 'radius', 'mass'], index_col=False)
+                star_neighbours_df = self._prepare_input_neighbour_stars(star_neighbours_df)
+                star_df, ra, dec = self._prepare_input_star(star_df)
+                lc_df, good_transits_count, transits_count = self._prepare_input_lc(lc_df, period, epoch, duration,
+                                                                                    time_key='#time', flux_key='flux')
+                not_null_times_args = np.argwhere(lc_df['#time'].to_numpy() > 0).flatten()
+                lc_df = lc_df.iloc[not_null_times_args]
+                offset_filename = file_prefix + 'source_offsets.csv'
+                offset_df = pd.read_csv(offset_filename, low_memory=True)
+                row = offset_df[offset_df['name'] == 'mean'].iloc[0]
+                offset_ra = row['ra']
+                offset_dec = row['dec']
+                offset_ra_err = row['ra_err']
+                offset_dec_err = row['dec_err']
+                target_dist = np.sqrt((offset_ra - ra) ** 2 + (offset_dec - dec) ** 2)
+                offset_err = offset_ra_err if offset_ra_err > offset_dec_err else offset_dec_err
+                offset_err = offset_err if offset_err > 0 else target_dist * 2
+                offset_err = offset_err / (target_dist * 2)
+                offset_err = 1 - self.zero_epsilon if offset_err >= 1 else offset_err
+                good_transits_count_norm = good_transits_count / 20
+                good_transits_count_norm = good_transits_count_norm if good_transits_count_norm < 1 else 1 - self.zero_epsilon
+                good_transits_ratio = good_transits_count / transits_count if transits_count > 0 else self.zero_epsilon
+                good_transits_ratio = good_transits_ratio if good_transits_ratio < 1 else 1 - self.zero_epsilon
+                planet_radius = target_row['radius(earth)'] / 300
+                planet_radius = planet_radius if planet_radius < 1 else 1 - self.zero_epsilon
+                depth = target_row['depth_primary'] / 1e3
+                depth = depth if depth < 1 else 1 - self.zero_epsilon
+                scalar_values[i] = np.transpose([[period / 1200 if period < 1200 else 1, duration / 15, depth,
+                                                  planet_radius, good_transits_count_norm,
+                                                  good_transits_ratio,
+                                                  target_dist if not np.isnan(target_dist) else self.zero_epsilon,
+                                                  offset_err]])
+                #['ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k'])
+                neighbours_array = star_neighbours_df.to_numpy().flatten()
+                #star_neighbours_array[i] = np.transpose([neighbours_array if len(neighbours_array) == 9 * 15 \
+                #    else neighbours_array + np.zeros(9 * 15 - len(neighbours_array))])
+                star_array[i] = np.transpose([star_df.to_numpy()])
+                time = lc_df['#time'].to_numpy()
+                # Global flux
+                # Shifting data 1/4 so that main transit and possible occultation don't get cut by the borders
+                lc_df_sorted_fold = lc_df.copy()
+                lc_df_sorted_fold['#time'] = self.fold(time, period, epoch + period / 4)
+                lc_df_sorted_fold = lc_df_sorted_fold.sort_values(by=['#time'])
+                global_flux_array[i], global_flux_array_err[i] = \
+                    self.bin_by_time(lc_df_sorted_fold.to_numpy(), self.input_sizes[2], target_row['object_id'])
+                # Focus flux even
+                lc_df_focus = lc_df.copy()
+                lc_df_focus['#time'] = self.fold(time, period, epoch)
+                lc_df_focus = lc_df_focus.sort_values(by=['#time'])
+                lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
+                                          (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
+                folded_flux_even_array[i], folded_flux_even_array_err[i] = \
+                    self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[3], target_row['object_id'])
+                # Focus flux odd
+                lc_df_focus = lc_df.copy()
+                lc_df_focus['#time'] = self.fold(time, period, epoch + period / 2)
+                lc_df_focus = lc_df_focus.sort_values(by=['#time'])
+                lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
+                                          (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
+                folded_flux_odd_array[i], folded_flux_odd_array_err[i] = \
+                    self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[4], target_row['object_id'])
+                # Focus flux harmonic even
+                lc_df_focus = lc_df.copy()
+                lc_df_focus['#time'] = self.fold(time, period * 2, epoch)
+                lc_df_focus = lc_df_focus.sort_values(by=['#time'])
+                lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
+                                          (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
+                folded_flux_even_har_array[i], folded_flux_even_har_array_err[i] = \
+                    self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[7], target_row['object_id'])
+                # Focus flux harmonic odd
+                lc_df_focus = lc_df.copy()
+                lc_df_focus['#time'] = self.fold(time, period * 2, epoch + period)
+                lc_df_focus = lc_df_focus.sort_values(by=['#time'])
+                lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
+                                          (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
+                folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i] = \
+                    self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[8], target_row['object_id'])
+                # Focus flux sub-harmonic even
+                lc_df_focus = pd.DataFrame(columns=['#time', 'flux'])
+                time, flux0, _ = LcbuilderHelper.mask_transits(time,
+                                                                lc_df.copy()['flux'].to_numpy(), period, duration * 2,
+                                                                epoch)
+                lc_df_focus['#time'] = time
+                lc_df_focus['flux'] = flux0
+                lc_df_focus['#time'] = self.fold(time, period / 2, epoch)
+                lc_df_focus = lc_df_focus.sort_values(by=['#time'])
+                lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
+                                          (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
+                folded_flux_even_subhar_array[i], folded_flux_even_subhar_array_err[i] = \
+                    self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[5], target_row['object_id'])
+                # Focus flux sub-harmonic odd
+                lc_df_focus = pd.DataFrame(columns=['#time', 'flux'])
+                lc_df_focus['#time'] = time
+                lc_df_focus['flux'] = flux0
+                lc_df_focus['#time'] = self.fold(time, period / 2, epoch + period / 4)
+                lc_df_focus = lc_df_focus.sort_values(by=['#time'])
+                lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
+                                          (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
+                folded_flux_odd_subhar_array[i], folded_flux_odd_subhar_array_err[i] = \
+                    self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[6], target_row['object_id'])
+            else:
+                scalar_values[i] = [[e] for e in np.loadtxt(file_prefix + '_input_scalar_values.csv', delimiter=',')]
+                star_array[i] = [[e] for e in np.loadtxt(file_prefix + '_input_star.csv', delimiter=',')]
+                star_neighbours_array[i] = [[e] for e in np.loadtxt(file_prefix + '_input_nb.csv', delimiter=',')]
+                global_flux_array[i] = np.loadtxt(file_prefix + '_input_global.csv', delimiter=',')
+                global_flux_array_err[i] = np.loadtxt(file_prefix + '_input_global_err.csv', delimiter=',')
+                folded_flux_even_array[i] = np.loadtxt(file_prefix + '_input_even.csv', delimiter=',')
+                folded_flux_even_array_err[i] = np.loadtxt(file_prefix + '_input_even_err.csv', delimiter=',')
+                folded_flux_odd_array[i] = np.loadtxt(file_prefix + '_input_odd.csv', delimiter=',')
+                folded_flux_odd_array_err[i] = np.loadtxt(file_prefix + '_input_odd_err.csv', delimiter=',')
+                folded_flux_even_subhar_array[i] = np.loadtxt(file_prefix + '_input_even_sh.csv', delimiter=',')
+                folded_flux_even_subhar_array_err[i] = np.loadtxt(file_prefix + '_input_even_sh_err.csv', delimiter=',')
+                folded_flux_odd_subhar_array[i] = np.loadtxt(file_prefix + '_input_odd_sh.csv', delimiter=',')
+                folded_flux_odd_subhar_array_err[i] = np.loadtxt(file_prefix + '_input_odd_sh_err.csv', delimiter=',')
+                folded_flux_even_har_array[i] = np.loadtxt(file_prefix + '_input_even_h.csv', delimiter=',')
+                folded_flux_even_har_array_err[i] = np.loadtxt(file_prefix + '_input_even_h_err.csv', delimiter=',')
+                folded_flux_odd_har_array[i] = np.loadtxt(file_prefix + '_input_odd_h.csv', delimiter=',')
+                folded_flux_odd_har_array_err[i] = np.loadtxt(file_prefix + '_input_odd_h_err.csv', delimiter=',')
+                folded_centroids_array[i] = np.loadtxt(file_prefix + '_input_centroids.csv', delimiter=',')
+                folded_centroids_array_err[i] = np.loadtxt(file_prefix + '_input_centroids_err.csv', delimiter=',')
+                folded_og_array[i] = np.loadtxt(file_prefix + '_input_og.csv', delimiter=',')
+                folded_og_array_err[i] = np.loadtxt(file_prefix + '_input_og_err.csv', delimiter=',')
             self.assert_in_range(object_id, scalar_values[i], None)
             self.assert_in_range(object_id, global_flux_array[i], global_flux_array_err[i])
             self.assert_in_range(object_id, star_array[i], None)
@@ -386,6 +410,27 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
             # self._plot_input(folded_flux_odd_subhar_array[i], folded_flux_odd_subhar_array_err[i], target_row['object_id'], "odd_subhar")
             self._plot_input(folded_og_array[i], folded_og_array_err[i], target_row['object_id'], "OG", save_dir=inputs_save_dir)
             self._plot_input(folded_centroids_array[i], folded_centroids_array_err[i], target_row['object_id'], "CENTROIDS", save_dir=inputs_save_dir)
+            np.savetxt(file_prefix + '_input_scalar_values.csv', scalar_values[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_star.csv', star_array[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_nb.csv', star_neighbours_array[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_global.csv', global_flux_array[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_global_err.csv', global_flux_array_err[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_even.csv', folded_flux_even_array[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_even_err.csv', folded_flux_even_array_err[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_odd.csv', folded_flux_odd_array[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_odd_err.csv', folded_flux_odd_array_err[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_even_sh.csv', folded_flux_even_subhar_array[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_even_sh_err.csv', folded_flux_even_subhar_array_err[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_odd_sh.csv', folded_flux_odd_subhar_array[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_odd_sh_err.csv', folded_flux_odd_subhar_array_err[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_even_h.csv', folded_flux_even_har_array[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_even_h_err.csv', folded_flux_even_har_array_err[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_odd_h.csv', folded_flux_odd_har_array[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_odd_h_err.csv', folded_flux_odd_har_array_err[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_centroids.csv', folded_centroids_array[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_centroids_err.csv', folded_centroids_array_err[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_og.csv', folded_og_array[i], delimiter=',')
+            np.savetxt(file_prefix + '_input_og_err.csv', folded_og_array_err[i], delimiter=',')
             i = i + 1
         filter_channels = np.array([0, 1, 6, 7, 8, 9, 10, 11])
         return [scalar_values[:, [0, 1, 2, 3, 4, 5]], scalar_values[:, [6, 7]],
