@@ -361,11 +361,11 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
         else:
             planet_eff_temp = star_info.teff * (sec_depth ** (1 / 4)) * (rp_rs ** (1 / 2))
         statistics_df = pd.DataFrame(columns=['name', 'value'])
-        statistics_df = statistics_df.append({'name': 'depth', 'value': depth}, ignore_index=True)
-        statistics_df = statistics_df.append({'name': 'sec_depth', 'value': sec_depth}, ignore_index=True)
-        statistics_df = statistics_df.append({'name': 'geom_albedo', 'value': geom_albedo}, ignore_index=True)
-        statistics_df = statistics_df.append({'name': 'eq_temp', 'value': planet_eq_temp}, ignore_index=True)
-        statistics_df = statistics_df.append({'name': 'eff_temp', 'value': planet_eff_temp}, ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['depth'], 'value': [depth]}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': 'sec_depth', 'value': sec_depth}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': 'geom_albedo', 'value': geom_albedo}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': 'eq_temp', 'value': planet_eq_temp}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': 'eff_temp', 'value': planet_eff_temp}, orient='columns')], ignore_index=True)
         statistics_df.to_csv(file_prefix + '_metrics_' + str(cadence) + '.csv')
     return lc_df
 
