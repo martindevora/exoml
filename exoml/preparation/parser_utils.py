@@ -152,12 +152,12 @@ def create_star_csv(create_star_input):
             stars["dist_arcsec"] = sep
             stars["PA (E of N)"] = pa  # TODO should we use this?
             for index, star in stars.iterrows():
-                star_df = star_df.append({'id': star['ID'], 'ra': star['ra'], 'dec': star['dec'], 'ld_a': 0,
-                                          'ld_b': 0, 'Teff': star['Teff'],
-                                          'lum': star['lum'], 'logg': star['logg'], 'radius': star['rad'],
-                                          'mass': star['mass'], 'v': star['Vmag'], 'j': star['Jmag'],
-                                          'h': star['Hmag'],
-                                          'k': star['Kmag'], 'dist_arcsec': star['dist_arcsec']}, ignore_index=True)
+                star_df = pd.concat([star_df, pd.DataFrame.from_dict({'id': [star['ID']], 'ra': [star['ra']], 'dec': [star['dec']], 'ld_a': [0],
+                                          'ld_b': [0], 'Teff': [star['Teff']],
+                                          'lum': [star['lum']], 'logg': [star['logg']], 'radius': [star['rad']],
+                                          'mass': [star['mass']], 'v': [star['Vmag']], 'j': [star['Jmag']],
+                                          'h': [star['Hmag']],
+                                          'k': [star['Kmag']], 'dist_arcsec': [star['dist_arcsec']]}, orient='columns')], ignore_index=True)
             star_df = star_df.sort_values(["dist_arcsec"], ascending=True)
         except Exception as e:
             logging.exception('Something failed when retrieving neighbours info for object id %s',

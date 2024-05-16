@@ -292,6 +292,19 @@ def create_synth_targets_df(tces_dir):
     synth_df['object_id'] = 'KIC ' + synth_df.loc[:, 'kepid'].astype(str)
     synth_df.to_csv(tces_dir + '/classified_tces_synthetic.csv')
 
+def create_tess_cps_df(df_dir):
+    tois_df = pd.read_csv('/home/martin/.sherlockpipe/tois.csv')
+    tois_df = tois_df.loc[(tois_df["Disposition"] == "KP") | (tois_df["Disposition"] == "CP")]
+    tois_df['object_id'] = tois_df['Object Id']
+    tois_df['kepid'] = tois_df['object_id'].str[3:-1]
+    tois_df['period'] = tois_df['Period (days)']
+    tois_df['epoch'] = tois_df['Epoch (BJD)']
+    tois_df['duration(h)'] = tois_df['Duration (hours)']
+    tois_df['depth_primary'] = tois_df['Depth (ppm)']
+    tois_df['radius(earth)'] = tois_df['Planet Radius (R_Earth)']
+    tois_df = tois_df.loc[(~tois_df['period'].isna()) & (tois_df['period'] > 0.0)]
+    tois_df.to_csv(f"{df_dir}/tess_cps.csv", index=False)
+
 def download_synth_targets(download_dir, wget_files, df_file):
     df = pd.read_csv(df_file, comment='#')
     os.chdir(download_dir)
@@ -319,7 +332,7 @@ def download_synth_targets(download_dir, wget_files, df_file):
 
 
 def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_count() - 1, force=False, ids=None,
-                       mode='all'):
+                       mode='all', mission_prefix='KIC'):
     tces_df = pd.read_csv(csv, comment='#')
     tces_df = tces_df.sort_values(by=["kepid"], ascending=True)
     #tces_df = tces_df.drop_duplicates(subset=["kepid"], keep='last')
@@ -333,7 +346,7 @@ def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_cou
     print("Total number of targets is " + str(len(tces_df)))
     for index in ranges:
         tce_row = tces_df.iloc[index]
-        inputs = inputs + [CreateTargetInput('KIC', tce_row['object_id'], None, target_dir, None, tce_row, cache_dir, index, force=force, mode=mode)]
+        inputs = inputs + [CreateTargetInput(mission_prefix, tce_row['object_id'], None, target_dir, None, tce_row, cache_dir, index, force=force, mode=mode)]
     with Pool(processes=cores, maxtasksperchild=1) as pool:
         pool.map(create_target_csv, inputs, chunksize=1)
 
