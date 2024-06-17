@@ -4,6 +4,7 @@ import os
 from threading import Thread
 from typing import List
 
+import foldedleastsquares.stats
 import numpy
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -19,17 +20,19 @@ from keras.src.optimizers import Adam
 from keras.utils import plot_model
 from keras.src.layers import LeakyReLU
 from keras_nlp.src.layers import TransformerEncoder
+from lightkurve import TessLightCurve
 from numpy import ndarray
 from sklearn.utils import shuffle
 
 from exoml.ml.callback.early_stopping import ExoMlEarlyStopping
-from exoml.ml.callback.learning_rate import SWA, MultiOptimizer
+from exoml.ml.callback.learning_rate import SWA, MultiOptimizer, WarmUpAndLinDecreaseCallback
 from exoml.ml.callback.training_data_aware import ModelDirDataAwareCallback, ValidationDataAwareCallback
 from exoml.ml.layers.transformer_classifier import TransformerClassifier
 from exoml.ml.log.get_weights_logger import ModelWeightsLogger
 from exoml.ml.log.with_logging import WithLogging
 from exoml.ml.model.base_model import HyperParams
 from exoml.santo.santo_generator import SantoGenerator
+from exoml.santo.santo_predict_generator import SantoPredictGenerator
 
 
 def weighted_binary_crossentropy_param(weight=1):
@@ -213,6 +216,110 @@ class SANTO(WithLogging):
             fit_history = self.fit_model(hyperparams, training_batch_generator, steps_per_epoch, class_weights,
                                          validation_batch_generator, model_validation_steps)
             self.save(output_dir)
+
+    def predict(self, times: list, fluxes: list, model_dir: str, batch_size: int = 10000, input_size: int = 500, zero_epsilon: float = 1e-7,
+                plot=False, plot_positives=False, tagged_data: list = None, target_name: str = ""):
+        self.load_model(model_dir)
+        generator = SantoPredictGenerator(times, fluxes, input_size=input_size, step_size=1, batch_size=batch_size, zero_epsilon=zero_epsilon)
+        generator_df = generator.generator_info_df.sort_values(by=['curve_index', 'batch_index'])
+        predictions = self.model.predict(generator)
+        predictions = predictions.flatten()
+        predictions_curve_indexes = np.full((len(predictions)), -1)
+        current_index = 0
+        for index, row in generator_df.iterrows():
+            if row['end_jump_index'] >= row['initial_jump_index'] + row['file_index'] + batch_size:
+                predictions_curve_indexes[current_index:current_index + batch_size] = row['curve_index']
+            else:
+                diff = row['end_jump_index'] - row['initial_jump_index']
+                predictions_curve_indexes[current_index:current_index + int(diff % batch_size)] = row['curve_index']
+            current_index = current_index + batch_size
+        results = []
+        times_windows = []
+        fluxes_windows = []
+        predictions_windows = []
+        for index in np.arange(0, len(times)):
+            curve_indexes = np.argwhere(predictions_curve_indexes == index).flatten()
+            results = results + [predictions[curve_indexes]]
+            results[index] = np.concatenate([results[index][-input_size // 2:], results[index][:-input_size // 2]])
+            local_maxima_indexes = self.tokenize_found_transits(times[index], fluxes[index], results[index], plot=plot_positives, tagged_data=tagged_data)
+            if plot:
+                dif = times[index][1:] - times[index][:-1]
+                jumps = np.where(dif > 1)[0]
+                jumps = np.append(jumps, len(times[index]))
+                previous_jump_index = 0
+                for jumpIndex in jumps:
+                    times_truncated = times[index][previous_jump_index:jumpIndex]
+                    fluxes_truncated = fluxes[index][previous_jump_index:jumpIndex]
+                    results_truncated = results[index][previous_jump_index:jumpIndex]
+                    fig, axs = plt.subplots(2 if tagged_data is None else 3, 1, figsize=(16, 8),
+                                            constrained_layout=True)
+                    if tagged_data is not None:
+                        tags_truncated = tagged_data[index][previous_jump_index:jumpIndex]
+                        axs[2].plot(times_truncated, tags_truncated, color='orange')
+                    axs[0].scatter(times_truncated, fluxes_truncated)
+                    axs[1].plot(times_truncated, results_truncated, color='blue')
+                    fig.suptitle(target_name)
+                    previous_jump_index = jumpIndex + 1
+                    plt.show()
+                    plt.close(fig)
+                    plt.clf()
+                periodogram = (TessLightCurve(times[index], results[index]) \
+                               .to_periodogram(minimum_period=0.5, maximum_period=10, oversample_factor=3))
+                # power_norm = self.running_median(periodogram.power.value, 20)
+                periodogram.plot(view='period', scale='log')
+                plt.show()
+        return results
+
+    def tokenize_found_transits(self, time, flux, predictions, window_size=500, plot=False, tagged_data=None):
+        positive_predictions = predictions
+        for _ in np.arange(0, 10):
+            positive_predictions = np.convolve(positive_predictions, np.ones(25) / 25, mode='same')
+        sigma_low_indexes = np.argwhere(predictions < 3 * np.nanstd(predictions)).flatten()
+        positive_predictions[sigma_low_indexes] = 0
+        diff = np.diff(positive_predictions)
+        local_maxima = (np.hstack([diff, 0]) < 0) & (np.hstack([0, diff]) > 0)
+        local_maxima_indexes = np.argwhere(local_maxima).flatten()
+        if plot:
+            for index in local_maxima_indexes:
+                if index > window_size // 2:
+                    fig, axs = plt.subplots(2 if tagged_data is None else 3, 1, figsize=(16, 8), constrained_layout=True)
+                    above_indexes = np.argwhere(predictions[index - window_size // 2:index + window_size // 2] >= 3 * np.nanstd(predictions))
+                    below_indexes = np.argwhere(predictions[index - window_size // 2:index + window_size // 2] < 3 * np.nanstd(predictions))
+                    axs[0].scatter(time[index - window_size // 2:index + window_size // 2][above_indexes],
+                                   flux[index - window_size // 2:index + window_size // 2][above_indexes],
+                                   color='blue')
+                    axs[1].scatter(time[index - window_size // 2:index + window_size // 2][above_indexes],
+                                predictions[index - window_size // 2:index + window_size // 2][above_indexes],
+                                color='blue')
+                    axs[0].scatter(time[index - window_size // 2:index + window_size // 2][below_indexes],
+                                   flux[index - window_size // 2:index + window_size // 2][below_indexes],
+                                   color='firebrick')
+                    axs[1].scatter(time[index - window_size // 2:index + window_size // 2][below_indexes],
+                                predictions[index - window_size // 2:index + window_size // 2][below_indexes],
+                                color='firebrick')
+                    if tagged_data is not None:
+                        axs[2].scatter(time[index - window_size // 2:index + window_size // 2][above_indexes],
+                                    tagged_data[index - window_size // 2:index + window_size // 2][above_indexes],
+                                    color='blue')
+                    plt.show()
+                    plt.close(fig)
+                    plt.clf()
+        return local_maxima_indexes
+
+
+    def load_model(self, dir, custom_objects={}, compile=False):
+        custom_objects['WarmUpAndLinDecreaseCallback'] = WarmUpAndLinDecreaseCallback
+        custom_objects['ThresholdAtPrecision'] = None
+        logging.info("Loading model from %s", dir)
+        self.set_model(tf.keras.models.load_model(dir, compile=compile, custom_objects=custom_objects))
+        return self
+
+    def set_model(self, model):
+        """
+        Stores the model in a class attribute
+        :param model: the model to be stored
+        """
+        self.model = model
 
     def _get_model_dir(self):
         return self.name + '_model/'
