@@ -2,6 +2,7 @@ import glob
 import gzip
 import multiprocessing
 import os
+import pathlib
 import re
 import shutil
 from multiprocessing import Pool
@@ -296,7 +297,7 @@ def create_tess_cps_df(df_dir):
     tois_df = pd.read_csv('/home/martin/.sherlockpipe/tois.csv')
     tois_df = tois_df.loc[(tois_df["Disposition"] == "KP") | (tois_df["Disposition"] == "CP")]
     tois_df['object_id'] = tois_df['Object Id']
-    tois_df['kepid'] = tois_df['object_id'].str[3:-1]
+    tois_df['kepid'] = tois_df['Object Id'].str[4:]
     tois_df['period'] = tois_df['Period (days)']
     tois_df['epoch'] = tois_df['Epoch (BJD)']
     tois_df['duration(h)'] = tois_df['Duration (hours)']
@@ -304,6 +305,43 @@ def create_tess_cps_df(df_dir):
     tois_df['radius(earth)'] = tois_df['Planet Radius (R_Earth)']
     tois_df = tois_df.loc[(~tois_df['period'].isna()) & (tois_df['period'] > 0.0)]
     tois_df.to_csv(f"{df_dir}/tess_cps.csv", index=False)
+
+def create_tess_fps_df(df_dir):
+    tois_df = pd.read_csv('/home/martin/.sherlockpipe/tois.csv')
+    tois_df = tois_df.loc[(tois_df["Disposition"] == "FP") | (tois_df["Disposition"] == "FA")]
+    tois_df['object_id'] = tois_df['Object Id']
+    tois_df['kepid'] = tois_df['Object Id'].str[4:]
+    tois_df['period'] = tois_df['Period (days)']
+    tois_df['epoch'] = tois_df['Epoch (BJD)']
+    tois_df['duration(h)'] = tois_df['Duration (hours)']
+    tois_df['depth_primary'] = tois_df['Depth (ppm)']
+    tois_df['radius(earth)'] = tois_df['Planet Radius (R_Earth)']
+    tois_df = tois_df.loc[(~tois_df['period'].isna()) & (tois_df['period'] > 0.0)]
+    tois_df.to_csv(f"{df_dir}/tess_cps.csv", index=False)
+
+def create_tess_tces_df(df_dir):
+    df = None
+    for file in sorted(glob.glob(f'{df_dir}tess*tcestats.csv')):
+        if df is None:
+            df = pd.read_csv(file, comment='#')
+        else:
+            df = pd.concat([df, pd.read_csv(file, comment='#')], ignore_index=True)
+    tois_df = pd.read_csv('/home/martin/.sherlockpipe/tois.csv')
+    removed_tces = 0
+    df['type'] = 'tce'
+    for index, row in df.copy().iterrows():
+        if len(tois_df.loc[(np.abs(tois_df['Period (days)'] - row['tce_period']) < 0.05) & (tois_df['Object Id'].str[4:].astype(int) == row['ticid'])]) > 0:
+            df.loc[df['tceid'] == row['tceid'], 'type'] = 'toi'
+            removed_tces = removed_tces + 1
+    print("Removed tces " + str(removed_tces))
+    df['object_id'] = "TIC " + df['ticid'].apply(lambda x: str(x))
+    df['kepid'] = df['ticid']
+    df['period'] = df['tce_period']
+    df['epoch'] = df['tce_time0bt']
+    df['duration(h)'] = df['tce_duration']
+    df['depth_primary'] = df['tce_depth']
+    df['radius(earth)'] = df['tce_prad']
+    df.to_csv(df_dir + '/tces.csv')
 
 def download_synth_targets(download_dir, wget_files, df_file):
     df = pd.read_csv(df_file, comment='#')
@@ -319,16 +357,17 @@ def download_synth_targets(download_dir, wget_files, df_file):
                     rows = df[df['KIC'] == kepid]
                     for index, row in rows.iterrows():
                         if 'inj' in row['type']:
-                            print(f"Downloading: {line}")
-                            os.system(line)
                             match_date = re.search(pattern_date, line)
                             lc_file = f'{download_dir}/kplr{kepid:09}-{match_date.group(1)}_INJECTED-' + row['type'] + '_llc.fits'
-                            compressed_file = f'{lc_file}.gz'
-                            if os.path.exists(compressed_file):
-                                with gzip.open(compressed_file, 'rb') as f_in:
-                                    with open(lc_file, 'wb') as f_out:
-                                        shutil.copyfileobj(f_in, f_out)
-                                        os.remove(compressed_file)
+                            if not os.path.exists(lc_file):
+                                print(f"Downloading: {line}")
+                                os.system(line)
+                                compressed_file = f'{lc_file}.gz'
+                                if os.path.exists(compressed_file):
+                                    with gzip.open(compressed_file, 'rb') as f_in:
+                                        with open(lc_file, 'wb') as f_out:
+                                            shutil.copyfileobj(f_in, f_out)
+                                            os.remove(compressed_file)
 
 
 def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_count() - 1, force=False, ids=None,
