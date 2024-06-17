@@ -362,10 +362,10 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
             planet_eff_temp = star_info.teff * (sec_depth ** (1 / 4)) * (rp_rs ** (1 / 2))
         statistics_df = pd.DataFrame(columns=['name', 'value'])
         statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['depth'], 'value': [depth]}, orient='columns')], ignore_index=True)
-        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': 'sec_depth', 'value': sec_depth}, orient='columns')], ignore_index=True)
-        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': 'geom_albedo', 'value': geom_albedo}, orient='columns')], ignore_index=True)
-        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': 'eq_temp', 'value': planet_eq_temp}, orient='columns')], ignore_index=True)
-        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': 'eff_temp', 'value': planet_eff_temp}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['sec_depth'], 'value': [sec_depth]}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['geom_albedo'], 'value': [geom_albedo]}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['eq_temp'], 'value': [planet_eq_temp]}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['eff_temp'], 'value': [planet_eff_temp]}, orient='columns')], ignore_index=True)
         statistics_df.to_csv(file_prefix + '_metrics_' + str(cadence) + '.csv')
     return lc_df
 
@@ -440,7 +440,8 @@ def create_target_csv(create_target_input):
         logging.info("PID %s: Finished to get short cadence info for %s", pid, file_planet_prefix)
     except Exception as e:
         logging.exception("PID %s: Failed short cadence for %s", pid, file_planet_prefix)
-    if create_target_input.lc_file is not None:
+    logging.info(f"lc file is {create_target_input.lc_file}")
+    if create_target_input.lc_file is None:
         try:
             logging.info("PID %s: Trying to get long cadence info for %s", pid, file_planet_prefix)
             file_name = file_planet_prefix + '_metrics_long.csv'
