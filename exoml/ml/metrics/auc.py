@@ -4,6 +4,7 @@ import numpy as np
 import tensorflow.keras.backend as K
 from keras.metrics import Metric
 from keras.metrics import TopKCategoricalAccuracy
+from keras.src.utils import metrics_utils
 from tensorflow.python.ops.metrics_impl import precision
 
 
@@ -282,6 +283,126 @@ class ThresholdAtPrecision(SensitivitySpecificityBase):
         config = {
             "num_thresholds": self.num_thresholds,
             "precision": self.precision,
+        }
+        base_config = super().get_config()
+        return dict(list(base_config.items()) + list(config.items()))
+
+class ThresholdAtRecall(SensitivitySpecificityBase):
+    """Computes best recall where precision is >= specified value.
+
+    For a given score-label-distribution the required precision might not
+    be achievable, in this case 0.0 is returned as recall.
+
+    This metric creates four local variables, `true_positives`,
+    `true_negatives`, `false_positives` and `false_negatives` that are used to
+    compute the recall at the given precision. The threshold for the given
+    precision value is computed and used to evaluate the corresponding recall.
+
+    If `sample_weight` is `None`, weights default to 1.
+    Use `sample_weight` of 0 to mask values.
+
+    If `class_id` is specified, we calculate precision by considering only the
+    entries in the batch for which `class_id` is above the threshold
+    predictions, and computing the fraction of them for which `class_id` is
+    indeed a correct label.
+
+    Args:
+      precision: A scalar value in range `[0, 1]`.
+      num_thresholds: (Optional) Defaults to 200. The number of thresholds to
+        use for matching the given precision.
+      class_id: (Optional) Integer class ID for which we want binary metrics.
+        This must be in the half-open interval `[0, num_classes)`, where
+        `num_classes` is the last dimension of predictions.
+      name: (Optional) string name of the metric instance.
+      dtype: (Optional) data type of the metric result.
+
+    Standalone usage:
+
+    >>> m = tf.keras.metrics.RecallAtPrecision(0.8)
+    >>> m.update_state([0, 0, 1, 1], [0, 0.5, 0.3, 0.9])
+    >>> m.result().numpy()
+    0.5
+
+    >>> m.reset_state()
+    >>> m.update_state([0, 0, 1, 1], [0, 0.5, 0.3, 0.9],
+    ...                sample_weight=[1, 0, 0, 1])
+    >>> m.result().numpy()
+    1.0
+
+    Usage with `compile()` API:
+
+    ```python
+    model.compile(
+        optimizer='sgd',
+        loss='mse',
+        metrics=[tf.keras.metrics.RecallAtPrecision(precision=0.8)])
+    ```
+    """
+
+    @inject_mesh
+    def __init__(
+        self,
+        recall,
+        num_thresholds=200,
+        class_id=None,
+        name=None,
+        dtype=None,
+    ):
+        if recall < 0 or recall > 1:
+            raise ValueError(
+                "Argument `recall` must be in the range [0, 1]. "
+                f"Received: recall={recall}"
+            )
+        self.recall = recall
+        self.num_thresholds = num_thresholds
+        super().__init__(
+            value=recall,
+            num_thresholds=num_thresholds,
+            class_id=class_id,
+            name=name,
+            dtype=dtype,
+        )
+
+    def result(self):
+        precisions = tf.math.divide_no_nan(
+            self.true_positives,
+            tf.math.add(self.true_positives, self.false_positives),
+        )
+        recalls = tf.math.divide_no_nan(
+            self.true_positives,
+            tf.math.add(self.true_positives, self.false_negatives),
+        )
+        return self._find_max_threshold_under_constraint(
+            recalls, precisions, tf.greater_equal
+        )
+
+    def _find_max_threshold_under_constraint(self, constrained, dependent, predicate):
+        """Returns the maximum of dependent_statistic that satisfies the
+        constraint.
+
+        Args:
+          constrained: Over these values the constraint
+            is specified. A rank-1 tensor.
+          dependent: From these values the maximum that satiesfies the
+            constraint is selected. Values in this tensor and in
+            `constrained` are linked by having the same threshold at each
+            position, hence this tensor must have the same shape.
+          predicate: A binary boolean functor to be applied to arguments
+          `constrained` and `self.value`, e.g. `tf.greater`.
+
+        Returns:
+          maximal dependent value, if no value satiesfies the constraint 0.0.
+        """
+        variable_dtype = self.true_positives.dtype
+        thresholds = tf.convert_to_tensor(self.thresholds, dtype=variable_dtype)
+        feasible = tf.where(predicate(constrained, self.value))
+        feasible_exists = tf.greater(tf.size(feasible), 0)
+        return tf.where(feasible_exists, tf.gather(thresholds, tf.gather(feasible, [0])), 0.0)
+
+    def get_config(self):
+        config = {
+            "num_thresholds": self.num_thresholds,
+            "recall": self.recall,
         }
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
