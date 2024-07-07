@@ -68,7 +68,7 @@ def create_targets_df(tces_dir):
     disc_df['duration(h)'] = disc_df['pl_trandur']
     disc_df.loc[disc_df['duration(h)'].isna(), 'duration(h)'] = disc_df[disc_df['duration(h)'].isna()]['koi_duration']
     disc_df.loc[disc_df['duration(h)'].isna(), 'duration(h)'] = disc_df[disc_df['duration(h)'].isna()]['tce_duration']
-    disc_df['depth_primary'] = disc_df['pl_trandep']
+    disc_df['depth_primary'] = disc_df['pl_trandep'] * 10000
     disc_df.loc[disc_df['depth_primary'].isna(), 'depth_primary'] = disc_df[disc_df['depth_primary'].isna()]['koi_depth']
     disc_df.loc[disc_df['depth_primary'].isna(), 'depth_primary'] = disc_df[disc_df['depth_primary'].isna()]['tce_depth']
     disc_df['radius(earth)'] = disc_df['pl_rade']
@@ -199,7 +199,7 @@ def create_targets_multi_df(tces_dir):
     disc_df['duration(h)'] = disc_df['pl_trandur']
     disc_df.loc[disc_df['duration(h)'].isna(), 'duration(h)'] = disc_df[disc_df['duration(h)'].isna()]['koi_duration']
     disc_df.loc[disc_df['duration(h)'].isna(), 'duration(h)'] = disc_df[disc_df['duration(h)'].isna()]['tce_duration']
-    disc_df['depth_primary'] = disc_df['pl_trandep']
+    disc_df['depth_primary'] = disc_df['pl_trandep'] * 10000
     disc_df.loc[disc_df['depth_primary'].isna(), 'depth_primary'] = disc_df[disc_df['depth_primary'].isna()]['koi_depth']
     disc_df.loc[disc_df['depth_primary'].isna(), 'depth_primary'] = disc_df[disc_df['depth_primary'].isna()]['tce_depth']
     disc_df['radius(earth)'] = disc_df['pl_rade']
