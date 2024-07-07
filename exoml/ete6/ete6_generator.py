@@ -183,7 +183,7 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         input_df = input_df.replace(0, self.zero_epsilon)
         return input_df, len(good_quality_t0s), len(t0s_with_data)
 
-    def _prepare_input_star(self, star_df):
+    def _prepare_input_star(self, star_df, teff_mod=1, rad_mod=1, mass_mod=1):
         if 'ra' in star_df.columns:
             ra = star_df['ra'].iloc[0]
         if 'dec' in star_df.columns:
@@ -221,10 +221,11 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
             star_df['k'] = star_df['k'].fillna(-10)
         if 'h' in star_df.columns:
             star_df['h'] = star_df['h'].fillna(-10)
-        star_df['Teff'] = star_df['Teff'] / 60000
-        star_df['radius'] = star_df['radius'] / 3
+        star_df['Teff'] = star_df['Teff'] / 60000 * teff_mod
+        star_df['Teff'] = star_df['Teff'] if star_df['Teff'].iloc[0] <= 1 else 1
+        star_df['radius'] = star_df['radius'] / 3 * rad_mod
         star_df['radius'] = star_df['radius'] if star_df['radius'].iloc[0] <= 1 else 1
-        star_df['mass'] = star_df['mass'] / 3
+        star_df['mass'] = star_df['mass'] / 3 * mass_mod
         star_df['mass'] = star_df['mass'] if star_df['mass'].iloc[0] <= 1 else 1
         if 'lum' in star_df.columns:
             star_df['lum'] = sigmoid(star_df['lum'])
