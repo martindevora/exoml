@@ -1,0 +1,18 @@
+KEPLER length: 27395
+tce_og                  6980
+tce_candidate           6083
+fp                      3558
+tce_source_offset       3222
+tce_secondary           2370
+planet_transit          2186
+tce_centroids_offset    1029
+tce                      804
+tce_odd_even             733
+fa                       311
+planet                   119
+Name: type, dtype: int64
+TESS length: 15355
+none      12631
+planet     1730
+bckEB       715
+EB          279
