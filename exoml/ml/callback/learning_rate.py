@@ -501,7 +501,7 @@ class WarmUpAndLinDecreaseCallback(Callback):
         super().__init__()
 
     def on_epoch_end(self, epoch, logs=None):
-        if isinstance(self.model.optimizer, MultiOptimizer):
+        if self.model.optimizer.__class__.__name__ == MultiOptimizer.__name__:
             for index, optimizer_spec in enumerate(self.model.optimizer.optimizer_specs):
                 optimizer = optimizer_spec['optimizer']
                 warmup_slope = (self.top_lr - self.initial_lr) / self.warmup_epochs
