@@ -602,11 +602,12 @@ class BaseModel(WithLogging):
                     callbacks = []
                     for callback in hyperparams.callbacks:
                         new_callback = callback
-                        if issubclass(callback.__class__, ModelDirDataAwareCallback):
+                        logging.info(f"callback class {callback.__class__.__name__}")
+                        if callback.__class__.__name__ == ModelDirDataAwareCallback.__name__:
                             new_callback.set_model_dir(model_name)
-                        if issubclass(callback.__class__, ValidationDataAwareCallback):
+                        if callback.__class__.__name__ == ValidationDataAwareCallback.__name__:
                             new_callback.set_validation_data(validation_batch_generator)
-                        if issubclass(callback.__class__, ModelCheckpointCallback):
+                        if callback.__class__.__name__ == ModelCheckpointCallback.__name__:
                             if original_checkpoint_callback is None:
                                 original_checkpoint_callback = copy.deepcopy(callback)
                                 logging.info(f"Stored original checkpoint callback with "
