@@ -1,6 +1,7 @@
 import tensorflow as tf
-from keras.layers import MultiHeadAttention, LeakyReLU
-from keras.src.layers import Dense
+from keras_core.src.layers import LeakyReLU
+#from keras.layers import MultiHeadAttention, LeakyReLU
+#from keras.src.layers import Dense
 from keras_nlp.src.layers import TransformerEncoder
 
 from exoml.ml.layers.dropout import AdaptiveStdDropout
@@ -222,6 +223,7 @@ class TransformerClassifier(tf.keras.layers.Layer):
                                        hyperparams=self.hyperparams, num_blocks=self.num_blocks)
         self.layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-6, name="Transformer/encoder_norm")
         activation = "softmax" if self.classes > 1 else "sigmoid"
+        self.output_flatten = tf.keras.layers.Flatten()
         self.head = tf.keras.layers.Dense(self.classes, name="head", activation=activation,
                                           activity_regularizer=tf.keras.regularizers.L1L2(
                                               l1=self.hyperparams.l1_regularization,
@@ -229,17 +231,18 @@ class TransformerClassifier(tf.keras.layers.Layer):
                                           )
 
 
-    def call(self, inputs, training=True):
+    def call(self, inputs):
         # result = self.linear_proj(inputs)
         # Assuming we don't need to reshape our data as we don't need to flatten the resulting image of the linear_proj
         #result = tf.keras.layers.Reshape((result.shape[1] * result.shape[2], self.transformer_input_size))(result)
         #result = self.class_token(result)
         #result = self.add_pos_embedding(result)
-        result = self.transformer(inputs, training=training)
+        result = self.transformer(inputs)
         # result = tf.keras.layers.Lambda(
         #      lambda v: v[:, 0],
         #      name="ExtractToken")(result)
         result = self.layer_norm(result)
+        result = self.output_flatten(result)
         result = self.head(result)
         #result = self.dropout_layer(result, training=training)
         return result

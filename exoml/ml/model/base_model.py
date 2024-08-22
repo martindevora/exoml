@@ -4,13 +4,19 @@ import logging
 import os
 from typing import List, Dict, Union, Any, Optional, Literal
 
+import keras
 import numpy as np
 import tensorflow as tf
 import pandas as pd
 from abc import abstractmethod
 
-from keras.optimizers import Adam
-from keras.utils import plot_model
+from keras_core.src.optimizers import Adam
+from keras_core.src.optimizers.schedules.learning_rate_schedule import LearningRateSchedule
+from keras_core.src.utils import plot_model
+# from keras.optimizers import Adam
+# from keras.utils import plot_model
+# from keras.optimizers.schedules import LearningRateSchedule
+
 from sklearn.utils import shuffle
 
 from exoml.ml.callback.checkpoint import ModelCheckpointCallback
@@ -22,11 +28,12 @@ from exoml.ml.callback.training_data_aware import ValidationDataAwareCallback, M
 from exoml.ml.learning_rate.schedulers import ExponentialRescaleDecay
 from exoml.ml.log.get_weights_logger import ModelWeightsLogger
 from exoml.ml.log.with_logging import WithLogging
-from keras.optimizers.schedules import LearningRateSchedule
 
 from exoml.ml.metrics.auc import precision_at_k, mean_positive_value, mean_true_positive_value, mean_false_positive_value, \
     mean_true_negative_value, ThresholdAtPrecision
-from exoml.ml.callback.learning_rate import MultiOptimizer, SWA
+
+#from exoml.ml.callback.learning_rate import MultiOptimizer, SWA
+from tensorflow_addons.optimizers import MultiOptimizer, SWA
 
 
 @dataclasses.dataclass
@@ -81,6 +88,10 @@ class HyperParams:
     l1_regularization: float = 0.0
     '''L2 regularization factor'''
     l2_regularization: float = 0.0
+    '''L1 regularization factor for convolutional layers'''
+    l1_regularization_conv: float = 0.0
+    '''L2 regularization factor for convolutional layers'''
+    l2_regularization_conv: float = 0.0
     '''Initial dropout rate'''
     dropout_rate: float = 0.1
     '''Maximum value for adaptive std dropout'''
@@ -89,6 +100,10 @@ class HyperParams:
     spatial_dropout_rate: float = 0.1
     '''Initial white noise standard deviation value'''
     white_noise_std: Optional[float] = 0.0
+    '''Initial white noise standard deviation value'''
+    numerical_white_noise_std: Optional[float] = 0.0
+    '''Initial white noise standard deviation value for conv layers'''
+    white_noise_layer_std: Optional[float] = 0.0
     '''Number of cross validation folds to be used for training'''
     cross_validation_folds: float = 0
     '''Epoch from which starting applying stochastic weight average'''
@@ -175,10 +190,11 @@ class BaseModel(WithLogging):
             if sampling > 1:
                 rows_for_type = training_set[training_set['type'].isin(labels)]
                 sampling = sampling - 1
-                training_set = [training_set, rows_for_type * np.floor(sampling).astype(int)]
-                training_set = pd.concat(training_set)
-                class_expected_size_remainder = np.round(np.mod(sampling, 1) * class_count).astype(int)
-                training_set = [training_set, training_set[training_set['type'].isin(labels)].iloc[0:class_expected_size_remainder]]
+                training_set = [training_set, rows_for_type.sample(frac=sampling, replace=True)]
+                # training_set = [training_set, rows_for_type * np.floor(sampling).astype(int)]
+                # training_set = pd.concat(training_set) 
+                # class_expected_size_remainder = np.round(np.mod(sampling, 1) * class_count).astype(int)
+                # training_set = [training_set, training_set[training_set['type'].isin(labels)].iloc[0:class_expected_size_remainder]]
                 training_set = pd.concat(training_set)
             elif sampling < 1:
                 class_expected_size = np.round(class_expected_size).astype(int)
@@ -245,10 +261,20 @@ class BaseModel(WithLogging):
         logging.info("Saved model")
         return dest_dir
 
+    def slice_dataset(self, dataset, validation_percent=0.1):
+        logging.info("Slicing dataset with validation percent = %s", validation_percent)
+        dataset_length = len(dataset)
+        dataset = shuffle(dataset)
+        train_last_index = int(dataset_length * (1 - validation_percent))
+        train_dataset = dataset[:train_last_index]
+        validation_dataset = dataset[train_last_index + 1:]
+        return train_dataset, validation_dataset
+
     def prepare_training_data(self, training_dir, output_dir, batch_size, train_percent=0.8, validation_percent=0.1,
                               training_set_limit=None, balance_class_id=None, balance_class_sampling=None):
         training_dataset = self.load_training_set(training_dir=training_dir)
         training_dataset = shuffle(training_dataset)
+        training_dataset, validation_dataset = self.slice_dataset(training_dataset, validation_percent)
         test_dataset = None
         if balance_class_sampling is not None:
             training_dataset, test_dataset = \
@@ -266,11 +292,6 @@ class BaseModel(WithLogging):
         for labels in self.class_ids.values():
             class_len = len(training_dataset[training_dataset['type'].isin(labels)])
             logging.info("%s (%s %%) items of class %s", class_len, class_len / len(training_dataset) * 100, labels)
-        train_last_index = int(dataset_length * train_percent)
-        train_last_index = train_last_index - train_last_index % batch_size
-        validation_last_index = train_last_index + int(dataset_length * validation_percent)
-        validation_last_index = validation_last_index if validation_last_index < dataset_length else dataset_length
-        test_last_index = dataset_length - 1
         train_dataset_filename = output_dir + "/train_dataset.csv"
         validation_dataset_filename = output_dir + "/validation_dataset.csv"
         test_dataset_filename = output_dir + "/test_dataset.csv"
@@ -284,39 +305,25 @@ class BaseModel(WithLogging):
         if os.path.exists(test_dataset_filename):
             os.remove(test_dataset_filename)
         if isinstance(training_dataset, pd.DataFrame):
-            train_filenames = training_dataset.iloc[0:train_last_index]
-            validation_filenames = training_dataset.iloc[train_last_index:validation_last_index]
-            train_filenames.to_csv(train_dataset_filename)
-            validation_filenames.to_csv(validation_dataset_filename)
-            train_dataset_len = len(train_filenames)
-            validation_dataset_len = len(validation_filenames)
-            logging.info("Training set is of length %s (%s %%)", len(train_filenames),
-                         len(train_filenames) / dataset_length * 100)
-            logging.info("Validation set is of length %s (%s %%)", len(validation_filenames),
-                         len(validation_filenames) / dataset_length * 100)
+            training_dataset.to_csv(train_dataset_filename)
+            validation_dataset.to_csv(validation_dataset_filename)
+            train_dataset_len = len(training_dataset)
+            validation_dataset_len = len(validation_dataset)
+            logging.info("Training set is of length %s (%s %%)", len(training_dataset),
+                         len(training_dataset) / dataset_length * 100)
+            logging.info("Validation set is of length %s (%s %%)", len(validation_dataset),
+                         len(validation_dataset) / dataset_length * 100)
             logging.info("Testing set is of length %s (%s %%)", len(test_filenames),
                          len(test_filenames) / dataset_length * 100)
             for labels in self.class_ids.values():
-                class_len = len(train_filenames[train_filenames['type'].isin(labels)])
+                class_len = len(training_dataset[training_dataset['type'].isin(labels)])
                 logging.info("Training set contains %s (%s %%) items of class %s", class_len,
                              class_len / train_dataset_len * 100, labels)
             for labels in self.class_ids.values():
-                class_len = len(validation_filenames[validation_filenames['type'].isin(labels)])
+                class_len = len(validation_dataset[validation_dataset['type'].isin(labels)])
                 logging.info("Validation set contains %s (%s %%) items of class %s", class_len,
                              class_len / validation_dataset_len * 100, labels)
-            if validation_last_index != test_last_index:
-                test_filenames = test_dataset if test_dataset is not None else train_filenames.iloc[:0, :].copy()
-                test_filenames = pd.concat([test_filenames, training_dataset.iloc[validation_last_index:test_last_index]])
-                test_filenames.to_csv(test_dataset_filename)
-                test_dataset_len = len(test_filenames)
-                for labels in self.class_ids.values():
-                    class_len = len(test_filenames[test_filenames['type'].isin(labels)])
-                    logging.info("Testing set contains %s (%s %%) items of class %s", class_len,
-                                 class_len / test_dataset_len * 100, labels)
-            else:
-                train_filenames = training_dataset[0:train_last_index]
-                validation_filenames = training_dataset[train_last_index:validation_last_index]
-        return train_filenames, validation_filenames, test_filenames
+        return training_dataset, validation_dataset, test_filenames
 
     def prepare_training_data_cv(self, training_dir, folds=10):
         dataset = self.load_training_set(training_dir=training_dir)
@@ -345,7 +352,7 @@ class BaseModel(WithLogging):
             class_weights[label] = 1 / (count / train_len)
         return class_weights
 
-    def train(self, training_dir, output_dir, hyperparams):
+    def train(self, training_dir, output_dir, hyperparams, plot_metrics=False, continue_from_model=None):
         logging.info("Preparing training data with (training_dir," + str(training_dir) +
                      ") (train_percent," + str(hyperparams.train_percent) +
                      ") (test_percent," + str(hyperparams.validation_percent) +
@@ -368,6 +375,9 @@ class BaseModel(WithLogging):
         optimizer = self.build_optimizer(hyperparams, steps_per_epoch)
         # We don't use SparseCategoricalCrossentropy because our targets are one-hot encoded
         loss, accuracy = self.instance_loss_accuracy()
+        if continue_from_model is not None:
+            logging.info(f"Continuing model fit from checkpoint {continue_from_model}")
+            self.load_model(continue_from_model)
         self.compile(optimizer, hyperparams.custom_loss if hyperparams.custom_loss is not None else loss,
                      metrics=[accuracy] + self.instance_metrics() + hyperparams.metrics,
                      run_eagerly=hyperparams.run_eagerly)
@@ -404,10 +414,10 @@ class BaseModel(WithLogging):
                     callback.set_model_dir(model_path)
                 if issubclass(callback.__class__, ValidationDataAwareCallback):
                     callback.set_validation_data(validation_batch_generator)
-            hyperparams.callbacks = [BatchAwareCsvLogger(model_path + '/training_log.csv', steps_per_epoch),
-                                                             #GetWeights(model_weights_logger),
-                                     MetricsPlotCallback(self, model_path, steps_per_epoch)] \
-                                    + hyperparams.callbacks
+            additional_callbacks = [BatchAwareCsvLogger(model_path + '/training_log.csv', steps_per_epoch)]
+            if plot_metrics:
+                additional_callbacks = additional_callbacks + [MetricsPlotCallback(self, model_path, steps_per_epoch)]
+            hyperparams.callbacks = additional_callbacks + hyperparams.callbacks
             if hyperparams.early_stopping_patience > 0 and hyperparams.early_stopping_delta > 0:
                 hyperparams.callbacks = hyperparams.callbacks + [ExoMlEarlyStopping(
                     monitor="val_loss",
@@ -421,8 +431,10 @@ class BaseModel(WithLogging):
             model_validation_steps = None
             class_weights = hyperparams.class_loss_weights if hyperparams.class_loss_weights is not None \
                 else training_batch_generator.class_weights()
+            logging.info("Class weights are %s", class_weights)
             if isinstance(class_weights, str) and 'auto' == class_weights:
                 class_weights = self.compute_class_weights(train_filenames)
+                logging.info("Class weights are %s", class_weights)
             logging.info("Initializing training with (epochs," + str(hyperparams.epochs) +
                          ") (steps_per_epoch," + str(steps_per_epoch) +
                          ")")
@@ -513,7 +525,7 @@ class BaseModel(WithLogging):
                          class_len / validation_dataset_size * 100, labels)
 
     def train_cv(self, training_dir, output_dir, hyperparams, folds=10, retry_rp99_threshold=0, retry_indexes=[],
-                 continue_from=None):
+                 continue_from=None, plot_metrics=False, devices=None):
         root_model_name = self._get_model_dir()
         dataset, fold_indexes = self.prepare_training_data_cv(training_dir, folds)
         dataset_length = len(dataset)
@@ -526,145 +538,175 @@ class BaseModel(WithLogging):
         model_weights_logger = ModelWeightsLogger()
         metrics = [accuracy] + self.instance_metrics() + hyperparams.metrics
         for index, fold_index in enumerate(fold_indexes):
-            model_name = root_model_name.strip("/") + f'_{index}/'
-            model_chk_name = root_model_name.strip("/") + f'_chk_{index}/'
-            model_name_initial = root_model_name.strip("/") + '_initial/'
-            model_path = output_dir + '/' + model_name
-            model_chk_path = output_dir + '/' + model_chk_name
-            if not os.path.exists(model_path):
-                os.mkdir(model_path)
-            if index > 0 or retry_rp99_threshold > 0:
-                self.load_model(output_dir + '/' + model_name_initial)
-            if (retry_rp99_threshold is None or retry_rp99_threshold <= 0) and len(retry_indexes) == 0:
-                previous_fold_index = fold_indexes[index - 1] if index > 0 else 0
-                training_set = pd.concat([dataset.iloc[0:previous_fold_index], dataset.iloc[fold_index:]])
-                validation_set = dataset.iloc[previous_fold_index:fold_index]
-            else:
-                training_set = pd.read_csv(model_path + '/train_dataset.csv')
-                validation_set = pd.read_csv(model_path + '/validation_dataset.csv')
-            training_log_path = model_path + '/training_log.csv'
-            max_rp99 = 0
-            if os.path.exists(training_log_path):
-                log_df = pd.read_csv(training_log_path)
-                max_rp99 = log_df['val_r@p99'].max()
-            original_checkpoint_callback = None
-            if (len(retry_indexes) > 0 and index in retry_indexes) or \
-                (len(retry_indexes) == 0 and (retry_rp99_threshold <= 0 or max_rp99 < retry_rp99_threshold)):
-                logging.info("Preparing training for K-fold no %s", index)
-                train_dataset_size = len(training_set)
-                validation_dataset_size = len(validation_set)
-                BaseModel.log_sets_distribution(training_set, validation_set, dataset_length, self.class_ids)
-                training_set.to_csv(model_path + 'train_dataset.csv')
-                validation_set.to_csv(model_path + 'validation_dataset.csv')
-                logging.info("Initializing optimizer with (initial_learning_rate," +
-                             str(hyperparams.initial_learning_rate) + ")")
-                # train_filenames, validation_filenames, test_filenames = \
-                #     self.prepare_training_data(training_dir, model_path, hyperparams.batch_size, hyperparams.train_percent,
-                #                                hyperparams.validation_percent, hyperparams.training_set_limit,
-                #                                hyperparams.balance_class_id, hyperparams.balance_class_sampling)
-                # # The optimizer is executed once for every batch, hence optimizer steps per epoch are
-                # train_dataset_size = len(train_filenames)
-                # test_dataset_size = len(validation_filenames)
-                steps_per_epoch = int(hyperparams.dataset_iterations_per_epoch * train_dataset_size // hyperparams.batch_size)
-                total_steps = steps_per_epoch * hyperparams.epochs
-                optimizer = self.build_optimizer(hyperparams, steps_per_epoch)
-                self.compile(optimizer, hyperparams.custom_loss if hyperparams.custom_loss is not None else loss,
-                             metrics=metrics,
-                             run_eagerly=hyperparams.run_eagerly)
-                self.save(output_dir, model_name_initial)
-                # if hyperparams.learning_rate_schedule is None:
-                #     learning_rate_decay_steps = steps_per_epoch // 2
-                #     learning_rate_decay_steps = learning_rate_decay_steps if learning_rate_decay_steps > steps_per_epoch \
-                #         else steps_per_epoch
-                #     logging.info("Initializing optimizer with learning_rate_decay_steps," + str(learning_rate_decay_steps) +
-                #                  ") (gradient_clip_norm," + str(hyperparams.gradient_clip_norm) +
-                #                  ")")
-                #     powers_for_half_learning_rate_decay = np.log(hyperparams.learning_rate_decay / 2) // \
-                #                                           np.log(hyperparams.learning_rate_decay)
-                #     hyperparams.learning_rate_schedule = ExponentialRescaleDecay(hyperparams.initial_learning_rate,
-                #                                                      decay_steps=learning_rate_decay_steps,
-                #                                                      decay_rate=hyperparams.learning_rate_decay,
-                #                                                      restore_steps=learning_rate_decay_steps *
-                #                                                                    powers_for_half_learning_rate_decay,
-                #                                                      restore_rate=1.5,
-                #                                                      staircase=True)
+            with self.train_strategy(devices).scope():
+                model_name = root_model_name.strip("/") + f'_{index}/'
+                model_chk_name = root_model_name.strip("/") + f'_chk_{index}/'
+                model_name_initial = root_model_name.strip("/") + '_initial/'
+                model_path = output_dir + '/' + model_name
+                model_chk_path = output_dir + '/' + model_chk_name
+                if not os.path.exists(model_path):
+                    os.mkdir(model_path)
+                if index > 0 or retry_rp99_threshold > 0:
+                    self.load_model(output_dir + '/' + model_name_initial)
+                if (retry_rp99_threshold is None or retry_rp99_threshold <= 0) and len(retry_indexes) == 0:
+                    previous_fold_index = fold_indexes[index - 1] if index > 0 else 0
+                    training_set = pd.concat([dataset.iloc[0:previous_fold_index], dataset.iloc[fold_index:]])
+                    validation_set = dataset.iloc[previous_fold_index:fold_index]
+                else:
+                    training_set = pd.read_csv(model_path + '/train_dataset.csv')
+                    validation_set = pd.read_csv(model_path + '/validation_dataset.csv')
+                training_log_path = model_path + '/training_log.csv'
+                max_rp99 = 0
+                if os.path.exists(training_log_path):
+                    log_df = pd.read_csv(training_log_path)
+                    max_rp99 = log_df['val_r@p99'].max()
+                original_checkpoint_callback = None
+                if (len(retry_indexes) > 0 and index in retry_indexes) or \
+                    (len(retry_indexes) == 0 and (retry_rp99_threshold <= 0 or max_rp99 < retry_rp99_threshold)):
+                    logging.info("Preparing training for K-fold no %s", index)
+                    train_dataset_size = len(training_set)
+                    validation_dataset_size = len(validation_set)
+                    BaseModel.log_sets_distribution(training_set, validation_set, dataset_length, self.class_ids)
+                    training_set.to_csv(model_path + 'train_dataset.csv')
+                    validation_set.to_csv(model_path + 'validation_dataset.csv')
+                    logging.info("Initializing optimizer with (initial_learning_rate," +
+                                 str(hyperparams.initial_learning_rate) + ")")
+                    # train_filenames, validation_filenames, test_filenames = \
+                    #     self.prepare_training_data(training_dir, model_path, hyperparams.batch_size, hyperparams.train_percent,
+                    #                                hyperparams.validation_percent, hyperparams.training_set_limit,
+                    #                                hyperparams.balance_class_id, hyperparams.balance_class_sampling)
+                    # # The optimizer is executed once for every batch, hence optimizer steps per epoch are
+                    # train_dataset_size = len(train_filenames)
+                    # test_dataset_size = len(validation_filenames)
+                    steps_per_epoch = int(hyperparams.dataset_iterations_per_epoch * train_dataset_size // hyperparams.batch_size)
+                    total_steps = steps_per_epoch * hyperparams.epochs
+                    optimizer = self.build_optimizer(hyperparams, steps_per_epoch)
+                    self.compile(optimizer, hyperparams.custom_loss if hyperparams.custom_loss is not None else loss,
+                                 metrics=metrics,
+                                 run_eagerly=hyperparams.run_eagerly)
+                    self.save(output_dir, model_name_initial)
+                    # if hyperparams.learning_rate_schedule is None:
+                    #     learning_rate_decay_steps = steps_per_epoch // 2
+                    #     learning_rate_decay_steps = learning_rate_decay_steps if learning_rate_decay_steps > steps_per_epoch \
+                    #         else steps_per_epoch
+                    #     logging.info("Initializing optimizer with learning_rate_decay_steps," + str(learning_rate_decay_steps) +
+                    #                  ") (gradient_clip_norm," + str(hyperparams.gradient_clip_norm) +
+                    #                  ")")
+                    #     powers_for_half_learning_rate_decay = np.log(hyperparams.learning_rate_decay / 2) // \
+                    #                                           np.log(hyperparams.learning_rate_decay)
+                    #     hyperparams.learning_rate_schedule = ExponentialRescaleDecay(hyperparams.initial_learning_rate,
+                    #                                                      decay_steps=learning_rate_decay_steps,
+                    #                                                      decay_rate=hyperparams.learning_rate_decay,
+                    #                                                      restore_steps=learning_rate_decay_steps *
+                    #                                                                    powers_for_half_learning_rate_decay,
+                    #                                                      restore_rate=1.5,
+                    #                                                      staircase=True)
 
-                if not hyperparams.dry_run:
-                    logging.info("Initializing training and validation generators with (batch_size," + str(hyperparams.batch_size) +
-                                 ") (self.input_size," + str(self.input_size) +
-                                 ") (zero_epsilon," + str(hyperparams.zero_epsilon) +
-                                 ")")
-                    training_batch_generator = self.instance_generator(training_set, training_dir, hyperparams.batch_size,
-                                                                       self.input_size, self.type_to_label, hyperparams.zero_epsilon)
-                    validation_batch_generator = self.instance_generator(validation_set, training_dir, hyperparams.batch_size,
-                                                                         self.input_size, self.type_to_label, hyperparams.zero_epsilon,
-                                                                         shuffle=False)
-                    callbacks = []
-                    for callback in hyperparams.callbacks:
-                        new_callback = callback
-                        logging.info(f"callback class {callback.__class__.__name__}")
-                        if callback.__class__.__name__ == ModelDirDataAwareCallback.__name__:
-                            new_callback.set_model_dir(model_name)
-                        if callback.__class__.__name__ == ValidationDataAwareCallback.__name__:
-                            new_callback.set_validation_data(validation_batch_generator)
-                        if callback.__class__.__name__ == ModelCheckpointCallback.__name__:
-                            if original_checkpoint_callback is None:
-                                original_checkpoint_callback = copy.deepcopy(callback)
-                                logging.info(f"Stored original checkpoint callback with "
-                                             f"{original_checkpoint_callback.original_path} "
-                                             f",{original_checkpoint_callback.filepath} and "
-                                             f"{original_checkpoint_callback.best}")
-                            new_callback = copy.deepcopy(original_checkpoint_callback)
-                            logging.info(f"Switched modelCheckpointCallback to {model_path} "
-                                         f",{model_chk_path} and {new_callback.best}")
-                            new_callback.original_path = model_path
-                            new_callback.filepath = model_chk_path
-                        callbacks = callbacks + [new_callback]
-                    callbacks = [BatchAwareCsvLogger(model_name + '/training_log.csv', steps_per_epoch),
-                                                         #GetWeights(model_weights_logger),
-                                 MetricsPlotCallback(self, model_name, steps_per_epoch)] + \
-                                callbacks
-                    if hyperparams.early_stopping_patience > 0 and hyperparams.early_stopping_delta > 0:
-                        callbacks = callbacks + [ExoMlEarlyStopping(
-                            monitor="val_loss",
-                            min_delta=hyperparams.early_stopping_delta,
-                            patience=hyperparams.early_stopping_patience,
-                            verbose=0,
-                            mode="auto",
-                            baseline=None,
-                            restore_best_weights=False,
-                        )]
-                    model_validation_steps = int(validation_dataset_size // hyperparams.batch_size)
-                    class_weights = hyperparams.class_loss_weights if hyperparams.class_loss_weights is not None \
-                        else training_batch_generator.class_weights()
-                    if isinstance(class_weights, str) and 'auto' == class_weights:
-                        class_weights = self.compute_class_weights(training_set)
-                    logging.info("Initializing training with (epochs," + str(hyperparams.epochs) +
-                                 ") (steps_per_epoch," + str(steps_per_epoch) +
-                                 ") (model_validation_steps," + str(model_validation_steps) +
-                                 ")")
-                    if continue_from is None:
+                    if not hyperparams.dry_run:
+                        logging.info("Initializing training and validation generators with (batch_size," + str(hyperparams.batch_size) +
+                                     ") (self.input_size," + str(self.input_size) +
+                                     ") (zero_epsilon," + str(hyperparams.zero_epsilon) +
+                                     ")")
+                        training_batch_generator = self.instance_generator(training_set, training_dir, hyperparams.batch_size,
+                                                                           self.input_size, self.type_to_label, hyperparams.zero_epsilon)
+                        validation_batch_generator = self.instance_generator(validation_set, training_dir, hyperparams.batch_size,
+                                                                             self.input_size, self.type_to_label, hyperparams.zero_epsilon,
+                                                                             shuffle=False)
+                        callbacks = []
+                        for callback in hyperparams.callbacks:
+                            new_callback = callback
+                            logging.info(f"callback class {callback.__class__.__name__}")
+                            if callback.__class__.__name__ == ModelDirDataAwareCallback.__name__:
+                                new_callback.set_model_dir(model_name)
+                            if callback.__class__.__name__ == ValidationDataAwareCallback.__name__:
+                                new_callback.set_validation_data(validation_batch_generator)
+                            if callback.__class__.__name__ == ModelCheckpointCallback.__name__:
+                                if original_checkpoint_callback is None:
+                                    original_checkpoint_callback = copy.deepcopy(callback)
+                                    logging.info(f"Stored original checkpoint callback with "
+                                                 f"{original_checkpoint_callback.original_path} "
+                                                 f",{original_checkpoint_callback.filepath} and "
+                                                 f"{original_checkpoint_callback.best}")
+                                new_callback = copy.deepcopy(original_checkpoint_callback)
+                                logging.info(f"Switched modelCheckpointCallback to {model_path} "
+                                             f",{model_chk_path} and {new_callback.best}")
+                                new_callback.original_path = model_path
+                                new_callback.filepath = model_chk_path
+                            callbacks = callbacks + [new_callback]
+                        additional_callbacks = [BatchAwareCsvLogger(model_name + '/training_log.csv', steps_per_epoch)]
+                        if plot_metrics:
+                            additional_callbacks = additional_callbacks + [
+                                MetricsPlotCallback(self, model_name, steps_per_epoch)]
+                        hyperparams.callbacks = additional_callbacks + hyperparams.callbacks
+                        callbacks = additional_callbacks + callbacks
+                        if hyperparams.early_stopping_patience > 0 and hyperparams.early_stopping_delta > 0:
+                            callbacks = callbacks + [ExoMlEarlyStopping(
+                                monitor="val_loss",
+                                min_delta=hyperparams.early_stopping_delta,
+                                patience=hyperparams.early_stopping_patience,
+                                verbose=0,
+                                mode="auto",
+                                baseline=None,
+                                restore_best_weights=False,
+                            )]
+                        model_validation_steps = int(validation_dataset_size // hyperparams.batch_size)
+                        class_weights = hyperparams.class_loss_weights if hyperparams.class_loss_weights is not None \
+                            else training_batch_generator.class_weights()
+                        if isinstance(class_weights, str) and 'auto' == class_weights:
+                            class_weights = self.compute_class_weights(training_set)
+                        logging.info("Initializing training with (epochs," + str(hyperparams.epochs) +
+                                     ") (steps_per_epoch," + str(steps_per_epoch) +
+                                     ") (model_validation_steps," + str(model_validation_steps) +
+                                     ")")
+                        if continue_from is None:
+                            self.save(output_dir, model_name)
+                        else:
+                            continue_from_model = continue_from + str(index)
+                            logging.info(f"Continuing model fit from checkpoint {continue_from_model}")
+                            self.load_model(continue_from_model)
+                            self.compile(optimizer,
+                                         hyperparams.custom_loss if hyperparams.custom_loss is not None else loss,
+                                         metrics=metrics,
+                                         run_eagerly=hyperparams.run_eagerly)
+                        self.__write_hyperparameters(hyperparams, model_name)
+                        fit_history = self.model.fit(x=training_batch_generator,
+                                       steps_per_epoch=steps_per_epoch,
+                                       epochs=hyperparams.epochs, verbose=1, class_weight=class_weights,
+                                       validation_data=validation_batch_generator,
+                                       validation_steps=model_validation_steps,
+                                       callbacks=callbacks,
+                                       use_multiprocessing=hyperparams.cores > 0, workers=1 if hyperparams.cores <= 0
+                            else hyperparams.cores)
                         self.save(output_dir, model_name)
                     else:
-                        continue_from_model = continue_from + str(index)
-                        logging.info(f"Continuing model fit from checkpoint ${continue_from_model}")
-                        self.load_model(continue_from_model)
-                        self.compile(optimizer,
-                                     hyperparams.custom_loss if hyperparams.custom_loss is not None else loss,
-                                     metrics=metrics,
-                                     run_eagerly=hyperparams.run_eagerly)
-                    self.__write_hyperparameters(hyperparams, model_name)
-                    fit_history = self.model.fit(x=training_batch_generator,
-                                   steps_per_epoch=steps_per_epoch,
-                                   epochs=hyperparams.epochs, verbose=1, class_weight=class_weights,
-                                   validation_data=validation_batch_generator,
-                                   validation_steps=model_validation_steps,
-                                   callbacks=callbacks,
-                                   use_multiprocessing=hyperparams.cores > 0, workers=1 if hyperparams.cores <= 0
-                        else hyperparams.cores)
-                    self.save(output_dir, model_name)
-                else:
-                    logging.warning("dry_run was activated and 'training' will not be launched")
+                        logging.warning("dry_run was activated and 'training' will not be launched")
+
+    def train_strategy(self, devices=None):
+        gpus = tf.config.list_physical_devices('GPU')
+        num_gpus = len(gpus)
+        logging.info("Number of GPUs available: ", num_gpus)
+        for gpu in gpus:
+            logging.info(gpu)
+        # Use MirroredStrategy if more than one GPU is available
+        if devices is not None and len(devices) > 1:
+            strategy = tf.distribute.MirroredStrategy(devices)
+            logging.info("Using MirroredStrategy for multi-GPU training.")
+        else:
+            if devices is not None:
+                tf.config.set_visible_devices([tf.config.PhysicalDevice(name=device, device_type='GPU') for device in devices], 'GPU')
+            strategy = tf.distribute.get_strategy()  # Default strategy that works on a single GPU or CPU
+            logging.info("Using default strategy for single GPU or CPU.")
+        return strategy
+
+    def _apply_normalization_mode(self, layer, normalization_mode='layer_norm'):
+        if normalization_mode == 'batch_norm':
+            final_layer = keras.layers.BatchNormalization()(layer)
+        elif normalization_mode == 'layer_norm':
+            final_layer = keras.layers.LayerNormalization()(layer)
+        else:
+            final_layer = layer
+        return final_layer
+
 
     def __write_hyperparameters(self, hyperparameters: HyperParams, output_dir):
         pass
