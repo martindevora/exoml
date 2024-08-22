@@ -2,12 +2,23 @@ import abc
 import tensorflow as tf
 import numpy as np
 import tensorflow.keras.backend as K
-from keras.metrics import Metric
-from keras.src.utils import metrics_utils
-from keras.src.utils.generic_utils import to_list
-from keras.src.metrics import base_metric
-from keras.src import backend
 
+from keras import backend
+from keras.utils import metrics_utils
+from keras.utils.generic_utils import to_list
+from keras_core import Metric
+from keras_core.src.utils import tf_utils
+#from tf_keras.src.metrics import base_metric
+
+
+#from tf_keras.src.metrics import base_metric
+# from keras.src import backend
+# from keras.src.utils import tf_utils
+# from keras.metrics import Metric
+# from keras.src.utils import metrics_utils
+# from keras.src.utils.generic_utils import to_list
+# from keras.src.metrics import base_metric
+# from keras.src import backend
 
 def inject_mesh(init_method):
     """Inject DTensor mesh information to an object.
@@ -71,16 +82,16 @@ class SensitivitySpecificityBase(Metric, metaclass=abc.ABCMeta):
         self.value = value
         self.class_id = class_id
         self.true_positives = self.add_weight(
-            "true_positives", shape=(num_thresholds,), initializer="zeros"
+            name="true_positives", shape=(num_thresholds,), initializer="zeros"
         )
         self.true_negatives = self.add_weight(
-            "true_negatives", shape=(num_thresholds,), initializer="zeros"
+            name="true_negatives", shape=(num_thresholds,), initializer="zeros"
         )
         self.false_positives = self.add_weight(
-            "false_positives", shape=(num_thresholds,), initializer="zeros"
+            name="false_positives", shape=(num_thresholds,), initializer="zeros"
         )
         self.false_negatives = self.add_weight(
-            "false_negatives", shape=(num_thresholds,), initializer="zeros"
+            name="false_negatives", shape=(num_thresholds,), initializer="zeros"
         )
 
         # Compute `num_thresholds` thresholds in [0, 1]
@@ -292,6 +303,7 @@ class ThresholdAtPrecision(SensitivitySpecificityBase):
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
+
 class ThresholdAtRecall(SensitivitySpecificityBase):
     """Computes best recall where precision is >= specified value.
 
@@ -312,7 +324,7 @@ class ThresholdAtRecall(SensitivitySpecificityBase):
     indeed a correct label.
 
     Args:
-      precision: A scalar value in range `[0, 1]`.
+      recall: A scalar value in range `[0, 1]`.
       num_thresholds: (Optional) Defaults to 200. The number of thresholds to
         use for matching the given precision.
       class_id: (Optional) Integer class ID for which we want binary metrics.
@@ -412,6 +424,7 @@ class ThresholdAtRecall(SensitivitySpecificityBase):
         base_config = super().get_config()
         return dict(list(base_config.items()) + list(config.items()))
 
+
 class ThresholdAtNPV(SensitivitySpecificityBase):
     """Computes best recall where precision is >= specified value.
 
@@ -432,7 +445,7 @@ class ThresholdAtNPV(SensitivitySpecificityBase):
     indeed a correct label.
 
     Args:
-      precision: A scalar value in range `[0, 1]`.
+      npv: A scalar value in range `[0, 1]`.
       num_thresholds: (Optional) Defaults to 200. The number of thresholds to
         use for matching the given precision.
       class_id: (Optional) Integer class ID for which we want binary metrics.
@@ -783,7 +796,7 @@ class CategoricalClassMetric(tf.keras.metrics.Metric):
     def result(self):
         return self.metric
 
-class NegativePredictiveValue(base_metric.Metric):
+class NegativePredictiveValue(Metric):
     """Computes the NPV of the predictions with respect to the labels.
 
     The metric creates two local variables, `true_positives` and
@@ -881,10 +894,10 @@ class NegativePredictiveValue(base_metric.Metric):
             metrics_utils.is_evenly_distributed_thresholds(self.thresholds)
         )
         self.true_negatives = self.add_weight(
-            "true_negatives", shape=(len(self.thresholds),), initializer="zeros"
+            name="true_negatives", shape=(len(self.thresholds),), initializer="zeros"
         )
         self.false_negatives = self.add_weight(
-            "false_negatives",
+            name="false_negatives",
             shape=(len(self.thresholds),),
             initializer="zeros",
         )
@@ -944,7 +957,7 @@ class NegativePredictiveValue(base_metric.Metric):
         return dict(list(base_config.items()) + list(config.items()))
 
 
-class Specificity(base_metric.Metric):
+class Specificity(Metric):
     """Computes the NPV of the predictions with respect to the labels.
 
     The metric creates two local variables, `true_positives` and
@@ -1042,10 +1055,10 @@ class Specificity(base_metric.Metric):
             metrics_utils.is_evenly_distributed_thresholds(self.thresholds)
         )
         self.true_negatives = self.add_weight(
-            "true_negatives", shape=(len(self.thresholds),), initializer="zeros"
+            name="true_negatives", shape=(len(self.thresholds),), initializer="zeros"
         )
         self.false_positives = self.add_weight(
-            "false_positives",
+            name="false_positives",
             shape=(len(self.thresholds),),
             initializer="zeros",
         )
@@ -1125,7 +1138,7 @@ class SpecificityAtNPV(SensitivitySpecificityBase):
     indeed a correct label.
 
     Args:
-      precision: A scalar value in range `[0, 1]`.
+      npv: A scalar value in range `[0, 1]`.
       num_thresholds: (Optional) The number of thresholds to
         use for matching the given precision. Defaults to `200`.
       class_id: (Optional) Integer class ID for which we want binary metrics.
