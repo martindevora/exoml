@@ -2,7 +2,7 @@ keras==2.15.0
 keras_nlp==0.8.1
 ellc==1.8.8
 #dearwatson==0.7.15
-lcbuilder==0.20.2
+lcbuilder==0.20.3
 #timesynth @ git+https://github.com/TimeSynth/TimeSynth.git
 ruamel.yaml==0.17.32
 #debugpy
