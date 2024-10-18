@@ -10,7 +10,8 @@ import tensorflow as tf
 import pandas as pd
 from abc import abstractmethod
 
-from keras_core.src.optimizers import Adam
+from keras.optimizers import Adam
+#from keras_core.src.optimizers import Adam
 from keras_core.src.optimizers.schedules.learning_rate_schedule import LearningRateSchedule
 from keras_core.src.utils import plot_model
 # from keras.optimizers import Adam
@@ -93,6 +94,8 @@ class HyperParams:
     '''L2 regularization factor for convolutional layers'''
     l2_regularization_conv: float = 0.0
     '''Initial dropout rate'''
+    branch_dropout_rate: float = 0
+    '''Initial dropout rate'''
     dropout_rate: float = 0.1
     '''Maximum value for adaptive std dropout'''
     dropout_max_rate: float = 0.1
@@ -110,6 +113,10 @@ class HyperParams:
     stochastic_weight_average_wait: float = 0
     '''Learning rate progression factor to be applied to the final dense layers'''
     lr_progression: float = 1
+    '''Layer normalization epsilon'''
+    layer_norm_epsilon: float = 1e-3
+    '''Layer normalization epsilon for transformer layers'''
+    transformer_layer_norm_epsilon: float = 1e-3
 
 
 @dataclasses.dataclass
@@ -524,9 +531,10 @@ class BaseModel(WithLogging):
             logging.info("Validation set contains %s (%s %%) items of class %s", class_len,
                          class_len / validation_dataset_size * 100, labels)
 
-    def train_cv(self, training_dir, output_dir, hyperparams, folds=10, retry_rp99_threshold=0, retry_indexes=[],
+    def train_cv(self, training_dir, output_dir, hyperparams, folds=10, retry_indexes=[],
                  continue_from=None, plot_metrics=False, devices=None):
         root_model_name = self._get_model_dir()
+        model_name_initial = root_model_name.strip("/") + '_initial/'
         dataset, fold_indexes = self.prepare_training_data_cv(training_dir, folds)
         dataset_length = len(dataset)
         logging.info("Preparing training data with (training_dir," + str(training_dir) +
@@ -535,73 +543,44 @@ class BaseModel(WithLogging):
                      ") and CV Folds with indexes %s", fold_indexes)
         # We don't use SparseCategoricalCrossentropy because our targets are one-hot encoded
         loss, accuracy = self.instance_loss_accuracy()
-        model_weights_logger = ModelWeightsLogger()
         metrics = [accuracy] + self.instance_metrics() + hyperparams.metrics
+        for index, fold_index in enumerate(fold_indexes):
+            model_name = root_model_name.strip("/") + f'_{index}/'
+            model_path = output_dir + '/' + model_name
+            if not os.path.exists(model_path):
+                os.mkdir(model_path)
+                previous_fold_index = fold_indexes[index - 1] if index > 0 else 0
+                training_set = pd.concat([dataset.iloc[0:previous_fold_index], dataset.iloc[fold_index:]])
+                validation_set = dataset.iloc[previous_fold_index:fold_index]
+                logging.info("Generating training for K-fold no %s", index)
+                BaseModel.log_sets_distribution(training_set, validation_set, dataset_length, self.class_ids)
+                training_set.to_csv(model_path + 'train_dataset.csv')
+                validation_set.to_csv(model_path + 'validation_dataset.csv')
+        optimizer = self.build_optimizer(hyperparams, 150)
+        self.compile(optimizer, hyperparams.custom_loss if hyperparams.custom_loss is not None else loss,
+                     metrics=metrics,
+                     run_eagerly=hyperparams.run_eagerly)
+        self.save(output_dir, model_name_initial)
         for index, fold_index in enumerate(fold_indexes):
             with self.train_strategy(devices).scope():
                 model_name = root_model_name.strip("/") + f'_{index}/'
                 model_chk_name = root_model_name.strip("/") + f'_chk_{index}/'
-                model_name_initial = root_model_name.strip("/") + '_initial/'
                 model_path = output_dir + '/' + model_name
                 model_chk_path = output_dir + '/' + model_chk_name
                 if not os.path.exists(model_path):
                     os.mkdir(model_path)
-                if index > 0 or retry_rp99_threshold > 0:
-                    self.load_model(output_dir + '/' + model_name_initial)
-                if (retry_rp99_threshold is None or retry_rp99_threshold <= 0) and len(retry_indexes) == 0:
-                    previous_fold_index = fold_indexes[index - 1] if index > 0 else 0
-                    training_set = pd.concat([dataset.iloc[0:previous_fold_index], dataset.iloc[fold_index:]])
-                    validation_set = dataset.iloc[previous_fold_index:fold_index]
-                else:
+                original_checkpoint_callback = None
+                if len(retry_indexes) == 0 or (len(retry_indexes) > 0 and index in retry_indexes):
+                    logging.info("Preparing training for K-fold no %s", index)
                     training_set = pd.read_csv(model_path + '/train_dataset.csv')
                     validation_set = pd.read_csv(model_path + '/validation_dataset.csv')
-                training_log_path = model_path + '/training_log.csv'
-                max_rp99 = 0
-                if os.path.exists(training_log_path):
-                    log_df = pd.read_csv(training_log_path)
-                    max_rp99 = log_df['val_r@p99'].max()
-                original_checkpoint_callback = None
-                if (len(retry_indexes) > 0 and index in retry_indexes) or \
-                    (len(retry_indexes) == 0 and (retry_rp99_threshold <= 0 or max_rp99 < retry_rp99_threshold)):
-                    logging.info("Preparing training for K-fold no %s", index)
                     train_dataset_size = len(training_set)
                     validation_dataset_size = len(validation_set)
                     BaseModel.log_sets_distribution(training_set, validation_set, dataset_length, self.class_ids)
-                    training_set.to_csv(model_path + 'train_dataset.csv')
-                    validation_set.to_csv(model_path + 'validation_dataset.csv')
                     logging.info("Initializing optimizer with (initial_learning_rate," +
                                  str(hyperparams.initial_learning_rate) + ")")
-                    # train_filenames, validation_filenames, test_filenames = \
-                    #     self.prepare_training_data(training_dir, model_path, hyperparams.batch_size, hyperparams.train_percent,
-                    #                                hyperparams.validation_percent, hyperparams.training_set_limit,
-                    #                                hyperparams.balance_class_id, hyperparams.balance_class_sampling)
-                    # # The optimizer is executed once for every batch, hence optimizer steps per epoch are
-                    # train_dataset_size = len(train_filenames)
-                    # test_dataset_size = len(validation_filenames)
                     steps_per_epoch = int(hyperparams.dataset_iterations_per_epoch * train_dataset_size // hyperparams.batch_size)
-                    total_steps = steps_per_epoch * hyperparams.epochs
                     optimizer = self.build_optimizer(hyperparams, steps_per_epoch)
-                    self.compile(optimizer, hyperparams.custom_loss if hyperparams.custom_loss is not None else loss,
-                                 metrics=metrics,
-                                 run_eagerly=hyperparams.run_eagerly)
-                    self.save(output_dir, model_name_initial)
-                    # if hyperparams.learning_rate_schedule is None:
-                    #     learning_rate_decay_steps = steps_per_epoch // 2
-                    #     learning_rate_decay_steps = learning_rate_decay_steps if learning_rate_decay_steps > steps_per_epoch \
-                    #         else steps_per_epoch
-                    #     logging.info("Initializing optimizer with learning_rate_decay_steps," + str(learning_rate_decay_steps) +
-                    #                  ") (gradient_clip_norm," + str(hyperparams.gradient_clip_norm) +
-                    #                  ")")
-                    #     powers_for_half_learning_rate_decay = np.log(hyperparams.learning_rate_decay / 2) // \
-                    #                                           np.log(hyperparams.learning_rate_decay)
-                    #     hyperparams.learning_rate_schedule = ExponentialRescaleDecay(hyperparams.initial_learning_rate,
-                    #                                                      decay_steps=learning_rate_decay_steps,
-                    #                                                      decay_rate=hyperparams.learning_rate_decay,
-                    #                                                      restore_steps=learning_rate_decay_steps *
-                    #                                                                    powers_for_half_learning_rate_decay,
-                    #                                                      restore_rate=1.5,
-                    #                                                      staircase=True)
-
                     if not hyperparams.dry_run:
                         logging.info("Initializing training and validation generators with (batch_size," + str(hyperparams.batch_size) +
                                      ") (self.input_size," + str(self.input_size) +
@@ -658,16 +637,17 @@ class BaseModel(WithLogging):
                                      ") (steps_per_epoch," + str(steps_per_epoch) +
                                      ") (model_validation_steps," + str(model_validation_steps) +
                                      ")")
-                        if continue_from is None:
-                            self.save(output_dir, model_name)
-                        else:
-                            continue_from_model = continue_from + str(index)
+                        continue_from_model = continue_from + str(index)
+                        if continue_from is not None and os.path.exists(continue_from_model):
                             logging.info(f"Continuing model fit from checkpoint {continue_from_model}")
                             self.load_model(continue_from_model)
-                            self.compile(optimizer,
-                                         hyperparams.custom_loss if hyperparams.custom_loss is not None else loss,
-                                         metrics=metrics,
-                                         run_eagerly=hyperparams.run_eagerly)
+                        else:
+                            logging.info(f"Continuing model fit from initial {model_name_initial}")
+                            self.load_model(model_name_initial)
+                        self.compile(optimizer,
+                                     hyperparams.custom_loss if hyperparams.custom_loss is not None else loss,
+                                     metrics=metrics,
+                                     run_eagerly=hyperparams.run_eagerly)
                         self.__write_hyperparameters(hyperparams, model_name)
                         fit_history = self.model.fit(x=training_batch_generator,
                                        steps_per_epoch=steps_per_epoch,
@@ -684,18 +664,19 @@ class BaseModel(WithLogging):
     def train_strategy(self, devices=None):
         gpus = tf.config.list_physical_devices('GPU')
         num_gpus = len(gpus)
-        logging.info("Number of GPUs available: ", num_gpus)
+        logging.info("Number of GPUs available: %s", num_gpus)
         for gpu in gpus:
             logging.info(gpu)
         # Use MirroredStrategy if more than one GPU is available
         if devices is not None and len(devices) > 1:
-            strategy = tf.distribute.MirroredStrategy(devices)
             logging.info("Using MirroredStrategy for multi-GPU training.")
+            strategy = tf.distribute.MirroredStrategy(devices)
         else:
+            logging.info("Using default strategy for single GPU or CPU.")
             if devices is not None:
+                logging.info("Selecting device %s", devices)
                 tf.config.set_visible_devices([tf.config.PhysicalDevice(name=device, device_type='GPU') for device in devices], 'GPU')
             strategy = tf.distribute.get_strategy()  # Default strategy that works on a single GPU or CPU
-            logging.info("Using default strategy for single GPU or CPU.")
         return strategy
 
     def _apply_normalization_mode(self, layer, normalization_mode='layer_norm'):

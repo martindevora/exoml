@@ -1,17 +1,15 @@
 import logging
 from abc import abstractmethod
 
-import matplotlib.pyplot as plt
 import foldedleastsquares
 import scipy
 #import timesynth
-import wotan
 from lcbuilder.helper import LcbuilderHelper
 from numpy.random import default_rng
 from scipy import stats
 from sklearn.preprocessing import StandardScaler, MinMaxScaler
 
-from exoml.ml.encoding.time_position import value_encode_times
+from exoml.ete6.NanException import NanException
 from sklearn.utils import shuffle
 import tensorflow as tf
 import numpy as np
@@ -24,10 +22,12 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
     random_number_generator = default_rng()
     standard_scaler = StandardScaler()
 
-    def __init__(self, zero_epsilon=1e-6, shuffle_batch=True):
+    def __init__(self, zero_epsilon=1e-6, shuffle_batch=True, flag_incomplete=False, throw_nan_exception=False):
         self.zero_epsilon = zero_epsilon
         self.minmax_scaler = MinMaxScaler(feature_range=(self.zero_epsilon, 1 - self.zero_epsilon))
         self.shuffle_batch = shuffle_batch
+        self.flag_incomplete = flag_incomplete
+        self.throw_nan_exception = throw_nan_exception
 
     def on_epoch_end(self):
         if self.shuffle_batch:
@@ -64,6 +64,7 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         result_err = np.full((array.shape[1], new_size), self.zero_epsilon)
         transposed_array = np.transpose(array)
         time_array = transposed_array[0]
+        any_nan = False
         for index, nested_array in enumerate(transposed_array):
             if index > 0:
                 mask = nested_array > self.zero_epsilon
@@ -77,8 +78,10 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
                     bin_stds, _, _ = stats.binned_statistic(masked_time_array, nested_array, statistic='std',
                                                             bins=new_size)
                     nans, x = self.nan_helper(bin_means)
+                    any_nan = any_nan or np.any(nans)
                     bin_means[nans] = np.interp(x(nans), x(~nans), bin_means[~nans])
                     nans, x = self.nan_helper(bin_stds)
+                    any_nan = any_nan or np.any(nans)
                     bin_stds[nans] = np.interp(x(nans), x(~nans), bin_stds[~nans])
                     bin_width = (bin_edges[1] - bin_edges[0])
                     bin_centers = bin_edges[1:] - bin_width / 2
@@ -86,11 +89,13 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
                         result[0] = bin_centers
                         result_err[0] = np.full((new_size), 0.5)
                     # Store binning values for flux
-                    result[index] = bin_means
+                    result[index] = self.minmax_scaler.fit_transform(bin_means.reshape(-1, 1)).flatten()
                     result_err[index] = bin_stds if len(np.isnan(bin_stds)) == 0 else np.full((new_size), np.nanstd(bin_means))
                 except Exception as e:
                     logging.exception("Error when interpolating for target " + str(target) + ", will create empty input array")
-        return np.transpose(np.nan_to_num(result)), np.transpose(np.nan_to_num(result_err))
+        if self.throw_nan_exception and any_nan:
+            raise NanException(f"Nan values in array for target {target}")
+        return np.transpose(np.nan_to_num(result[1:])), np.transpose(np.nan_to_num(result_err[1:]))
 
     @staticmethod
     def nan_helper(y):
@@ -118,8 +123,8 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
             input_df_clipped = input_df.loc[~outliers_mask].copy()
             if len(input_df_clipped) > 0:
                 # transform data
-                input_df_clipped['centroids_ra'] = self.minmax_scaler.fit_transform(self.standard_scaler.fit_transform(input_df_clipped['centroids_ra'].values.reshape(-1, 1))).flatten()
-                input_df_clipped['centroids_dec'] = self.minmax_scaler.fit_transform(self.standard_scaler.fit_transform(input_df_clipped['centroids_dec'].values.reshape(-1, 1))).flatten()
+                input_df_clipped['centroids_ra'] = self.minmax_scaler.fit_transform(input_df_clipped['centroids_ra'].values.reshape(-1, 1)).flatten()
+                input_df_clipped['centroids_dec'] = self.minmax_scaler.fit_transform(input_df_clipped['centroids_dec'].values.reshape(-1, 1)).flatten()
                 input_df_clipped = input_df_clipped.fillna(self.zero_epsilon)
                 input_df_clipped = input_df_clipped.replace(0.0, self.zero_epsilon)
                 input_df_clipped = input_df_clipped.replace(0, self.zero_epsilon)
@@ -131,7 +136,7 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
             _, outliers_mask = LcbuilderHelper.clip_outliers(input_df['og_flux'].to_numpy(), 3)
             input_df_clipped = input_df.loc[~outliers_mask].copy()
             if len(input_df_clipped) > 0:
-                input_df_clipped['og_flux'] = self.minmax_scaler.fit_transform(self.standard_scaler.fit_transform(input_df_clipped['og_flux'].values.reshape(-1, 1))).flatten()
+                input_df_clipped['og_flux'] = self.minmax_scaler.fit_transform(input_df_clipped['og_flux'].values.reshape(-1, 1)).flatten()
             input_df_clipped = input_df_clipped.fillna(self.zero_epsilon)
             input_df_clipped = input_df_clipped.replace(0.0, self.zero_epsilon)
             input_df_clipped = input_df_clipped.replace(0, self.zero_epsilon)
@@ -183,7 +188,7 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         input_df = input_df.replace(0, self.zero_epsilon)
         return input_df, len(good_quality_t0s), len(t0s_with_data)
 
-    def _prepare_input_star(self, star_df, teff_mod=1, rad_mod=1, mass_mod=1):
+    def _prepare_input_star(self, target_row, star_df, teff_mod=1, rad_mod=1, mass_mod=1):
         if 'ra' in star_df.columns:
             ra = star_df['ra'].iloc[0]
         if 'dec' in star_df.columns:
@@ -206,9 +211,19 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
             star_df['ld_a'] = star_df['ld_a'].fillna(0.25)
         if 'ld_a' in star_df.columns:
             star_df['ld_b'] = star_df['ld_b'].fillna(0.25)
+        if 'st_teff' in target_row and not np.isnan(target_row['st_teff']):
+            star_df['Teff'] = target_row['st_teff']
+        elif 'koi_steff' in target_row and not np.isnan(target_row['koi_steff']):
+            star_df['Teff'] = target_row['koi_steff']
+        elif 'tce_steff' in target_row and not np.isnan(target_row['tce_steff']):
+            star_df['Teff'] = target_row['tce_steff']
         star_df['Teff'] = star_df['Teff'].fillna(6000)
-        star_df['radius'] = star_df['radius'].fillna(1)
-        star_df['mass'] = star_df['mass'].fillna(1)
+        if 'st_rad' in target_row and not np.isnan(target_row['st_rad']):
+            star_df['radius'] = target_row['st_rad']
+        elif 'koi_srad' in target_row and not np.isnan(target_row['koi_srad']):
+            star_df['radius'] = target_row['koi_srad']
+        elif 'tce_sradius' in target_row and not np.isnan(target_row['tce_sradius']):
+            star_df['radius'] = target_row['tce_sradius']
         if 'lum' in star_df.columns:
             star_df['lum'] = star_df['lum'].fillna(1)
         if 'logg' in star_df.columns:
@@ -261,7 +276,7 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
             star_df['radius'] = star_df['radius'] if star_df['radius'].iloc[0] <= 1 else 1
             star_df['mass'] = star_df['mass'] / 3
             star_df['mass'] = star_df['mass'] if star_df['mass'].iloc[0] <= 1 else 1
-            star_df['lum'] = star_df['mass'] / 1000
+            star_df['lum'] = star_df['lum'] / 1000
             star_df['v'] = (30 - star_df['v']) / 40
             star_df['j'] = (30 - star_df['j']) / 40
             star_df['k'] = (30 - star_df['k']) / 40
@@ -271,9 +286,57 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
                 star_df['dist_arcsec'] = star_df['dist_arcsec'].fillna(max_distance)
         return star_df
 
+    @staticmethod
+    def compute_snr(file_prefix, time, flux, duration, period, epoch, oot_range=5, fold=False, baseline=1, zero_epsilon=1e-7):
+        duration_to_period = duration / period
+        lc_df = pd.DataFrame(columns=['time', 'time_folded', 'flux'])
+        lc_df['time'] = time
+        lc_df['flux'] = flux
+        if fold:
+            lc_df['time_folded'] = foldedleastsquares.fold(lc_df['time'].to_numpy(), period, epoch + period / 2)
+            lc_df = lc_df.sort_values(by=['time_folded'], ascending=True)
+        else:
+            lc_df['time_folded'] = lc_df['time']
+        lc_it = lc_df[(lc_df['time_folded'] > 0.5 - duration_to_period / 2) &
+                      (lc_df['time_folded'] < 0.5 + duration_to_period / 2)]
+        lc_oot = lc_df[((lc_df['time_folded'] < 0.5 - duration_to_period) & (
+                    lc_df['time_folded'] > 0.5 - duration_to_period * oot_range / 2)) |
+                       ((lc_df['time_folded'] > 0.5 + duration_to_period) & (
+                                   lc_df['time_folded'] < 0.5 + duration_to_period * oot_range / 2))]
+        snr = (baseline - lc_it['flux'].mean()) * np.sqrt(len(lc_it)) / lc_oot['flux'].std()
+        if np.isnan(snr):
+            logging.info(f"NaN SNR for {file_prefix}")
+            snr = zero_epsilon
+        elif snr >= 20 - zero_epsilon:
+            snr = 1 - zero_epsilon
+        elif snr < -20:
+            snr = zero_epsilon
+        else:
+            snr = (snr + 20) / 40 + zero_epsilon
+        return snr
+
+    def compute_og_df(self, read_og_df, object_id, duration):
+        if len(read_og_df) > 0:
+            if read_og_df['core_flux'].isnull().values.all():
+                logging.info("Nan values found for CORE_OG for %s, zeroing OG", object_id)
+                read_og_df.loc[read_og_df['core_flux'].isnull(), 'core_flux'] = 1
+            if read_og_df['halo_flux'].isnull().values.all():
+                logging.info("Nan values found for HALO_OG for %s, zeroing OG", object_id)
+                read_og_df.loc[read_og_df['halo_flux'].isnull(), 'halo_flux'] = 1
+            read_og_df['core_flux'], _ = LcbuilderHelper.detrend(read_og_df['time'].to_numpy(),
+                                                              read_og_df['core_flux'].to_numpy(), duration * 4,
+                                                              check_cadence=True)
+            read_og_df['halo_flux'], _ = LcbuilderHelper.detrend(read_og_df['time'].to_numpy(),
+                                                              read_og_df['halo_flux'].to_numpy(), duration * 4,
+                                                              check_cadence=True)
+            read_og_df['og_flux'] = read_og_df['halo_flux'] - read_og_df['core_flux']
+        read_og_df = read_og_df.drop(columns=['halo_flux', 'core_flux'])
+        return read_og_df
+
     @abstractmethod
     def class_weights(self):
         pass
+
 
 # df = pd.read_csv("/mnt/DATA-2/ete6/injected_objects.csv", index_col=False)
 # df = shuffle(df)

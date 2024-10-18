@@ -1,15 +1,16 @@
-KEPLER length: 27395
+KEPLER length: 27396
+Kepler 11449844 planet_transit
 tce_og                  6980
 tce_candidate           6083
-fp                      3558
+fp                      3550
 tce_source_offset       3222
 tce_secondary           2370
-planet_transit          2186
+planet_transit          2193
 tce_centroids_offset    1029
 tce                      804
 tce_odd_even             733
 fa                       311
-planet                   119
+planet                   121
 Name: type, dtype: int64
 TESS length: 15355
 none      12631

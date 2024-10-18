@@ -6,16 +6,12 @@ import numpy as np
 import pandas as pd
 import keras
 import tensorflow as tf
-from keras.activations import sigmoid
-from keras.layers import LeakyReLU, Activation
-from keras.utils import losses_utils
-from keras.utils.generic_utils import to_list
+from keras.layers import LeakyReLU
 from sklearn.utils import shuffle
-from keras import backend as K
 
 from exoml.iatson.iatson_og_generator import IatsonOgModelGenerator
 from exoml.ml.layers.dropout import AdaptiveStdDropout
-from exoml.ml.layers.transformer_classifier import ClassToken, AddPositionEmbs, TransformerClassifier
+from exoml.ml.layers.transformer_classifier import TransformerClassifier
 from exoml.ml.model.base_model import CategoricalPredictionSetStats
 from exoml.ml.model.imbalanced_binary_model import ImbalancedBinaryModel
 
@@ -69,8 +65,12 @@ class IATSON_og(ImbalancedBinaryModel):
         #focus_flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(focus_flux_branch)
         focus_flux_branch = keras.layers.MaxPooling1D(pool_size=3, strides=1)(focus_flux_branch)
         if additional_inputs is not None:
-            focus_flux_branch = keras.layers.Flatten()(focus_flux_branch)
-            focus_flux_branch = keras.layers.Concatenate(axis=1)([focus_flux_branch, keras.layers.Flatten()(additional_inputs)])
+            additional_inputs_branch = additional_inputs
+            if self.hyperparams.numerical_white_noise_std is not None:
+                additional_inputs_branch = keras.layers.GaussianNoise(
+                    stddev=self.hyperparams.numerical_white_noise_std)(additional_inputs_branch)
+            focus_flux_branch = keras.layers.Concatenate(axis=1)(
+                [focus_flux_branch, keras.layers.Flatten()(additional_inputs_branch)])
         focus_flux_branch = keras.layers.Dense(64, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                                activation=LeakyReLU(leaky_relu_alpha))(focus_flux_branch)
         focus_flux_branch = AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
@@ -98,17 +98,12 @@ class IATSON_og(ImbalancedBinaryModel):
         #flux_branch = keras.layers.GlobalMaxPooling1D()(flux_branch)
         flux_branch = keras.layers.Flatten()(flux_branch)
         if additional_inputs is not None:
-            flux_branch = keras.layers.Concatenate(axis=1)([flux_branch, keras.layers.Flatten()(additional_inputs)])
-        flux_branch = keras.layers.Dense(1000, kernel_regularizer=tf.keras.regularizers.L1L2(
-            l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
-                                         activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
-        flux_branch = AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
-                                         max_rate=self.hyperparams.dropout_max_rate)(flux_branch)
-        flux_branch = keras.layers.Dense(250, kernel_regularizer=tf.keras.regularizers.L1L2(
-            l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
-                                         activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
-        flux_branch = AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
-                                         max_rate=self.hyperparams.dropout_max_rate)(flux_branch)
+            additional_inputs_branch = additional_inputs
+            if self.hyperparams.numerical_white_noise_std is not None:
+                additional_inputs_branch = keras.layers.GaussianNoise(
+                    stddev=self.hyperparams.numerical_white_noise_std)(additional_inputs_branch)
+            flux_branch = keras.layers.Concatenate(axis=1)(
+                [flux_branch, keras.layers.Flatten()(additional_inputs_branch)])
         flux_branch = keras.layers.Dense(50, kernel_regularizer=tf.keras.regularizers.L1L2(
             l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                          activation=LeakyReLU(leaky_relu_alpha))(flux_branch)

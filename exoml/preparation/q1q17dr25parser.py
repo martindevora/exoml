@@ -48,16 +48,17 @@ def create_targets_df(tces_dir):
     disc_df = disc_df[disc_df['disc_facility'] == 'Kepler']
     disc_df = disc_df[disc_df['discoverymethod'] == 'Transit']
     disc_df = pd.merge(tces_df, disc_df, on='pl_name', how='outer')
+    disc_df['close_period'] = 0
     disc_df['type'] = 'tce'
-    disc_df.loc[disc_df['koi_disposition'] == 'FALSE POSITIVE', 'type'] = 'candidate'
-    disc_df.loc[disc_df['koi_disposition'] == 'FALSE POSITIVE', 'type'] = 'candidate'
+    disc_df.loc[~disc_df['pl_name'].isna(), 'type'] = 'planet'
+    disc_df.loc[(disc_df['koi_disposition'] == 'FALSE POSITIVE') & (~disc_df['type'].str.contains('planet')), 'type'] = 'fp_candidate'
     disc_df.loc[(disc_df['koi_disposition'] == 'CONFIRMED'), 'type'] = 'planet_transit'
     disc_df.loc[(disc_df['rv_flag'] > 0) & (disc_df['tran_flag'] > 0) & (disc_df['koi_disposition'] == 'CONFIRMED'), 'type'] = 'planet'
     disc_df.loc[(disc_df['rv_flag'] == 0) & (disc_df['tran_flag'] > 0) & (disc_df['koi_disposition'] == 'CONFIRMED'), 'type'] = 'planet_transit'
-    disc_df.loc[disc_df['koi_disposition'] == 'FALSE POSITIVE', 'type'] = 'candidate'
-    disc_df.loc[disc_df['koi_disposition'] == 'CANDIDATE', 'type'] = 'candidate'
-    disc_df.loc[disc_df['fpwg_disp_status'] == 'CERTIFIED FP', 'type'] = 'fp'
-    disc_df.loc[disc_df['fpwg_disp_status'] == 'CERTIFIED FA', 'type'] = 'fa'
+    disc_df.loc[(disc_df['koi_disposition'] == 'FALSE POSITIVE') & (~disc_df['type'].str.contains('planet')), 'type'] = 'fp_candidate'
+    disc_df.loc[(disc_df['koi_disposition'] == 'CANDIDATE') & (~disc_df['type'].str.contains('planet')), 'type'] = 'candidate'
+    disc_df.loc[(disc_df['fpwg_disp_status'] == 'CERTIFIED FP') & (~disc_df['type'].str.contains('planet')), 'type'] = 'fp'
+    disc_df.loc[(disc_df['fpwg_disp_status'] == 'CERTIFIED FA') & (~disc_df['type'].str.contains('planet')), 'type'] = 'fa'
     disc_df['object_id'] = 'KIC ' + disc_df['kepid'].astype('Int64').astype('str')
     disc_df['period'] = disc_df['tce_period_x']
     disc_df.loc[disc_df['period'].isna(), 'period'] = disc_df[disc_df['period'].isna()]['tce_period_y']
@@ -116,11 +117,16 @@ def create_targets_df(tces_dir):
     result_df = disc_df.loc[unpaired_index]
     for i, index in enumerate(left_match_index):
         result = disc_df.loc[index].combine_first(disc_df.loc[right_match_index[i]])
+        result['close_period'] = 1
         result_df = pd.concat([result_df, result.to_frame().T], ignore_index=True)
     result_df.drop(result_df[result_df['duration(h)'].isnull()].index, inplace=True)
     result_df.drop(result_df[result_df['object_id'] == 'KIC <NA>'].index, inplace=True)
     # Remove latest KIC from the catalogue
     result_df.drop(result_df[result_df['object_id'] == 'KIC 100001645'].index, inplace=True)
+    result_df['ephemeris_contamination'] = 0
+    result_df.loc[(result_df['koi_fpflag_ec'] == 1) & (result_df['koi_fpflag_nt'] == 0) &
+                  (result_df['koi_fpflag_ss'] == 0) & (result_df['koi_fpflag_co'] == 0), 'ephemeris_contamination'] = 1
+    #result_df.drop(result_df[(np.isnan(result_df['tce_plnt_num']))].index, inplace=True) # discarding rows without DR25 tce
     result_df.to_csv(tces_dir + '/classified_tces.csv')
     results_df_no_validated = result_df.copy()
     results_df_no_validated.loc[results_df_no_validated['disc_refname'].str.contains('Valizadegan', na=False), ['type']] = 'candidate'
@@ -180,15 +186,25 @@ def create_targets_multi_df(tces_dir):
     disc_df = disc_df[disc_df['disc_facility'] == 'Kepler']
     disc_df = disc_df[disc_df['discoverymethod'] == 'Transit']
     disc_df = pd.merge(tces_df, disc_df, on='pl_name', how='outer')
-    disc_df['type'] = 'tce'
     disc_df['multitype'] = ''
+    disc_df['close_period'] = 0
+    disc_df['type'] = 'tce'
+    disc_df.loc[~disc_df['pl_name'].isna(), 'type'] = 'planet'
+    disc_df.loc[(disc_df['koi_disposition'] == 'FALSE POSITIVE') & (
+        ~disc_df['type'].str.contains('planet')), 'type'] = 'fp_candidate'
     disc_df.loc[(disc_df['koi_disposition'] == 'CONFIRMED'), 'type'] = 'planet_transit'
-    disc_df.loc[(disc_df['rv_flag'] > 0) & (disc_df['tran_flag'] > 0) & (disc_df['koi_disposition'] == 'CONFIRMED'), 'type'] = 'planet'
-    disc_df.loc[(disc_df['rv_flag'] == 0) & (disc_df['tran_flag'] > 0) & (disc_df['koi_disposition'] == 'CONFIRMED'), 'type'] = 'planet_transit'
-    disc_df.loc[disc_df['koi_disposition'] == 'FALSE POSITIVE', 'type'] = 'candidate'
-    disc_df.loc[disc_df['koi_disposition'] == 'CANDIDATE', 'type'] = 'candidate'
-    disc_df.loc[disc_df['fpwg_disp_status'] == 'CERTIFIED FP', 'type'] = 'fp'
-    disc_df.loc[disc_df['fpwg_disp_status'] == 'CERTIFIED FA', 'type'] = 'fa'
+    disc_df.loc[(disc_df['rv_flag'] > 0) & (disc_df['tran_flag'] > 0) & (
+                disc_df['koi_disposition'] == 'CONFIRMED'), 'type'] = 'planet'
+    disc_df.loc[(disc_df['rv_flag'] == 0) & (disc_df['tran_flag'] > 0) & (
+                disc_df['koi_disposition'] == 'CONFIRMED'), 'type'] = 'planet_transit'
+    disc_df.loc[(disc_df['koi_disposition'] == 'FALSE POSITIVE') & (
+        ~disc_df['type'].str.contains('planet')), 'type'] = 'fp_candidate'
+    disc_df.loc[
+        (disc_df['koi_disposition'] == 'CANDIDATE') & (~disc_df['type'].str.contains('planet')), 'type'] = 'candidate'
+    disc_df.loc[
+        (disc_df['fpwg_disp_status'] == 'CERTIFIED FP') & (~disc_df['type'].str.contains('planet')), 'type'] = 'fp'
+    disc_df.loc[
+        (disc_df['fpwg_disp_status'] == 'CERTIFIED FA') & (~disc_df['type'].str.contains('planet')), 'type'] = 'fa'
     disc_df['object_id'] = 'KIC ' + disc_df['kepid'].astype('Int64').astype('str')
     disc_df['period'] = disc_df['tce_period_x']
     disc_df.loc[disc_df['period'].isna(), 'period'] = disc_df[disc_df['period'].isna()]['tce_period_y']
@@ -254,11 +270,16 @@ def create_targets_multi_df(tces_dir):
     result_df = disc_df.loc[unpaired_index]
     for i, index in enumerate(left_match_index):
         result = disc_df.loc[index].combine_first(disc_df.loc[right_match_index[i]])
+        result['close_period'] = 1
         result_df = pd.concat([result_df, result.to_frame().T], ignore_index=True)
     result_df.drop(result_df[result_df['duration(h)'].isnull()].index, inplace=True)
     result_df.drop(result_df[result_df['object_id'] == 'KIC <NA>'].index, inplace=True)
     # Remove latest KIC from the catalogue
     result_df.drop(result_df[result_df['object_id'] == 'KIC 100001645'].index, inplace=True)
+    result_df['ephemeris_contamination'] = 0
+    result_df.loc[(result_df['koi_fpflag_ec'] == 1) & (result_df['koi_fpflag_nt'] == 0) &
+                  (result_df['koi_fpflag_ss'] == 0) & (result_df['koi_fpflag_co'] == 0), 'ephemeris_contamination'] = 1
+    #result_df.drop(result_df[(np.isnan(result_df['tce_plnt_num']))].index, inplace=True) # discarding rows without DR25 tce
     result_df.to_csv(tces_dir + '/classified_tces_multi.csv')
     #disc_df[disc_df['object_id'] == 'KIC 7377200'].iloc[0]['epoch']
     result_df = result_df[result_df['type'].isin(['fp', 'fa', 'planet', 'planet_transit', 'tce', 'tce_og',

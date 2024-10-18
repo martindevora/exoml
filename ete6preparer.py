@@ -3,8 +3,7 @@ import sys
 
 from lcbuilder.star.TicStarCatalog import TicStarCatalog
 
-from preparation.parser_utils import create_star_csvs
-from preparation.ete6parser import create_target_csvs, create_injection_dataframe
+from exoml.preparation.ete6parser import create_target_csvs, create_injection_dataframe
 
 if not isinstance(logging.root, logging.RootLogger):
     logging.root = logging.RootLogger(logging.INFO)
@@ -27,4 +26,4 @@ cores = 1
 #uncompress_data('/mnt/DATA-2/ete6/planets/Planets/')
 #create_injection_dataframe(root_dir, lcs_dir)
 #create_star_csvs(lcs_dir, 50, 4, TicStarCatalog(), targets_df, cores, force=False, ids=['TIC 318948330'])
-create_target_csvs(lcs_dir, root_dir, cores=cores, force=True, ids=["TIC 57907253", "TIC 458524570"], mode=['og'])
+create_target_csvs(lcs_dir, root_dir, cores=cores, force=True, mode=['source_offset'])

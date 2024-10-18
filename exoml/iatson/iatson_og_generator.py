@@ -209,15 +209,15 @@ class IatsonOgModelGenerator(Ete6ModelGenerator):
                 og_long_filename = file_prefix + '_og_long.csv'
                 og_df = None
                 if os.path.exists(og_long_filename):
-                    read_og_df = pd.read_csv(og_long_filename, usecols=['time', 'og_flux'],
+                    read_og_df = pd.read_csv(og_long_filename, usecols=['time', 'og_flux', 'halo_flux', 'core_flux'],
                                              low_memory=True)
-                    og_df = read_og_df if og_df is None \
-                        else og_df.append(read_og_df, ignore_index=True)
+                    read_og_df = self.compute_og_df(read_og_df, object_id, duration)
+                    og_df = read_og_df if og_df is None else og_df.append(read_og_df, ignore_index=True)
                 if os.path.exists(og_short_filename):
-                    read_og_df = pd.read_csv(og_short_filename, usecols=['time', 'og_flux'],
+                    read_og_df = pd.read_csv(og_short_filename, usecols=['time', 'og_flux', 'halo_flux', 'core_flux'],
                                              low_memory=True)
-                    og_df = read_og_df if og_df is None \
-                        else og_df.append(read_og_df, ignore_index=True)
+                    read_og_df = self.compute_og_df(read_og_df, object_id, duration)
+                    og_df = read_og_df if og_df is None else og_df.append(read_og_df, ignore_index=True)
                 og_df['time'] = self.fold(og_df['time'].to_numpy(), period, epoch + period / 2)
                 og_df = og_df.sort_values(by=['time'])
                 og_df = self._prepare_input_og(og_df)

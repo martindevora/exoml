@@ -156,7 +156,7 @@ class Transformer(tf.keras.layers.Layer):
                 self.num_heads,
                 dropout=self.hyperparams.dropout_rate,
                 activation=LeakyReLU(),
-                layer_norm_epsilon=1e-05,
+                layer_norm_epsilon=self.hyperparams.transformer_layer_norm_epsilon,
                 kernel_initializer="glorot_uniform",
                 bias_initializer="zeros",
                 normalize_first=False
@@ -168,7 +168,7 @@ class Transformer(tf.keras.layers.Layer):
             #     name=f"Transformer/encoderblock_{n}"
             # )]
 
-    def call(self, inputs):
+    def call(self, inputs, training=True):
         result = inputs
         for n in range(self.num_blocks):
             result = self.transformer_encoders[n](result)
@@ -221,7 +221,7 @@ class TransformerClassifier(tf.keras.layers.Layer):
         #self.add_pos_embedding = AddPositionEmbs(name="add_pos_embedding")
         self.transformer = Transformer(num_heads=self.num_heads, mlp_dim=self.mlp_dim,
                                        hyperparams=self.hyperparams, num_blocks=self.num_blocks)
-        self.layer_norm = tf.keras.layers.LayerNormalization(epsilon=1e-6, name="Transformer/encoder_norm")
+        self.layer_norm = tf.keras.layers.LayerNormalization(epsilon=self.hyperparams.transformer_layer_norm_epsilon, name="Transformer/encoder_norm")
         activation = "softmax" if self.classes > 1 else "sigmoid"
         self.output_flatten = tf.keras.layers.Flatten()
         self.head = tf.keras.layers.Dense(self.classes, name="head", activation=activation,

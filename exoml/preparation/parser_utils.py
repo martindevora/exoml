@@ -11,7 +11,7 @@ from multiprocessing import Pool
 import gzip
 import shutil
 import lcbuilder.constants
-import triceratops.triceratops as tr
+#import triceratops.triceratops as tr
 import astropy.units as u
 import foldedleastsquares
 import lightkurve
@@ -180,6 +180,9 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
         tpfs = []
         for file in tpf_files:
             tpfs.append(lightkurve.TessTargetPixelFile(file, ignore_missing_simple=True))
+    lc_filename = str(file_prefix) + '_lc_' + str(cadence) + '.csv'
+    transit_duration = transit_duration if transit_duration < transit_period else transit_period / 2
+    duration_to_period = transit_duration / transit_period
     if 'all' in modes or 'lc' in modes:
         lc_df = pd.DataFrame(columns=['#time', 'flux', 'flux_err', 'planet_model', 'eb_model', 'bckeb_model',
                                       'centroid_x', 'centroid_y', 'motion_x', 'motion_y', 'bck_flux'])
@@ -193,8 +196,6 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
             median_flux = np.nanmedian(flux_values)
             flux_values = flux_values / median_flux
         time_values = np.array(lc_data.time)
-        transit_duration = transit_duration if transit_duration < transit_period else transit_period / 2
-        duration_to_period = transit_duration / transit_period
         series_len = len(time_values)
         for j in np.arange(0, 1, 1):
             logging.info("Detrending no %s for target %s with %s points with duration %s", j, object_id, series_len, transit_duration * (4 + j))
@@ -214,7 +215,7 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
         lc_df['motion_x'] = np.array(lc_data.motion_x)
         lc_df['motion_y'] = np.array(lc_data.motion_y)
         lc_df = lc_df.fillna(0)
-        lc_df.to_csv(str(file_prefix) + '_lc_' + str(cadence) + '.csv')
+        lc_df.to_csv(lc_filename)
     logging.info("Computing T0s for %s", object_id)
     t0s_list = LcbuilderHelper.compute_t0s(lc_data['time'].to_numpy(), transit_period, epoch, transit_duration)
     source_offsets_diffimg = []
@@ -289,14 +290,14 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
             og_df['core_flux'] = list(chain.from_iterable(og_core_flux_list))
             og_df['halo_flux'] = list(chain.from_iterable(og_halo_flux_list))
             og_df['og_flux'] = og_df['halo_flux'] - og_df['core_flux']
-            og_df.fillna(0)
+            og_df.fillna(1, inplace=True)
             og_df.to_csv(file_prefix + '_og_' + str(cadence) + '.csv')
         if 'all' in modes or 'centroids' in modes:
             centroid_coords_df = pd.DataFrame(columns=['time', 'centroids_ra', 'centroids_dec'])
             centroid_coords_df['centroids_ra'] = list(chain.from_iterable(centroids_offsets_ra_list))
             centroid_coords_df['centroids_dec'] = list(chain.from_iterable(centroids_offsets_dec_list))
             centroid_coords_df['time'] = list(chain.from_iterable(centroids_offsets_time_list))
-            centroid_coords_df.fillna(0)
+            centroid_coords_df.fillna(0, inplace=True)
             centroid_coords_df.to_csv(file_prefix + '_cent_' + str(cadence) + '.csv')
         if 'all' in modes or 'source_offset' in modes:
             if len(source_offsets_diffimg) > 0:
@@ -336,6 +337,10 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
                                'ra_err': offset_ra_err, 'dec_err': offset_dec_err}, ignore_index=True)
             offsets_df.to_csv(file_prefix + '_offset_' + str(cadence) + '.csv')
     if 'all' in modes or 'metrics' in modes:
+        logging.info("Computing bootstrap fap for %s", object_id)
+        if lc_df is None:
+            lc_df = pd.read_csv(lc_filename)
+        bootstrap_fap = Watson.compute_bootstrap_fap(lc_df['#time'].to_numpy(), lc_df['flux'].to_numpy(), transit_period, transit_duration, star_info, flux_err=None)
         logging.info("Computing metrics for %s", object_id)
         lc_df['time_folded'] = foldedleastsquares.fold(lc_df['#time'].to_numpy(), transit_period, epoch + transit_period / 2)
         lc_df['time_folded_sec'] = foldedleastsquares.fold(lc_df['#time'].to_numpy(), transit_period, epoch)
@@ -362,6 +367,7 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
             planet_eff_temp = star_info.teff * (sec_depth ** (1 / 4)) * (rp_rs ** (1 / 2))
         statistics_df = pd.DataFrame(columns=['name', 'value'])
         statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['depth'], 'value': [depth]}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['bootstrap_fap'], 'value': [bootstrap_fap]}, orient='columns')], ignore_index=True)
         statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['sec_depth'], 'value': [sec_depth]}, orient='columns')], ignore_index=True)
         statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['geom_albedo'], 'value': [geom_albedo]}, orient='columns')], ignore_index=True)
         statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['eq_temp'], 'value': [planet_eq_temp]}, orient='columns')], ignore_index=True)

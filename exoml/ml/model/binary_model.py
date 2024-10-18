@@ -21,6 +21,7 @@ class BinaryModel(BaseModel):
         return [Precision(name="precision"), Recall(name="recall"),
                 #F1Score(num_classes=1, threshold=0.5, average='weighted', name='f1_score'),
                 RecallAtPrecision(precision=0.99, name="r@p99", num_thresholds=1000),
+                RecallAtPrecision(precision=1.0, name="r@p100", num_thresholds=1000),
                 #ThresholdAtPrecision(precision=0.99, name="t@p99", num_thresholds=1000),
                 AUC(name="roc_auc"),
                 AUC(curve="PR", name="pr_auc")]

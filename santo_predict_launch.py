@@ -30,10 +30,11 @@ for index in np.arange(0, number_of_items):
         tagged_data = tagged_data + [target_data[1]]
     batch_index = batch_index + 1
     santo.predict(times, fluxes, "SANTO_model_chk", batch_size=5000, tagged_data=tagged_data, plot=True, target_name=targets_files[batch_index])
+
 ##### Predict from real target
 # target_id = "TIC 200322593" # fast rotator
-#target_dir = "TIC_231663901_santo" # hot jupiter
-#target_dir = "TIC_305048087_santo"
+# # target_dir = "TIC_231663901_santo" # hot jupiter
+# # target_dir = "TIC_305048087_santo"
 # target_dir = f"{target_id}_santo"
 # if not os.path.exists(target_dir):
 #     os.mkdir(target_dir)
@@ -42,4 +43,4 @@ for index in np.arange(0, number_of_items):
 
 #SANTO().predict([lcbuild.lc.time.value], [lcbuild.lc.flux.value], "SANTO_model_chk", batch_size=5000, tagged_data=[tagged_data])
 #SANTO().predict([lcbuild.lc.time.value], [lcbuild.lc.flux.value], "SANTO_model_chk", batch_size=5000, plot=True, plot_positives=False)
-#SANTO().predict([lcbuild.lc.time.value], [wotan.flatten(lcbuild.lc.time.value, lcbuild.lc.flux.value, window_length=0.35)], "SANTO_model_chk", batch_size=5000)
+#SANTO().predict([lcbuild.lc.time.value], [wotan.flatten(lcbuild.lc.time.value, lcbuild.lc.flux.value, window_length=0.2)], "SANTO_model_chk", batch_size=5000, plot=True, plot_positives=False)
