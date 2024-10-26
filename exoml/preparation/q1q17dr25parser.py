@@ -126,6 +126,8 @@ def create_targets_df(tces_dir):
     result_df['ephemeris_contamination'] = 0
     result_df.loc[(result_df['koi_fpflag_ec'] == 1) & (result_df['koi_fpflag_nt'] == 0) &
                   (result_df['koi_fpflag_ss'] == 0) & (result_df['koi_fpflag_co'] == 0), 'ephemeris_contamination'] = 1
+    result_df['koi_without_tce'] = 0
+    result_df.loc[(~result_df['kepoi_name'].isna()) & (result_df['tce_plnt_num'].isna()), 'koi_without_tce'] = 1
     #result_df.drop(result_df[(np.isnan(result_df['tce_plnt_num']))].index, inplace=True) # discarding rows without DR25 tce
     result_df.to_csv(tces_dir + '/classified_tces.csv')
     results_df_no_validated = result_df.copy()
@@ -279,6 +281,8 @@ def create_targets_multi_df(tces_dir):
     result_df['ephemeris_contamination'] = 0
     result_df.loc[(result_df['koi_fpflag_ec'] == 1) & (result_df['koi_fpflag_nt'] == 0) &
                   (result_df['koi_fpflag_ss'] == 0) & (result_df['koi_fpflag_co'] == 0), 'ephemeris_contamination'] = 1
+    result_df['koi_without_tce'] = 0
+    result_df.loc[(~result_df['kepoi_name'].isna()) & (result_df['tce_plnt_num'].isna()), 'koi_without_tce'] = 1
     #result_df.drop(result_df[(np.isnan(result_df['tce_plnt_num']))].index, inplace=True) # discarding rows without DR25 tce
     result_df.to_csv(tces_dir + '/classified_tces_multi.csv')
     #disc_df[disc_df['object_id'] == 'KIC 7377200'].iloc[0]['epoch']
