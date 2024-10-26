@@ -356,7 +356,7 @@ class IATSON_planet(ImbalancedBinaryModel):
         #                                                activation=LeakyReLU(leaky_relu_alpha),
         #                                                name="stellar-neighbours_3")(
         #     stellar_neighbours_branch)
-        #flux_model_branch = self._get_flux_conv_model_branch()
+        flux_model_branch = self._get_flux_conv_model_branch()
         focus_flux_model_input, focus_flux_model_branch = self._get_focus_flux_conv_model_branch(transit_params_input)
         #centroids_input, centroids_err_input, centroids_branch = self._get_focus_flux_conv_branch("centroids_branch", 3)
         centroids_input, centroids_branch = self._get_focus_flux_conv_branch("centroids_branch", 2,
@@ -374,22 +374,22 @@ class IATSON_planet(ImbalancedBinaryModel):
         final_branch = keras.layers.Concatenate(axis=-1)(
             [keras.layers.Flatten()(stellar_model_branch),
              # stellar_neighbours_branch,
-             #keras.layers.Flatten()(flux_model_branch.output),
+             keras.layers.Flatten()(flux_model_branch.output),
              keras.layers.Flatten()(focus_flux_model_branch),
              keras.layers.Flatten()(centroids_branch),
              keras.layers.Flatten()(og_branch)])
-       # final_branch = keras.layers.Dense(1000, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
-       #                                   activation=LeakyReLU(leaky_relu_alpha), name="final-dense2")(final_branch)
-        #final_branch = Dropout(rate=self.hyperparams.dropout_rate, name="final-dropout2")(final_branch)
-        #final_branch = keras.layers.Dense(250, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
-        #                                  activation=LeakyReLU(leaky_relu_alpha), name="final-dense3")(final_branch)
-        #final_branch = Dropout(self.hyperparams.dropout_rate, name="final-dropout3")(final_branch)
+        final_branch = keras.layers.Dense(1000, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
+                                         activation=LeakyReLU(leaky_relu_alpha), name="final-dense2")(final_branch)
+        final_branch = Dropout(rate=self.hyperparams.dropout_rate, name="final-dropout2")(final_branch)
+        final_branch = keras.layers.Dense(250, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
+                                         activation=LeakyReLU(leaky_relu_alpha), name="final-dense3")(final_branch)
+        final_branch = Dropout(self.hyperparams.dropout_rate, name="final-dropout3")(final_branch)
         final_branch = keras.layers.Dense(75, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                           activation=LeakyReLU(leaky_relu_alpha), name="final-dense4")(final_branch)
         final_branch = Dropout(self.hyperparams.dropout_rate, name="final-dropout4")(final_branch)
-        #final_branch = keras.layers.Dense(35, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
-        #                                  activation=LeakyReLU(leaky_relu_alpha), name="final-dense5")(final_branch)
-        #final_branch = Dropout(self.hyperparams.dropout_rate, name="final-dropout5")(final_branch)
+        final_branch = keras.layers.Dense(35, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
+                                         activation=LeakyReLU(leaky_relu_alpha), name="final-dense5")(final_branch)
+        final_branch = Dropout(self.hyperparams.dropout_rate, name="final-dropout5")(final_branch)
         final_branch = keras.layers.Dense(16, kernel_regularizer=tf.keras.regularizers.L1L2(l1=self.hyperparams.l1_regularization, l2=self.hyperparams.l2_regularization),
                                           activation=LeakyReLU(leaky_relu_alpha), name="final-dense6")(final_branch)
         final_branch = Dropout(self.hyperparams.dropout_rate, name="final-dropout6")(final_branch)
@@ -402,13 +402,13 @@ class IATSON_planet(ImbalancedBinaryModel):
             inputs = inputs + [transit_params_input]
         if offset_params_input is not None:
             inputs = inputs + [offset_params_input]
-        inputs = inputs + [stellar_model_input] + \
-                 [focus_flux_model_input] + \
-                 [centroids_input, og_input]
         # inputs = inputs + [stellar_model_input] + \
-        #          flux_model_branch.inputs + \
         #          [focus_flux_model_input] + \
         #          [centroids_input, og_input]
+        inputs = inputs + [stellar_model_input] + \
+                 flux_model_branch.inputs + \
+                 [focus_flux_model_input] + \
+                 [centroids_input, og_input]
         return inputs, final_branch
 
     def build_transformer(self, transformer_blocks=6, transformer_heads=6):
@@ -501,6 +501,9 @@ class IATSON_planet(ImbalancedBinaryModel):
             logging.info("Removing validated signals")
             q1q17_df.loc[q1q17_df['disc_refname'].str.contains('Valizadegan', na=False), ['type']] = 'candidate'
             #q1q17_df.loc[q1q17_df['disc_refname'].str.contains('Armstrong et al. 2021', na=False), ['type']] = 'candidate'
+        if 'q1q17' in self.mode and not 'with_kois_without_tce' in self.mode:
+            logging.info("Removing signals without matching TCE")
+            q1q17_df = q1q17_df.loc[q1q17_df['koi_without_tce'] != 1]
         #if 'q1q17' in self.mode and 'with_radius' in self.mode:
         #    q1q17_df = q1q17_df.loc[q1q17_df['type'] != 'planet']
         if 'q1q17' in self.mode and not 'with_ephemeris_contamination' in self.mode:
@@ -693,31 +696,31 @@ class IATSON_planet(ImbalancedBinaryModel):
         rp_values = [0.95, 0.975, 0.99, 0.995, 1.0]
         all_recalls, selected_rp_thresholds, all_precisions, selected_pr_thresholds, all_sensitivities, selected_snpv_thresholds = \
             self.compute_rp_thresholds(fold_thresholds_to_results, rp_values=rp_values, log=True)
-        self.compute_metrics(predictions_df, thresholds=[np.mean(selected_snpv_thresholds[4]),
-                                                         np.mean(selected_snpv_thresholds[3]),
-                                                         np.mean(selected_snpv_thresholds[2]),
-                                                         np.mean(selected_rp_thresholds[2]),
-                                                         np.mean(selected_rp_thresholds[4])], log=True)
+        self.compute_metrics(predictions_df, thresholds=[float(np.squeeze(np.mean(selected_snpv_thresholds[4]))),
+                                                         float(np.squeeze(np.mean(selected_snpv_thresholds[3]))),
+                                                         float(np.squeeze(np.mean(selected_snpv_thresholds[2]))),
+                                                         float(np.squeeze(np.mean(selected_rp_thresholds[2]))),
+                                                         float(np.squeeze(np.mean(selected_rp_thresholds[4])))], log=True)
         self.log_prediction_metrics(predictions_df, k_values, "K_METRICS_COMPLETE")
         #IATSON_planet.compute_statistics_map(fps_fns_df, './', filename=f"fps_fns_{message}_distribution", markersize=60)
         self.compute_rp_metrics(predictions_df, log=True)
         # self.compute_pr_thresholds(fold_thresholds_to_results, log=True)
         # self.compute_pr_metrics(predictions_df, log=True)
         logging.info("----------------------------------Q1Q17 SET METRICS ---------------------------------------")
-        self.compute_metrics(predictions_df_q1q17, thresholds=[np.mean(selected_snpv_thresholds[2]),
-                                                         np.mean(selected_snpv_thresholds[3]),
-                                                         np.mean(selected_snpv_thresholds[4]),
-                                                         np.mean(selected_pr_thresholds[2]),
-                                                         np.mean(selected_pr_thresholds[4])], log=True)
+        self.compute_metrics(predictions_df_q1q17, thresholds=[float(np.squeeze(np.mean(selected_snpv_thresholds[2]))),
+                                                         float(np.squeeze(np.mean(selected_snpv_thresholds[3]))),
+                                                         float(np.squeeze(np.mean(selected_snpv_thresholds[4]))),
+                                                         float(np.squeeze(np.mean(selected_pr_thresholds[2]))),
+                                                         float(np.squeeze(np.mean(selected_pr_thresholds[4])))], log=True)
         self.log_prediction_metrics(predictions_df_q1q17, k_values, "K_METRICS_Q1Q17")
         self.compute_rp_metrics(predictions_df_q1q17, log=True)
         # self.compute_pr_metrics(predictions_df_q1q17, log=True)
         logging.info("----------------------------------Ete6 SET METRICS ---------------------------------------")
-        self.compute_metrics(predictions_df_ete6, thresholds=[np.mean(selected_snpv_thresholds[2]),
-                                                         np.mean(selected_snpv_thresholds[3]),
-                                                         np.mean(selected_snpv_thresholds[4]),
-                                                         np.mean(selected_pr_thresholds[2]),
-                                                         np.mean(selected_pr_thresholds[4])], log=True)
+        self.compute_metrics(predictions_df_ete6, thresholds=[float(np.squeeze(np.mean(selected_snpv_thresholds[2]))),
+                                                         float(np.squeeze(np.mean(selected_snpv_thresholds[3]))),
+                                                         float(np.squeeze(np.mean(selected_snpv_thresholds[4]))),
+                                                         float(np.squeeze(np.mean(selected_pr_thresholds[2]))),
+                                                         float(np.squeeze(np.mean(selected_pr_thresholds[4])))], log=True)
         self.log_prediction_metrics(predictions_df_ete6, k_values, "K_METRICS_ETE6")
         self.compute_rp_metrics(predictions_df_ete6, log=True)
         # self.compute_pr_metrics(predictions_df_ete6, log=True)
@@ -988,14 +991,14 @@ class IATSON_planet(ImbalancedBinaryModel):
             best_recalls = best_recalls + [metric.result().numpy()]
             metric = ThresholdAtPrecision(rp_value, num_thresholds=thresholds)
             metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
-            best_recall_thresholds = best_recall_thresholds + [metric.result() if isinstance(metric.result(), float) else metric.result()]
+            best_recall_thresholds = best_recall_thresholds + [metric.result() if isinstance(metric.result(), float) else metric.result().numpy()]
             logging.info(f"Keras R@P{rp_value}: {best_recalls[-1]}, {best_recall_thresholds[-1]}")
             metric = SpecificityAtNPV(rp_value, num_thresholds=thresholds)
             metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
             best_sensitivities = best_sensitivities + [metric.result().numpy()]
             metric = ThresholdAtNPV(rp_value, num_thresholds=thresholds)
             metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
-            best_sensitivity_thresholds = best_sensitivity_thresholds + [metric.result() if isinstance(metric.result(), float) else metric.result()]
+            best_sensitivity_thresholds = best_sensitivity_thresholds + [metric.result() if isinstance(metric.result(), float) else metric.result().numpy()]
             logging.info(f"Keras S@NPV{rp_value}: {best_sensitivities[-1]}, {best_sensitivity_thresholds[-1]}")
         return best_recall_thresholds, best_recalls, best_sensitivity_thresholds, best_sensitivities
 
@@ -1025,31 +1028,31 @@ class IATSON_planet(ImbalancedBinaryModel):
         for threshold in thresholds:
             metric = tf.keras.metrics.TruePositives(thresholds=threshold)
             metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
-            tps[threshold] = metric.result().numpy()
+            tps[threshold] = metric.result() if isinstance(metric.result(), float) else metric.result().numpy()
             metric = tf.keras.metrics.FalsePositives(thresholds=threshold)
             metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
-            fps[threshold] = metric.result().numpy()
+            fps[threshold] = metric.result() if isinstance(metric.result(), float) else metric.result().numpy()
             metric = tf.keras.metrics.TrueNegatives(thresholds=threshold)
             metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
-            tns[threshold] = metric.result().numpy()
+            tns[threshold] = metric.result() if isinstance(metric.result(), float) else metric.result().numpy()
             metric = tf.keras.metrics.FalseNegatives(thresholds=threshold)
             metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
-            fns[threshold] = metric.result().numpy()
+            fns[threshold] = metric.result() if isinstance(metric.result(), float) else metric.result().numpy()
             metric = tf.keras.metrics.Precision(thresholds=threshold)
             metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
-            precisions[threshold] = metric.result().numpy()
+            precisions[threshold] = metric.result() if isinstance(metric.result(), float) else metric.result().numpy()
             metric = tf.keras.metrics.Recall(thresholds=threshold)
             metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
-            recalls[threshold] = metric.result().numpy()
+            recalls[threshold] = metric.result() if isinstance(metric.result(), float) else metric.result().numpy()
             metric = tf.keras.metrics.BinaryAccuracy(threshold=threshold)
             metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
-            accuracies[threshold] = metric.result().numpy()
+            accuracies[threshold] = metric.result() if isinstance(metric.result(), float) else metric.result().numpy()
             metric = NegativePredictiveValue(thresholds=threshold)
             metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
-            npvs[threshold] = metric.result().numpy()
+            npvs[threshold] = metric.result() if isinstance(metric.result(), float) else metric.result().numpy()
             metric = Specificity(thresholds=threshold)
             metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
-            sensitivities[threshold] = metric.result().numpy()
+            sensitivities[threshold] = metric.result() if isinstance(metric.result(), float) else metric.result().numpy()
             if log:
                 logging.info(f"Metrics: tps={tps}, fps={fps}, tns={tns}, fns={fns},"
                              f"precision={precisions[threshold]}, recall={recalls[threshold]}, "
