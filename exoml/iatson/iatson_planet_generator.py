@@ -201,7 +201,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 #TODO calculate ef_temp with (D^1/4) * Teff / (Rp/R*)^1/2, where Rp/R* is tce_ror, Teff is tce_steff, and D is wst_depth.
                 #TODO calculate eq_temp with Teq = Tstar * np.sqrt(Rstar / (2 * a)) * (1 - albedo) ** (1 / 4) where albedo is assumed as 0.3
                 #TODO calculate statistic with (Teff / Teq) / (uncertainty of Teff / Teq)
-                temperature_stat = 1
+                temperature_stat = 0
             if 'tce_albedo_stat' in target_row and not np.isnan(target_row['tce_albedo']):
                 albedo_stat = target_row['tce_albedo_stat']
             else:
@@ -495,12 +495,18 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 albedo_stat = (albedo_stat + 10) / 20
                 albedo_stat = albedo_stat if albedo_stat > 0 else self.zero_epsilon
                 albedo_stat = albedo_stat if albedo_stat < 1 else 1 - self.zero_epsilon
-                scalar_values[i] = np.transpose([[period / 1200 if period < 1200 else 1, duration / 15, depth,
-                                                  planet_radius, good_transits_count_norm,
+                scalar_values[i] = np.transpose([[period / 1200 if period < 1200 else 1,
+                                                  duration / 15,
+                                                  depth,
+                                                  planet_radius,
+                                                  good_transits_count_norm,
                                                   good_transits_ratio,
                                                   target_dist if not np.isnan(target_dist) else self.zero_epsilon,
-                                                  offset_err, bootstrap_fap, oe_factor,
-                                                  temperature_stat, albedo_stat]])
+                                                  offset_err,
+                                                  bootstrap_fap,
+                                                  oe_factor,
+                                                  temperature_stat,
+                                                  albedo_stat]])
             self.assert_in_range(object_id, scalar_values[i], None)
             self.assert_in_range(object_id, global_flux_array[i], global_flux_array_err[i])
             self.assert_in_range(object_id, star_array[i], None)
@@ -565,7 +571,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
         return [scalar_values[:, [0, 1, 3, 4, 5, 8, 9, 10, 11]], scalar_values[:, [7]],
                 star_array[:, [2, 6]], #Only Teff, Rad
                 # star_neighbours_array,
-                #global_flux_array,
+                global_flux_array,
                 folded_flux_even_array,
                 folded_flux_odd_array,
                 # folded_flux_even_subhar_array,
