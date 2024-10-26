@@ -52,10 +52,11 @@ class ModelCheckpointCallback(ModelCheckpoint):
     def __init__(self, filepath, original_path, monitor: str = "val_loss", verbose: int = 0,
                  save_best_only: bool = False,
                  save_weights_only: bool = False, mode: str = "auto", save_freq="epoch", options=None,
-                 initial_value_threshold=None, **kwargs):
+                 initial_value_threshold=None, filter_metrics: list[str] = [], **kwargs):
         super().__init__(filepath, monitor, verbose, save_best_only, save_weights_only, mode, save_freq, options,
                          initial_value_threshold, **kwargs)
         self.original_path = original_path
+        self.filter_metrics = filter_metrics
 
     def on_epoch_end(self, epoch, logs=None):
         self.epochs_since_last_save += 1
@@ -97,6 +98,7 @@ class ModelCheckpointCallback(ModelCheckpoint):
             try:
                 if self.save_best_only:
                     current = logs.get(self.monitor)
+                    metrics_for_filter = [logs.get(filter_metric) for filter_metric in self.filter_metrics]
                     if current is None:
                         logging.warning(
                             "Can save best model only with %s available, "
@@ -104,7 +106,7 @@ class ModelCheckpointCallback(ModelCheckpoint):
                             self.monitor,
                         )
                     else:
-                        if self.monitor_op(current, self.best):
+                        if self.monitor_op(current, self.best) and np.all(np.array(metrics_for_filter) > 0):
                             if self.verbose > 0:
                                 logging.info(
                                     f"\nEpoch {epoch + 1}: {self.monitor} "
