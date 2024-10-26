@@ -75,7 +75,7 @@ def statistics(df, title, labels):
         range_df = df_loop.index[df_loop['type'] == label].tolist()
         inputs = []
         for i in range_df:
-            inputs = inputs + [RowRegeneratorInput(df_loop, i, plot_inputs=False, from_arrays=False, store_arrays=False, throw_nan_exception=True)]
+            inputs = inputs + [RowRegeneratorInput(df_loop, i, plot_inputs=False, from_arrays=True, store_arrays=False, throw_nan_exception=True)]
         with Pool(processes=cores, maxtasksperchild=1) as pool:
             results = pool.map(row_regenerator, inputs, chunksize=1)
         scalar_values = np.zeros((12, len(results)))
@@ -108,19 +108,19 @@ def statistics(df, title, labels):
         logging.info(f"Gtr -> mean: {np.mean(scalar_values[4])}, median: {np.median(scalar_values[4])}, "
                      f"std: {np.std(scalar_values[4])}, min: {np.min(scalar_values[4])}, "
                      f"max: {np.max(scalar_values[4])}")
-        logging.info(f"Offset -> mean: {np.mean(scalar_values[5])}, median: {np.median(scalar_values[5])}, "
+        logging.info(f"Bootstrap FAP -> mean: {np.mean(scalar_values[5])}, median: {np.median(scalar_values[5])}, "
                      f"std: {np.std(scalar_values[5])}, min: {np.min(scalar_values[5])}, "
                      f"max: {np.max(scalar_values[5])}")
-        logging.info(f"Bootstrap FAP -> mean: {np.mean(scalar_values[6])}, median: {np.median(scalar_values[6])}, "
+        logging.info(f"Oe -> mean: {np.mean(scalar_values[6])}, median: {np.median(scalar_values[6])}, "
                      f"std: {np.std(scalar_values[6])}, min: {np.min(scalar_values[6])}, "
                      f"max: {np.max(scalar_values[6])}")
-        logging.info(f"Oe -> mean: {np.mean(scalar_values[7])}, median: {np.median(scalar_values[7])}, "
+        logging.info(f"Temp diff -> mean: {np.mean(scalar_values[7])}, median: {np.median(scalar_values[7])}, "
                      f"std: {np.std(scalar_values[7])}, min: {np.min(scalar_values[7])}, "
                      f"max: {np.max(scalar_values[7])}")
-        logging.info(f"Temp diff -> mean: {np.mean(scalar_values[8])}, median: {np.median(scalar_values[8])}, "
-                     f"std: {np.std(scalar_values[8])}, min: {np.min(scalar_values[8])}, "
+        logging.info(f"Albedo -> mean: {np.mean(scalar_values[8])}, median: {np.median(scalar_values[8])}, "
+                     f"std: {np.std(scalar_values[8])}, min: {np.min(scalar_values[9])}, "
                      f"max: {np.max(scalar_values[8])}")
-        logging.info(f"Albedo -> mean: {np.mean(scalar_values[9])}, median: {np.median(scalar_values[9])}, "
+        logging.info(f"Offset -> mean: {np.mean(scalar_values[9])}, median: {np.median(scalar_values[9])}, "
                      f"std: {np.std(scalar_values[9])}, min: {np.min(scalar_values[9])}, "
                      f"max: {np.max(scalar_values[9])}")
         logging.info(f"Teff -> mean: {np.mean(scalar_values[10])}, median: {np.median(scalar_values[10])}, "
@@ -129,7 +129,7 @@ def statistics(df, title, labels):
         logging.info(f"Rstar -> mean: {np.mean(scalar_values[11])}, median: {np.median(scalar_values[11])}, "
                      f"std: {np.std(scalar_values[11])}, min: {np.min(scalar_values[11])}, "
                      f"max: {np.max(scalar_values[11])}")
-        fig, axs = plt.subplots(3, 3, figsize=(20, 15), constrained_layout=True)
+        fig, axs = plt.subplots(4, 3, figsize=(20, 15), constrained_layout=True)
         axs[0][0].hist(scalar_values[0])
         axs[0][0].set_title("Period")
         axs[0][1].hist(scalar_values[1])
@@ -137,17 +137,23 @@ def statistics(df, title, labels):
         axs[0][2].hist(scalar_values[2])
         axs[0][2].set_title("Re")
         axs[1][0].hist(scalar_values[3])
-        axs[1][0].set_title("Oe")
+        axs[1][0].set_title("Gtn")
         axs[1][1].hist(scalar_values[4])
         axs[1][1].set_title("Gtr")
-        axs[1][2].hist(scalar_values[5])
-        axs[1][2].set_title("Gtn")
-        axs[2][0].hist(scalar_values[6])
-        axs[2][0].set_title("Offset")
-        axs[2][1].hist(scalar_values[7])
-        axs[2][1].set_title("Teff")
-        axs[2][2].hist(scalar_values[8])
-        axs[2][2].set_title("Rstar")
+        axs[1][2].hist(scalar_values[9])
+        axs[1][2].set_title("Offset")
+        axs[2][0].hist(scalar_values[5])
+        axs[2][0].set_title("Bootstrap FAP")
+        axs[2][1].hist(scalar_values[6])
+        axs[2][1].set_title("Oe")
+        axs[2][2].hist(scalar_values[7])
+        axs[2][2].set_title("T_diff")
+        axs[3][0].hist(scalar_values[8])
+        axs[3][0].set_title("Albedo_diff")
+        axs[3][1].hist(scalar_values[10])
+        axs[3][1].set_title("Teff")
+        axs[3][2].hist(scalar_values[11])
+        axs[3][2].set_title("Rstar")
         fig.suptitle(f"{title}_{label}")
         plt.show()
 
@@ -202,11 +208,12 @@ df = df1
 df = df.reset_index(drop=True)
 df_len = len(df)
 range_df = range(0, df_len)
-#range_df = df.index[df['type'] == 'planet'].tolist()
+range_df = df.index[df['object_id'] == 'KIC 9772531'].tolist()
 inputs = []
 for i in range_df:
-    inputs = inputs + [RowRegeneratorInput(df, i, plot_inputs=True, from_arrays=False, store_arrays=True, throw_nan_exception=True)]
+    inputs = inputs + [RowRegeneratorInput(df, i, plot_inputs=True, from_arrays=False, store_arrays=False, throw_nan_exception=True)]
 with Pool(processes=cores, maxtasksperchild=1) as pool:
     results = pool.map(row_regenerator, inputs, chunksize=1)
 #statistics(df2, 'ete6', ['planet', 'none', 'EB', 'bckEB'])
-#statistics(df1, 'q1q17', ['fp_candidate'])
+statistics(df1, 'q1q17', ['planet_transit', 'planet', 'fp', 'fa', 'tce', 'tce_og',
+                        'tce_secondary', 'tce_source_offset', 'tce_centroids_offset', 'tce_odd_even', 'tce_candidate', 'fp_candidate'])
