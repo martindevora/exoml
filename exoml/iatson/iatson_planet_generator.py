@@ -206,6 +206,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 albedo_stat = target_row['tce_albedo_stat']
             else:
                 #TODO calculate albedo statistic with (tce_albedo - 1) / tce_albedo_err where tce_albedo is D * (a^2) / (Rp^2),
+                #TODO tce_albedo is given by D * (a^2) / (Rp^2) where D is wst_depth
                 albedo_stat = 0
             duration_to_period = duration / period
             type = target_row['type']
