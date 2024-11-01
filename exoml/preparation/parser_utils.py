@@ -32,6 +32,7 @@ from lcbuilder.photometry.aperture_extractor import ApertureExtractor
 from lcbuilder.star.HabitabilityCalculator import HabitabilityCalculator
 from lcbuilder.star.starinfo import StarInfo
 from lightkurve import TessLightCurve, KeplerLightCurve, LightCurveCollection
+from uncertainties import ufloat
 from watson.watson import Watson
 
 
@@ -349,17 +350,30 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
         sec_depth_err = lc_df_secit['flux_0'].dropna().std()
         lc_df_it = lc_df[(lc_df['time_folded'] > 0.5 - duration_to_period / 2) & (lc_df['time_folded'] < 0.5 + duration_to_period / 2)]
         depth = 1 - lc_df_it['flux_0'].dropna().median()
-        rp = np.sqrt(depth * (star_info.radius ** 2))
-        rp_rs = rp / star_info.radius
         depth_err = lc_df_it['flux_0'].dropna().std()
+        rad_p = np.sqrt(ufloat(depth, depth_err) * (ufloat(star_info.radius, np.nanmax([star_info.radius - star_info.radius_min, star_info.radius_max - star_info.radius])) ** 2))
+        rp = rad_p.n
+        rp_err = rad_p.s
+        rp_rs = rp / star_info.radius
         habitability_calculator = HabitabilityCalculator()
-        semimajor_axis = \
-            habitability_calculator.calculate_semi_major_axis(transit_period, star_info.mass) * 215.032 #sun radii in au
-        geom_albedo = sec_depth * (semimajor_axis / rp)
-        albedo = 0.5
-        planet_eq_temp, _, _ = habitability_calculator.calculate_teq(star_info.mass, star_info.mass - star_info.mass_min, star_info.mass_max - star_info.mass,
-                                                               star_info.radius, star_info.radius - star_info.radius_min, star_info.radius_max - star_info.radius,
-                                                               transit_period, 0.0001, 0.0001, star_info.teff, star_info.teff / 100, star_info.teff / 100)
+        planet_eq_temp, planet_eq_temp_low_err, planet_eq_temp_up_err = (
+            habitability_calculator.calculate_teq(star_info.mass, star_info.mass - star_info.mass_min, star_info.mass_max - star_info.mass,
+                                                  star_info.radius, star_info.radius - star_info.radius_min, star_info.radius_max - star_info.radius,
+                                                  transit_period, 0.0001, 0.0001, star_info.teff, star_info.teff / 100, star_info.teff / 100,
+                                                  albedo=0.3))
+        planet_eff_temp, planet_eff_temp_low_err, planet_eff_temp_up_err = (
+            habitability_calculator.calculate_teff(star_info.teff, star_info.teff / 100, star_info.teff / 100,
+                                                   sec_depth, sec_depth_err, sec_depth_err, depth, depth_err, depth_err))
+        albedo, albedo_low_err, albedo_up_err = (
+            habitability_calculator.calculate_albedo(sec_depth, sec_depth_err, sec_depth_err,
+                                                     transit_period, 0.0001, 0.0001,
+                                                     star_info.mass, star_info.mass - star_info.mass_min, star_info.mass_max - star_info.mass,
+                                                     rp, rp_err, rp_err))
+        temp_stat = habitability_calculator.calculate_planet_temperature_stat(
+            planet_eq_temp, planet_eq_temp_low_err, planet_eq_temp_up_err,
+            planet_eff_temp, planet_eff_temp_low_err, planet_eff_temp_up_err
+        )
+        albedo_stat = habitability_calculator.calculate_albedo_stat(albedo, albedo_low_err, albedo_up_err)
         #planet_eq_temp = star_info.teff * ((star_info.radius / (2 * semimajor_axis)) ** (1 / 2)) * ((1 - albedo) ** (1 / 4))
         if sec_depth < 0 or rp_rs < 0:
             planet_eff_temp = np.nan
@@ -367,11 +381,18 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
             planet_eff_temp = star_info.teff * (sec_depth ** (1 / 4)) * (rp_rs ** (1 / 2))
         statistics_df = pd.DataFrame(columns=['name', 'value'])
         statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['depth'], 'value': [depth]}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['depth_err'], 'value': [depth_err]}, orient='columns')], ignore_index=True)
         statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['bootstrap_fap'], 'value': [bootstrap_fap]}, orient='columns')], ignore_index=True)
         statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['sec_depth'], 'value': [sec_depth]}, orient='columns')], ignore_index=True)
-        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['geom_albedo'], 'value': [geom_albedo]}, orient='columns')], ignore_index=True)
-        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['eq_temp'], 'value': [planet_eq_temp]}, orient='columns')], ignore_index=True)
-        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['eff_temp'], 'value': [planet_eff_temp]}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['sec_depth_err'], 'value': [sec_depth_err]}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['teff'], 'value': [planet_eff_temp]}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['teff_err'], 'value': [np.nanmax(planet_eff_temp_low_err, planet_eff_temp_up_err)]}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['teq'], 'value': [planet_eq_temp]}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['teq_err'], 'value': [np.nanmax(planet_eq_temp_low_err, planet_eq_temp_up_err)]}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['temp_stat'], 'value': [temp_stat]}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['geom_albedo'], 'value': [albedo]}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['geom_albedo_err'], 'value': [np.nanmax([albedo_low_err, albedo_up_err])]}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['albedo_stat'], 'value': [albedo_stat]}, orient='columns')], ignore_index=True)
         statistics_df.to_csv(file_prefix + '_metrics_' + str(cadence) + '.csv')
     return lc_df
 
