@@ -18,7 +18,6 @@ from exoml.iatson.iatson_planet_generator import IatsonPlanetModelGenerator
 from exoml.iatson.watson_planet_generator import WatsonPlanetModelGenerator
 from exoml.ml.calibration.calibrator import PlattCalibrator
 from exoml.ml.layers.branch_dropout import BranchDropoutLayer
-from exoml.ml.layers.dropout import AdaptiveStdDropout
 from exoml.ml.layers.random_reverse import RandomReverseLayer
 from exoml.ml.layers.transformer_classifier import TransformerClassifier
 from exoml.ml.metrics.auc import ThresholdAtPrecision, ThresholdAtRecall, SpecificityAtNPV, NegativePredictiveValue, \
