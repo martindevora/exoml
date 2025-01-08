@@ -1,0 +1,1225 @@
+/home/administrator/anaconda3/bin/conda run -n exoml_remote --no-capture-output python /home/administrator/tmp/pycharm_project_569/iatson_planet_tces_launch.py
+2024-12-12 14:28:26.378768: I tensorflow/core/platform/cpu_feature_guard.cc:182] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+2024-12-12 14:28:27.135870: W tensorflow/compiler/tf2tensorrt/utils/py_utils.cc:38] TF-TRT Warning: Could not find TensorRT
+Using TensorFlow backend
+/home/administrator/.local/lib/python3.10/site-packages/tensorflow_addons/utils/ensure_tf_install.py:53: UserWarning: Tensorflow Addons supports using Python ops for all Tensorflow versions above or equal to 2.9.0 and strictly below 2.12.0 (nightly versions are not supported).
+ The versions of TensorFlow you are currently using is 2.12.0 and is not supported.
+Some things might work, some things might not.
+If you were to encounter a bug, do not file an issue.
+If you want to make sure you're using a tested and supported configuration, either change the TensorFlow version or the TensorFlow Addons's version.
+You can find the compatibility matrix in TensorFlow Addon's readme:
+https://github.com/tensorflow/addons
+  warnings.warn(
+No module named 'cupy'
+Won't be able to use GPU
+/home/administrator/.local/lib/python3.10/site-packages/lightkurve/config/__init__.py:119: UserWarning: The default Lightkurve cache directory, used by download(), etc., has been moved to /home/administrator/.lightkurve/cache. Please move all the files in the legacy directory /home/administrator/.lightkurve-cache to the new location and remove the legacy directory. Refer to https://docs.lightkurve.org/reference/config.html#default-cache-directory-migration for more information.
+  warnings.warn(
+2024-12-12 14:28:31.931555: E tensorflow/compiler/xla/stream_executor/cuda/cuda_driver.cc:266] failed call to cuInit: CUDA_ERROR_NO_DEVICE: no CUDA-capable device is detected
+2024-12-12 14:28:31.931594: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:168] retrieving CUDA diagnostic information for host: tiki
+2024-12-12 14:28:31.931602: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:175] hostname: tiki
+2024-12-12 14:28:31.931687: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:199] libcuda reported version is: NOT_FOUND: was unable to find libcuda.so DSO loaded into this program
+2024-12-12 14:28:31.931721: I tensorflow/compiler/xla/stream_executor/cuda/cuda_diagnostics.cc:203] kernel reported version is: 470.256.2
+2024-12-12 14:28:32 INFO     Creating model plot and summary
+Model: "IATSON_planet"
+__________________________________________________________________________________________________
+ Layer (type)                   Output Shape         Param #     Connected to
+==================================================================================================
+ focus_odd_flux_branch (InputLa  [(None, 75, 1)]     0           []
+ yer)
+
+ focus_even_flux_branch (InputL  [(None, 75, 1)]     0           []
+ ayer)
+
+ focus_harmonic_odd_flux_branch  [(None, 75, 1)]     0           []
+  (InputLayer)
+
+ focus_harmonic_even_flux_branc  [(None, 75, 1)]     0           []
+ h (InputLayer)
+
+ random_reverse_layer (RandomRe  (None, 75, 1)       0           ['focus_odd_flux_branch[0][0]']
+ verseLayer)
+
+ random_reverse_layer_1 (Random  (None, 75, 1)       0           ['focus_even_flux_branch[0][0]']
+ ReverseLayer)
+
+ random_reverse_layer_2 (Random  (None, 75, 1)       0           ['focus_harmonic_odd_flux_branch[
+ ReverseLayer)                                                   0][0]']
+
+ random_reverse_layer_3 (Random  (None, 75, 1)       0           ['focus_harmonic_even_flux_branch
+ ReverseLayer)                                                   [0][0]']
+
+ gaussian_noise_1 (GaussianNois  (None, 75, 1)       0           ['random_reverse_layer[0][0]']
+ e)
+
+ gaussian_noise_3 (GaussianNois  (None, 75, 1)       0           ['random_reverse_layer_1[0][0]']
+ e)
+
+ gaussian_noise_5 (GaussianNois  (None, 75, 1)       0           ['random_reverse_layer_2[0][0]']
+ e)
+
+ gaussian_noise_7 (GaussianNois  (None, 75, 1)       0           ['random_reverse_layer_3[0][0]']
+ e)
+
+ centroids_branch (InputLayer)  [(None, 75, 2)]      0           []
+
+ global_flux_branch (InputLayer  [(None, 300, 1)]    0           []
+ )
+
+ focus_odd_flux_branch_1 (Conv1  (None, 75, 32)      672         ['gaussian_noise_1[0][0]']
+ D)
+
+ focus_even_flux_branch_1 (Conv  (None, 75, 32)      672         ['gaussian_noise_3[0][0]']
+ 1D)
+
+ focus_harmonic_odd_flux_branch  (None, 75, 32)      672         ['gaussian_noise_5[0][0]']
+ _1 (Conv1D)
+
+ focus_harmonic_even_flux_branc  (None, 75, 32)      672         ['gaussian_noise_7[0][0]']
+ h_1 (Conv1D)
+
+ random_reverse_layer_4 (Random  (None, 75, 2)       0           ['centroids_branch[0][0]']
+ ReverseLayer)
+
+ og_branch (InputLayer)         [(None, 75, 1)]      0           []
+
+ gn_flux (GaussianNoise)        (None, 300, 1)       0           ['global_flux_branch[0][0]']
+
+ max_pooling1d_4 (MaxPooling1D)  (None, 71, 32)      0           ['focus_odd_flux_branch_1[0][0]']
+
+ max_pooling1d_7 (MaxPooling1D)  (None, 71, 32)      0           ['focus_even_flux_branch_1[0][0]'
+                                                                 ]
+
+ max_pooling1d_10 (MaxPooling1D  (None, 71, 32)      0           ['focus_harmonic_odd_flux_branch_
+ )                                                               1[0][0]']
+
+ max_pooling1d_13 (MaxPooling1D  (None, 71, 32)      0           ['focus_harmonic_even_flux_branch
+ )                                                               _1[0][0]']
+
+ gaussian_noise_9 (GaussianNois  (None, 75, 2)       0           ['random_reverse_layer_4[0][0]']
+ e)
+
+ random_reverse_layer_5 (Random  (None, 75, 1)       0           ['og_branch[0][0]']
+ ReverseLayer)
+
+ global_flux_branch_1 (Conv1D)  (None, 300, 16)      1456        ['gn_flux[0][0]']
+
+ spatial_dropout1d_3 (SpatialDr  (None, 71, 32)      0           ['max_pooling1d_4[0][0]']
+ opout1D)
+
+ spatial_dropout1d_5 (SpatialDr  (None, 71, 32)      0           ['max_pooling1d_7[0][0]']
+ opout1D)
+
+ spatial_dropout1d_7 (SpatialDr  (None, 71, 32)      0           ['max_pooling1d_10[0][0]']
+ opout1D)
+
+ spatial_dropout1d_9 (SpatialDr  (None, 71, 32)      0           ['max_pooling1d_13[0][0]']
+ opout1D)
+
+ centroids_branch_1 (Conv1D)    (None, 75, 32)       1312        ['gaussian_noise_9[0][0]']
+
+ gaussian_noise_11 (GaussianNoi  (None, 75, 1)       0           ['random_reverse_layer_5[0][0]']
+ se)
+
+ max_pooling1d (MaxPooling1D)   (None, 291, 16)      0           ['global_flux_branch_1[0][0]']
+
+ focus_odd_flux_branch_2 (Conv1  (None, 71, 64)      20544       ['spatial_dropout1d_3[0][0]']
+ D)
+
+ focus_even_flux_branch_2 (Conv  (None, 71, 64)      20544       ['spatial_dropout1d_5[0][0]']
+ 1D)
+
+ focus_harmonic_odd_flux_branch  (None, 71, 64)      20544       ['spatial_dropout1d_7[0][0]']
+ _2 (Conv1D)
+
+ focus_harmonic_even_flux_branc  (None, 71, 64)      20544       ['spatial_dropout1d_9[0][0]']
+ h_2 (Conv1D)
+
+ max_pooling1d_16 (MaxPooling1D  (None, 71, 32)      0           ['centroids_branch_1[0][0]']
+ )
+
+ og_branch_1 (Conv1D)           (None, 75, 32)       672         ['gaussian_noise_11[0][0]']
+
+ spatial_dropout1d (SpatialDrop  (None, 291, 16)     0           ['max_pooling1d[0][0]']
+ out1D)
+
+ max_pooling1d_5 (MaxPooling1D)  (None, 69, 64)      0           ['focus_odd_flux_branch_2[0][0]']
+
+ max_pooling1d_8 (MaxPooling1D)  (None, 69, 64)      0           ['focus_even_flux_branch_2[0][0]'
+                                                                 ]
+
+ max_pooling1d_11 (MaxPooling1D  (None, 69, 64)      0           ['focus_harmonic_odd_flux_branch_
+ )                                                               2[0][0]']
+
+ max_pooling1d_14 (MaxPooling1D  (None, 69, 64)      0           ['focus_harmonic_even_flux_branch
+ )                                                               _2[0][0]']
+
+ spatial_dropout1d_11 (SpatialD  (None, 71, 32)      0           ['max_pooling1d_16[0][0]']
+ ropout1D)
+
+ max_pooling1d_19 (MaxPooling1D  (None, 71, 32)      0           ['og_branch_1[0][0]']
+ )
+
+ global_flux_branch_2 (Conv1D)  (None, 291, 32)      15392       ['spatial_dropout1d[0][0]']
+
+ spatial_dropout1d_4 (SpatialDr  (None, 69, 64)      0           ['max_pooling1d_5[0][0]']
+ opout1D)
+
+ spatial_dropout1d_6 (SpatialDr  (None, 69, 64)      0           ['max_pooling1d_8[0][0]']
+ opout1D)
+
+ spatial_dropout1d_8 (SpatialDr  (None, 69, 64)      0           ['max_pooling1d_11[0][0]']
+ opout1D)
+
+ spatial_dropout1d_10 (SpatialD  (None, 69, 64)      0           ['max_pooling1d_14[0][0]']
+ ropout1D)
+
+ centroids_branch_2 (Conv1D)    (None, 71, 64)       20544       ['spatial_dropout1d_11[0][0]']
+
+ spatial_dropout1d_13 (SpatialD  (None, 71, 32)      0           ['max_pooling1d_19[0][0]']
+ ropout1D)
+
+ max_pooling1d_1 (MaxPooling1D)  (None, 288, 32)     0           ['global_flux_branch_2[0][0]']
+
+ focus_odd_flux_branch_3 (Conv1  (None, 69, 128)     41088       ['spatial_dropout1d_4[0][0]']
+ D)
+
+ transit_params (InputLayer)    [(None, 9, 1)]       0           []
+
+ focus_even_flux_branch_3 (Conv  (None, 69, 128)     41088       ['spatial_dropout1d_6[0][0]']
+ 1D)
+
+ focus_harmonic_odd_flux_branch  (None, 69, 128)     41088       ['spatial_dropout1d_8[0][0]']
+ _3 (Conv1D)
+
+ focus_harmonic_even_flux_branc  (None, 69, 128)     41088       ['spatial_dropout1d_10[0][0]']
+ h_3 (Conv1D)
+
+ max_pooling1d_17 (MaxPooling1D  (None, 69, 64)      0           ['centroids_branch_2[0][0]']
+ )
+
+ og_branch_2 (Conv1D)           (None, 71, 64)       20544       ['spatial_dropout1d_13[0][0]']
+
+ spatial_dropout1d_1 (SpatialDr  (None, 288, 32)     0           ['max_pooling1d_1[0][0]']
+ opout1D)
+
+ max_pooling1d_6 (MaxPooling1D)  (None, 67, 128)     0           ['focus_odd_flux_branch_3[0][0]']
+
+ gaussian_noise_2 (GaussianNois  (None, 9, 1)        0           ['transit_params[0][0]']
+ e)
+
+ max_pooling1d_9 (MaxPooling1D)  (None, 67, 128)     0           ['focus_even_flux_branch_3[0][0]'
+                                                                 ]
+
+ gaussian_noise_4 (GaussianNois  (None, 9, 1)        0           ['transit_params[0][0]']
+ e)
+
+ max_pooling1d_12 (MaxPooling1D  (None, 67, 128)     0           ['focus_harmonic_odd_flux_branch_
+ )                                                               3[0][0]']
+
+ gaussian_noise_6 (GaussianNois  (None, 9, 1)        0           ['transit_params[0][0]']
+ e)
+
+ max_pooling1d_15 (MaxPooling1D  (None, 67, 128)     0           ['focus_harmonic_even_flux_branch
+ )                                                               _3[0][0]']
+
+ gaussian_noise_8 (GaussianNois  (None, 9, 1)        0           ['transit_params[0][0]']
+ e)
+
+ spatial_dropout1d_12 (SpatialD  (None, 69, 64)      0           ['max_pooling1d_17[0][0]']
+ ropout1D)
+
+ max_pooling1d_20 (MaxPooling1D  (None, 69, 64)      0           ['og_branch_2[0][0]']
+ )
+
+ global_flux_branch_3 (Conv1D)  (None, 288, 64)      30784       ['spatial_dropout1d_1[0][0]']
+
+ flatten (Flatten)              (None, 8576)         0           ['max_pooling1d_6[0][0]']
+
+ flatten_1 (Flatten)            (None, 9)            0           ['gaussian_noise_2[0][0]']
+
+ flatten_2 (Flatten)            (None, 8576)         0           ['max_pooling1d_9[0][0]']
+
+ flatten_3 (Flatten)            (None, 9)            0           ['gaussian_noise_4[0][0]']
+
+ flatten_4 (Flatten)            (None, 8576)         0           ['max_pooling1d_12[0][0]']
+
+ flatten_5 (Flatten)            (None, 9)            0           ['gaussian_noise_6[0][0]']
+
+ flatten_6 (Flatten)            (None, 8576)         0           ['max_pooling1d_15[0][0]']
+
+ flatten_7 (Flatten)            (None, 9)            0           ['gaussian_noise_8[0][0]']
+
+ centroids_branch_3 (Conv1D)    (None, 69, 128)      41088       ['spatial_dropout1d_12[0][0]']
+
+ offset_params (InputLayer)     [(None, 1, 1)]       0           []
+
+ spatial_dropout1d_14 (SpatialD  (None, 69, 64)      0           ['max_pooling1d_20[0][0]']
+ ropout1D)
+
+ max_pooling1d_2 (MaxPooling1D)  (None, 143, 64)     0           ['global_flux_branch_3[0][0]']
+
+ concatenate (Concatenate)      (None, 8585)         0           ['flatten[0][0]',
+                                                                  'flatten_1[0][0]']
+
+ concatenate_1 (Concatenate)    (None, 8585)         0           ['flatten_2[0][0]',
+                                                                  'flatten_3[0][0]']
+
+ concatenate_2 (Concatenate)    (None, 8585)         0           ['flatten_4[0][0]',
+                                                                  'flatten_5[0][0]']
+
+ concatenate_3 (Concatenate)    (None, 8585)         0           ['flatten_6[0][0]',
+                                                                  'flatten_7[0][0]']
+
+ max_pooling1d_18 (MaxPooling1D  (None, 67, 128)     0           ['centroids_branch_3[0][0]']
+ )
+
+ gaussian_noise_10 (GaussianNoi  (None, 1, 1)        0           ['offset_params[0][0]']
+ se)
+
+ og_branch_3 (Conv1D)           (None, 69, 128)      41088       ['spatial_dropout1d_14[0][0]']
+
+ spatial_dropout1d_2 (SpatialDr  (None, 143, 64)     0           ['max_pooling1d_2[0][0]']
+ opout1D)
+
+ dense_1 (Dense)                (None, 64)           549504      ['concatenate[0][0]']
+
+ dense_2 (Dense)                (None, 64)           549504      ['concatenate_1[0][0]']
+
+ dense_3 (Dense)                (None, 64)           549504      ['concatenate_2[0][0]']
+
+ dense_4 (Dense)                (None, 64)           549504      ['concatenate_3[0][0]']
+
+ flatten_8 (Flatten)            (None, 8576)         0           ['max_pooling1d_18[0][0]']
+
+ flatten_9 (Flatten)            (None, 1)            0           ['gaussian_noise_10[0][0]']
+
+ max_pooling1d_21 (MaxPooling1D  (None, 67, 128)     0           ['og_branch_3[0][0]']
+ )
+
+ global_flux_branch_4 (Conv1D)  (None, 143, 128)     65664       ['spatial_dropout1d_2[0][0]']
+
+ dropout_1 (Dropout)            (None, 64)           0           ['dense_1[0][0]']
+
+ dropout_2 (Dropout)            (None, 64)           0           ['dense_2[0][0]']
+
+ dropout_3 (Dropout)            (None, 64)           0           ['dense_3[0][0]']
+
+ dropout_4 (Dropout)            (None, 64)           0           ['dense_4[0][0]']
+
+ concatenate_4 (Concatenate)    (None, 8577)         0           ['flatten_8[0][0]',
+                                                                  'flatten_9[0][0]']
+
+ flatten_10 (Flatten)           (None, 8576)         0           ['max_pooling1d_21[0][0]']
+
+ max_pooling1d_3 (MaxPooling1D)  (None, 71, 128)     0           ['global_flux_branch_4[0][0]']
+
+ layer_normalization_1 (LayerNo  (None, 64)          128         ['dropout_1[0][0]']
+ rmalization)
+
+ layer_normalization_2 (LayerNo  (None, 64)          128         ['dropout_2[0][0]']
+ rmalization)
+
+ layer_normalization_3 (LayerNo  (None, 64)          128         ['dropout_3[0][0]']
+ rmalization)
+
+ layer_normalization_4 (LayerNo  (None, 64)          128         ['dropout_4[0][0]']
+ rmalization)
+
+ dense_5 (Dense)                (None, 64)           548992      ['concatenate_4[0][0]']
+
+ dense_6 (Dense)                (None, 64)           548928      ['flatten_10[0][0]']
+
+ dense (Dense)                  (None, 71, 64)       8256        ['max_pooling1d_3[0][0]']
+
+ branch_dropout_layer (BranchDr  (None, 64)          0           ['layer_normalization_1[0][0]']
+ opoutLayer)
+
+ branch_dropout_layer_1 (Branch  (None, 64)          0           ['layer_normalization_2[0][0]']
+ DropoutLayer)
+
+ branch_dropout_layer_2 (Branch  (None, 64)          0           ['layer_normalization_3[0][0]']
+ DropoutLayer)
+
+ branch_dropout_layer_3 (Branch  (None, 64)          0           ['layer_normalization_4[0][0]']
+ DropoutLayer)
+
+ dropout_5 (Dropout)            (None, 64)           0           ['dense_5[0][0]']
+
+ dropout_6 (Dropout)            (None, 64)           0           ['dense_6[0][0]']
+
+ stellar_model (InputLayer)     [(None, 2, 1)]       0           []
+
+ dropout (Dropout)              (None, 71, 64)       0           ['dense[0][0]']
+
+ add (Add)                      (None, 64)           0           ['branch_dropout_layer[0][0]',
+                                                                  'branch_dropout_layer_1[0][0]']
+
+ add_1 (Add)                    (None, 64)           0           ['branch_dropout_layer_2[0][0]',
+                                                                  'branch_dropout_layer_3[0][0]']
+
+ layer_normalization_5 (LayerNo  (None, 64)          128         ['dropout_5[0][0]']
+ rmalization)
+
+ layer_normalization_6 (LayerNo  (None, 64)          128         ['dropout_6[0][0]']
+ rmalization)
+
+ gaussian_noise (GaussianNoise)  (None, 2, 1)        0           ['stellar_model[0][0]']
+
+ layer_normalization (LayerNorm  (None, 71, 64)      128         ['dropout[0][0]']
+ alization)
+
+ add_2 (Add)                    (None, 64)           0           ['add[0][0]',
+                                                                  'add_1[0][0]']
+
+ branch_dropout_layer_4 (Branch  (None, 64)          0           ['layer_normalization_5[0][0]']
+ DropoutLayer)
+
+ branch_dropout_layer_5 (Branch  (None, 64)          0           ['layer_normalization_6[0][0]']
+ DropoutLayer)
+
+ flatten_11 (Flatten)           (None, 2)            0           ['gaussian_noise[0][0]']
+
+ flatten_12 (Flatten)           (None, 4544)         0           ['layer_normalization[0][0]']
+
+ flatten_13 (Flatten)           (None, 64)           0           ['add_2[0][0]']
+
+ flatten_14 (Flatten)           (None, 64)           0           ['branch_dropout_layer_4[0][0]']
+
+ flatten_15 (Flatten)           (None, 64)           0           ['branch_dropout_layer_5[0][0]']
+
+ concatenate_5 (Concatenate)    (None, 4738)         0           ['flatten_11[0][0]',
+                                                                  'flatten_12[0][0]',
+                                                                  'flatten_13[0][0]',
+                                                                  'flatten_14[0][0]',
+                                                                  'flatten_15[0][0]']
+
+ final-dense2 (Dense)           (None, 1000)         4739000     ['concatenate_5[0][0]']
+
+ final-dropout2 (Dropout)       (None, 1000)         0           ['final-dense2[0][0]']
+
+ final-dense3 (Dense)           (None, 250)          250250      ['final-dropout2[0][0]']
+
+ final-dropout3 (Dropout)       (None, 250)          0           ['final-dense3[0][0]']
+
+ final-dense4 (Dense)           (None, 75)           18825       ['final-dropout3[0][0]']
+
+ final-dropout4 (Dropout)       (None, 75)           0           ['final-dense4[0][0]']
+
+ final-dense5 (Dense)           (None, 35)           2660        ['final-dropout4[0][0]']
+
+ final-dropout5 (Dropout)       (None, 35)           0           ['final-dense5[0][0]']
+
+ final-dense6 (Dense)           (None, 16)           576         ['final-dropout5[0][0]']
+
+ final-dropout6 (Dropout)       (None, 16)           0           ['final-dense6[0][0]']
+
+ logits (Dense)                 (None, 1)            17          ['final-dropout6[0][0]']
+
+==================================================================================================
+Total params: 8,804,176
+Trainable params: 8,804,176
+Non-trainable params: 0
+__________________________________________________________________________________________________
+2024-12-12 14:28:33 INFO     Loading model from /home/administrator/exoml//08/IATSON_planet_model_chk_0/
+/home/administrator/.local/lib/python3.10/site-packages/exoml/iatson/IATSON_planet.py:623: DtypeWarning: Columns (319,449,454,517) have mixed types. Specify dtype option on import or set low_memory=False.
+  test_dataset = pd.read_csv(model_dir + '/' + test_dataset_filename)
+2024-12-12 14:28:50.475840: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+12/12 [==============================] - 4s 118ms/step
+2024-12-12 14:28:55 INFO     Loading calibrator from path /home/administrator/exoml//08/IATSON_planet_model_chk_0/IATSON_planet_cal_isotonic.pkl
+2024-12-12 14:28:59 INFO     Loading model from /home/administrator/exoml//08/IATSON_planet_model_chk_1/
+/home/administrator/.local/lib/python3.10/site-packages/exoml/iatson/IATSON_planet.py:623: DtypeWarning: Columns (320,438,449,517) have mixed types. Specify dtype option on import or set low_memory=False.
+  test_dataset = pd.read_csv(model_dir + '/' + test_dataset_filename)
+2024-12-12 14:29:16.717903: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+12/12 [==============================] - 4s 138ms/step
+2024-12-12 14:29:25 INFO     Loading calibrator from path /home/administrator/exoml//08/IATSON_planet_model_chk_1/IATSON_planet_cal_isotonic.pkl
+2024-12-12 14:29:28 INFO     Loading model from /home/administrator/exoml//08/IATSON_planet_model_chk_2/
+/home/administrator/.local/lib/python3.10/site-packages/exoml/iatson/IATSON_planet.py:623: DtypeWarning: Columns (438,444,517) have mixed types. Specify dtype option on import or set low_memory=False.
+  test_dataset = pd.read_csv(model_dir + '/' + test_dataset_filename)
+2024-12-12 14:29:45.885181: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+12/12 [==============================] - 4s 172ms/step
+2024-12-12 14:29:51 INFO     Loading calibrator from path /home/administrator/exoml//08/IATSON_planet_model_chk_2/IATSON_planet_cal_isotonic.pkl
+2024-12-12 14:29:54 INFO     Loading model from /home/administrator/exoml//08/IATSON_planet_model_chk_3/
+/home/administrator/.local/lib/python3.10/site-packages/exoml/iatson/IATSON_planet.py:623: DtypeWarning: Columns (320,444) have mixed types. Specify dtype option on import or set low_memory=False.
+  test_dataset = pd.read_csv(model_dir + '/' + test_dataset_filename)
+2024-12-12 14:30:11.852607: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+12/12 [==============================] - 4s 129ms/step
+2024-12-12 14:30:17 INFO     Loading calibrator from path /home/administrator/exoml//08/IATSON_planet_model_chk_3/IATSON_planet_cal_isotonic.pkl
+2024-12-12 14:30:20 INFO     Loading model from /home/administrator/exoml//08/IATSON_planet_model_chk_4/
+/home/administrator/.local/lib/python3.10/site-packages/exoml/iatson/IATSON_planet.py:623: DtypeWarning: Columns (444,459,464,517) have mixed types. Specify dtype option on import or set low_memory=False.
+  test_dataset = pd.read_csv(model_dir + '/' + test_dataset_filename)
+2024-12-12 14:30:38.879290: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+12/12 [==============================] - 4s 137ms/step
+2024-12-12 14:30:44 INFO     Loading calibrator from path /home/administrator/exoml//08/IATSON_planet_model_chk_4/IATSON_planet_cal_isotonic.pkl
+2024-12-12 14:30:47 INFO     Loading model from /home/administrator/exoml//08/IATSON_planet_model_chk_5/
+/home/administrator/.local/lib/python3.10/site-packages/exoml/iatson/IATSON_planet.py:623: DtypeWarning: Columns (320,438,459,464,517) have mixed types. Specify dtype option on import or set low_memory=False.
+  test_dataset = pd.read_csv(model_dir + '/' + test_dataset_filename)
+2024-12-12 14:31:05.031267: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+12/12 [==============================] - 4s 130ms/step
+2024-12-12 14:31:10 INFO     Loading calibrator from path /home/administrator/exoml//08/IATSON_planet_model_chk_5/IATSON_planet_cal_isotonic.pkl
+2024-12-12 14:31:14 INFO     Loading model from /home/administrator/exoml//08/IATSON_planet_model_chk_6/
+/home/administrator/.local/lib/python3.10/site-packages/exoml/iatson/IATSON_planet.py:623: DtypeWarning: Columns (320,444,449,517) have mixed types. Specify dtype option on import or set low_memory=False.
+  test_dataset = pd.read_csv(model_dir + '/' + test_dataset_filename)
+2024-12-12 14:31:31.055050: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+12/12 [==============================] - 4s 142ms/step
+2024-12-12 14:31:36 INFO     Loading calibrator from path /home/administrator/exoml//08/IATSON_planet_model_chk_6/IATSON_planet_cal_isotonic.pkl
+2024-12-12 14:31:40 INFO     Loading model from /home/administrator/exoml//08/IATSON_planet_model_chk_7/
+/home/administrator/.local/lib/python3.10/site-packages/exoml/iatson/IATSON_planet.py:623: DtypeWarning: Columns (438,444,449) have mixed types. Specify dtype option on import or set low_memory=False.
+  test_dataset = pd.read_csv(model_dir + '/' + test_dataset_filename)
+2024-12-12 14:31:57.328150: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+12/12 [==============================] - 4s 205ms/step
+2024-12-12 14:32:02 INFO     Loading calibrator from path /home/administrator/exoml//08/IATSON_planet_model_chk_7/IATSON_planet_cal_isotonic.pkl
+2024-12-12 14:32:06 INFO     Loading model from /home/administrator/exoml//08/IATSON_planet_model_chk_8/
+/home/administrator/.local/lib/python3.10/site-packages/exoml/iatson/IATSON_planet.py:623: DtypeWarning: Columns (320,438,459,464,517) have mixed types. Specify dtype option on import or set low_memory=False.
+  test_dataset = pd.read_csv(model_dir + '/' + test_dataset_filename)
+2024-12-12 14:32:23.782064: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+12/12 [==============================] - 4s 203ms/step
+2024-12-12 14:32:29 INFO     Loading calibrator from path /home/administrator/exoml//08/IATSON_planet_model_chk_8/IATSON_planet_cal_isotonic.pkl
+2024-12-12 14:32:32 INFO     Loading model from /home/administrator/exoml//08/IATSON_planet_model_chk_9/
+/home/administrator/.local/lib/python3.10/site-packages/exoml/iatson/IATSON_planet.py:623: DtypeWarning: Columns (319,320,438,444,459,464) have mixed types. Specify dtype option on import or set low_memory=False.
+  test_dataset = pd.read_csv(model_dir + '/' + test_dataset_filename)
+2024-12-12 14:32:50.513145: I tensorflow/core/common_runtime/executor.cc:1197] [/device:CPU:0] (DEBUG INFO) Executor start aborting (this does not indicate an error and you can ignore this message): INVALID_ARGUMENT: You must feed a value for placeholder tensor 'Placeholder/_0' with dtype int32
+	 [[{{node Placeholder/_0}}]]
+12/12 [==============================] - 5s 156ms/step
+2024-12-12 14:32:56 INFO     Loading calibrator from path /home/administrator/exoml//08/IATSON_planet_model_chk_9/IATSON_planet_cal_isotonic.pkl
+2024-12-12 14:32:59 INFO     ----------------------------------COMPLETE SET METRICS ---------------------------------------
+2024-12-12 14:33:00 INFO     R@P metrics for fold no 0
+2024-12-12 14:33:00 INFO     Keras R@P0.95: 0.9423868060112, [[0.5005005]]
+2024-12-12 14:33:00 INFO     Keras S@NPV0.95: 1.0, [[0.998999]]
+2024-12-12 14:33:00 INFO     Keras R@P0.975: 0.9218106865882874, [[0.6256256]]
+2024-12-12 14:33:00 INFO     Keras S@NPV0.975: 0.9995355606079102, [[0.976977]]
+2024-12-12 14:33:00 INFO     Keras R@P0.99: 0.9012345671653748, [[0.7507508]]
+2024-12-12 14:33:00 INFO     Keras S@NPV0.99: 0.9986066222190857, [[0.7497497]]
+2024-12-12 14:33:00 INFO     Keras R@P0.995: 0.8847736716270447, [[0.8008008]]
+2024-12-12 14:33:00 INFO     Keras S@NPV0.995: 0.9930329918861389, [[0.4994995]]
+2024-12-12 14:33:00 INFO     Keras R@P0.999: 0.7037037014961243, [[0.977978]]
+2024-12-12 14:33:00 INFO     Keras S@NPV0.999: 0.9665582776069641, [[0.02302302]]
+2024-12-12 14:33:00 INFO     Keras R@P1.0: 0.7037037014961243, [[0.977978]]
+2024-12-12 14:33:00 INFO     Keras S@NPV1.0: 0.9163957238197327, [[0.01501502]]
+2024-12-12 14:33:00 INFO     R@P metrics for fold no 1
+2024-12-12 14:33:00 INFO     Keras R@P0.95: 0.9959839582443237, [[0.11111111]]
+2024-12-12 14:33:00 INFO     Keras S@NPV0.95: 1.0, [[0.998999]]
+2024-12-12 14:33:00 INFO     Keras R@P0.975: 0.9919678568840027, [[0.2002002]]
+2024-12-12 14:33:00 INFO     Keras S@NPV0.975: 1.0, [[0.998999]]
+2024-12-12 14:33:00 INFO     Keras R@P0.99: 0.9759036302566528, [[0.6666667]]
+2024-12-12 14:33:00 INFO     Keras S@NPV0.99: 0.9990684390068054, [[0.8878879]]
+2024-12-12 14:33:00 INFO     Keras R@P0.995: 0.9116466045379639, [[0.8888889]]
+2024-12-12 14:33:00 INFO     Keras S@NPV0.995: 0.9990684390068054, [[0.8878879]]
+2024-12-12 14:33:00 INFO     Keras R@P0.999: 0.9116466045379639, [[0.8888889]]
+2024-12-12 14:33:00 INFO     Keras S@NPV0.999: 0.9981369376182556, [[0.6656657]]
+2024-12-12 14:33:00 INFO     Keras R@P1.0: 0.9116466045379639, [[0.8888889]]
+2024-12-12 14:33:00 INFO     Keras S@NPV1.0: 0.9925477504730225, [[0.11011011]]
+2024-12-12 14:33:00 INFO     R@P metrics for fold no 2
+2024-12-12 14:33:00 INFO     Keras R@P0.95: 0.9313304424285889, [[0.5005005]]
+2024-12-12 14:33:00 INFO     Keras S@NPV0.95: 0.9990757703781128, [[0.984985]]
+2024-12-12 14:33:00 INFO     Keras R@P0.975: 0.9227467775344849, [[0.6666667]]
+2024-12-12 14:33:00 INFO     Keras S@NPV0.975: 0.9990757703781128, [[0.984985]]
+2024-12-12 14:33:00 INFO     Keras R@P0.99: 0.8884119987487793, [[0.7277277]]
+2024-12-12 14:33:00 INFO     Keras S@NPV0.99: 0.9976894855499268, [[0.7267267]]
+2024-12-12 14:33:00 INFO     Keras R@P0.995: 0.30042919516563416, [[0.985986]]
+2024-12-12 14:33:00 INFO     Keras S@NPV0.995: 0.9921441674232483, [[0.4994995]]
+2024-12-12 14:33:00 INFO     Keras R@P0.999: 0.30042919516563416, [[0.985986]]
+2024-12-12 14:33:00 INFO     Keras S@NPV0.999: 0.987523078918457, [[0.22122122]]
+2024-12-12 14:33:00 INFO     Keras R@P1.0: 0.30042919516563416, [[0.985986]]
+2024-12-12 14:33:01 INFO     Keras S@NPV1.0: 0.8817005753517151, [[0.00800801]]
+2024-12-12 14:33:01 INFO     R@P metrics for fold no 3
+2024-12-12 14:33:01 INFO     Keras R@P0.95: 0.9508928656578064, [[0.26126125]]
+2024-12-12 14:33:01 INFO     Keras S@NPV0.95: 1.0, [[0.998999]]
+2024-12-12 14:33:01 INFO     Keras R@P0.975: 0.9508928656578064, [[0.26126125]]
+2024-12-12 14:33:01 INFO     Keras S@NPV0.975: 0.9995397925376892, [[0.981982]]
+2024-12-12 14:33:01 INFO     Keras R@P0.99: 0.9285714030265808, [[0.6666667]]
+2024-12-12 14:33:01 INFO     Keras S@NPV0.99: 0.9990795850753784, [[0.9329329]]
+2024-12-12 14:33:01 INFO     Keras R@P0.995: 0.6160714030265808, [[0.982983]]
+2024-12-12 14:33:01 INFO     Keras S@NPV0.995: 0.9898757338523865, [[0.26026025]]
+2024-12-12 14:33:01 INFO     Keras R@P0.999: 0.6160714030265808, [[0.982983]]
+2024-12-12 14:33:01 INFO     Keras S@NPV0.999: 0.9590427875518799, [[0.04104104]]
+2024-12-12 14:33:01 INFO     Keras R@P1.0: 0.6160714030265808, [[0.982983]]
+2024-12-12 14:33:01 INFO     Keras S@NPV1.0: 0.8794293403625488, [[0.005005]]
+2024-12-12 14:33:01 INFO     R@P metrics for fold no 4
+2024-12-12 14:33:01 INFO     Keras R@P0.95: 0.9469387531280518, [[0.33333334]]
+2024-12-12 14:33:01 INFO     Keras S@NPV0.95: 1.0, [[0.998999]]
+2024-12-12 14:33:01 INFO     Keras R@P0.975: 0.9265305995941162, [[0.4174174]]
+2024-12-12 14:33:01 INFO     Keras S@NPV0.975: 1.0, [[0.998999]]
+2024-12-12 14:33:01 INFO     Keras R@P0.99: 0.922448992729187, [[0.5005005]]
+2024-12-12 14:33:01 INFO     Keras S@NPV0.99: 0.9990702271461487, [[0.8878879]]
+2024-12-12 14:33:01 INFO     Keras R@P0.995: 0.8571428656578064, [[0.8888889]]
+2024-12-12 14:33:01 INFO     Keras S@NPV0.995: 0.9795444011688232, [[0.14214215]]
+2024-12-12 14:33:01 INFO     Keras R@P0.999: 0.8571428656578064, [[0.8888889]]
+2024-12-12 14:33:01 INFO     Keras S@NPV0.999: 0.9609484076499939, [[0.04504504]]
+2024-12-12 14:33:01 INFO     Keras R@P1.0: 0.8571428656578064, [[0.8888889]]
+Unexpected exception in thresholdAtNPV. {{function_node __wrapped__GatherV2_device_/job:localhost/replica:0/task:0/device:CPU:0}} indices[0] = 0 is not in [0, 0) [Op:GatherV2]
+Unexpected exception in thresholdAtNPV. {{function_node __wrapped__GatherV2_device_/job:localhost/replica:0/task:0/device:CPU:0}} indices[0] = 0 is not in [0, 0) [Op:GatherV2]
+2024-12-12 14:33:01 INFO     Keras S@NPV1.0: 0.0, 0.0
+/home/administrator/.local/lib/python3.10/site-packages/exoml/iatson/IATSON_planet.py:944: VisibleDeprecationWarning: Creating an ndarray from ragged nested sequences (which is a list-or-tuple of lists-or-tuples-or ndarrays with different lengths or shapes) is deprecated. If you meant to do this, you must specify 'dtype=object' when creating the ndarray.
+  selected_snpv_threshold = np.array(selected_snpv_threshold).flatten()
+2024-12-12 14:33:01 INFO     R@P metrics for fold no 5
+2024-12-12 14:33:01 INFO     Keras R@P0.95: 0.8553191423416138, [[0.5455455]]
+2024-12-12 14:33:01 INFO     Keras S@NPV0.95: 1.0, [[0.998999]]
+2024-12-12 14:33:01 INFO     Keras R@P0.975: 0.7829787135124207, [[0.7147147]]
+2024-12-12 14:33:01 INFO     Keras S@NPV0.975: 0.999537467956543, [[0.957958]]
+2024-12-12 14:33:01 INFO     Keras R@P0.99: 0.7829787135124207, [[0.7147147]]
+2024-12-12 14:33:01 INFO     Keras S@NPV0.99: 0.9902867674827576, [[0.4994995]]
+2024-12-12 14:33:01 INFO     Keras R@P0.995: 0.6851063966751099, [[0.958959]]
+2024-12-12 14:33:01 INFO     Keras S@NPV0.995: 0.9773358106613159, [[0.13313313]]
+2024-12-12 14:33:01 INFO     Keras R@P0.999: 0.6851063966751099, [[0.958959]]
+2024-12-12 14:33:01 INFO     Keras S@NPV0.999: 0.8455134034156799, [[0.01401401]]
+2024-12-12 14:33:01 INFO     Keras R@P1.0: 0.6851063966751099, [[0.958959]]
+2024-12-12 14:33:01 INFO     Keras S@NPV1.0: 0.7992599606513977, [[0.00900901]]
+2024-12-12 14:33:01 INFO     R@P metrics for fold no 6
+2024-12-12 14:33:01 INFO     Keras R@P0.95: 0.9264069199562073, [[0.5555556]]
+2024-12-12 14:33:02 INFO     Keras S@NPV0.95: 0.9995383024215698, [[0.990991]]
+2024-12-12 14:33:02 INFO     Keras R@P0.975: 0.887445867061615, [[0.6006006]]
+2024-12-12 14:33:02 INFO     Keras S@NPV0.975: 0.9995383024215698, [[0.990991]]
+2024-12-12 14:33:02 INFO     Keras R@P0.99: 0.8484848737716675, [[0.7507508]]
+2024-12-12 14:33:02 INFO     Keras S@NPV0.99: 0.9953832030296326, [[0.5995996]]
+2024-12-12 14:33:02 INFO     Keras R@P0.995: 0.3636363744735718, [[0.993994]]
+2024-12-12 14:33:02 INFO     Keras S@NPV0.995: 0.9921514391899109, [[0.3993994]]
+2024-12-12 14:33:02 INFO     Keras R@P0.999: 0.3636363744735718, [[0.993994]]
+2024-12-12 14:33:02 INFO     Keras S@NPV0.999: 0.9409049153327942, [[0.02702703]]
+2024-12-12 14:33:02 INFO     Keras R@P1.0: 0.3636363744735718, [[0.993994]]
+2024-12-12 14:33:02 INFO     Keras S@NPV1.0: 0.8785780072212219, [[0.00700701]]
+2024-12-12 14:33:02 INFO     R@P metrics for fold no 7
+2024-12-12 14:33:02 INFO     Keras R@P0.95: 0.870192289352417, [[0.6256256]]
+2024-12-12 14:33:02 INFO     Keras S@NPV0.95: 1.0, [[0.998999]]
+2024-12-12 14:33:02 INFO     Keras R@P0.975: 0.807692289352417, [[0.6506507]]
+2024-12-12 14:33:02 INFO     Keras S@NPV0.975: 0.9995429515838623, [[0.95996]]
+2024-12-12 14:33:02 INFO     Keras R@P0.99: 0.807692289352417, [[0.6506507]]
+2024-12-12 14:33:02 INFO     Keras S@NPV0.99: 0.9936014413833618, [[0.6246246]]
+2024-12-12 14:33:02 INFO     Keras R@P0.995: 0.692307710647583, [[0.960961]]
+2024-12-12 14:33:02 INFO     Keras S@NPV0.995: 0.9702925086021423, [[0.15515515]]
+2024-12-12 14:33:02 INFO     Keras R@P0.999: 0.692307710647583, [[0.960961]]
+2024-12-12 14:33:02 INFO     Keras S@NPV0.999: 0.9638939499855042, [[0.12412412]]
+2024-12-12 14:33:02 INFO     Keras R@P1.0: 0.692307710647583, [[0.960961]]
+2024-12-12 14:33:02 INFO     Keras S@NPV1.0: 0.7733089327812195, [[0.002002]]
+2024-12-12 14:33:02 INFO     R@P metrics for fold no 8
+2024-12-12 14:33:02 INFO     Keras R@P0.95: 0.9234042763710022, [[0.3183183]]
+2024-12-12 14:33:02 INFO     Keras S@NPV0.95: 1.0, [[0.998999]]
+2024-12-12 14:33:02 INFO     Keras R@P0.975: 0.9234042763710022, [[0.3183183]]
+2024-12-12 14:33:02 INFO     Keras S@NPV0.975: 0.9990749359130859, [[0.9479479]]
+2024-12-12 14:33:02 INFO     Keras R@P0.99: 0.9191489219665527, [[0.33333334]]
+2024-12-12 14:33:02 INFO     Keras S@NPV0.99: 0.9990749359130859, [[0.9479479]]
+2024-12-12 14:33:02 INFO     Keras R@P0.995: 0.7617021203041077, [[0.9489489]]
+2024-12-12 14:33:02 INFO     Keras S@NPV0.995: 0.9856614470481873, [[0.14214215]]
+2024-12-12 14:33:02 INFO     Keras R@P0.999: 0.7617021203041077, [[0.9489489]]
+2024-12-12 14:33:02 INFO     Keras S@NPV0.999: 0.8811286091804504, [[0.01901902]]
+2024-12-12 14:33:02 INFO     Keras R@P1.0: 0.7617021203041077, [[0.9489489]]
+Unexpected exception in thresholdAtNPV. {{function_node __wrapped__GatherV2_device_/job:localhost/replica:0/task:0/device:CPU:0}} indices[0] = 0 is not in [0, 0) [Op:GatherV2]
+Unexpected exception in thresholdAtNPV. {{function_node __wrapped__GatherV2_device_/job:localhost/replica:0/task:0/device:CPU:0}} indices[0] = 0 is not in [0, 0) [Op:GatherV2]
+2024-12-12 14:33:02 INFO     Keras S@NPV1.0: 0.0, 0.0
+2024-12-12 14:33:02 INFO     R@P metrics for fold no 9
+2024-12-12 14:33:02 INFO     Keras R@P0.95: 0.9369369149208069, [[0.33333334]]
+2024-12-12 14:33:02 INFO     Keras S@NPV0.95: 0.9995402097702026, [[0.992993]]
+2024-12-12 14:33:02 INFO     Keras R@P0.975: 0.9009009003639221, [[0.5455455]]
+2024-12-12 14:33:03 INFO     Keras S@NPV0.975: 0.9995402097702026, [[0.992993]]
+2024-12-12 14:33:03 INFO     Keras R@P0.99: 0.9009009003639221, [[0.5455455]]
+2024-12-12 14:33:03 INFO     Keras S@NPV0.99: 0.9972413778305054, [[0.5445445]]
+2024-12-12 14:33:03 INFO     Keras R@P0.995: 0.9009009003639221, [[0.5455455]]
+2024-12-12 14:33:03 INFO     Keras S@NPV0.995: 0.9921839237213135, [[0.2852853]]
+2024-12-12 14:33:03 INFO     Keras R@P0.999: 0.21621622145175934, [[0.993994]]
+2024-12-12 14:33:03 INFO     Keras S@NPV0.999: 0.9650574922561646, [[0.06806806]]
+2024-12-12 14:33:03 INFO     Keras R@P1.0: 0.21621622145175934, [[0.993994]]
+2024-12-12 14:33:03 INFO     Keras S@NPV1.0: 0.9485057592391968, [[0.04704705]]
+2024-12-12 14:33:03 INFO     R@P0.95 Values: [0.9423868  0.99598396 0.93133044 0.95089287 0.94693875 0.85531914
+ 0.9264069  0.8701923  0.9234043  0.9369369 ]
+2024-12-12 14:33:03 INFO     Average R@P0.95: 0.9279792904853821 +- 0.03801369667053223
+2024-12-12 14:33:03 INFO     Median R@P0.95: 0.9341336488723755 +- 0.03801369667053223
+2024-12-12 14:33:03 INFO     R@P0.95 Thresholds: [0.5005005  0.11111111 0.5005005  0.26126125 0.33333334 0.5455455
+ 0.5555556  0.6256256  0.3183183  0.33333334]
+2024-12-12 14:33:03 INFO     Average T@P0.95: 0.4085085391998291 +- 0.15298064053058624
+2024-12-12 14:33:03 INFO     Median T@P0.95: 0.4169169068336487 +- 0.15298064053058624
+2024-12-12 14:33:03 INFO     S@NPV0.95 Values: [1.        1.        0.9990758 1.        1.        1.        0.9995383
+ 1.        1.        0.9995402]
+2024-12-12 14:33:03 INFO     Average S@NPV0.95: 0.9998154640197754 +- 0.0003062849573325366
+2024-12-12 14:33:03 INFO     Median S@NPV0.95: 1.0 +- 0.0003062849573325366
+2024-12-12 14:33:03 INFO     S@NPV0.95 Thresholds: [0.9989989995956421 0.9989989995956421 0.9849849939346313
+ 0.9989989995956421 array([[0.998999]], dtype=float32) 0.9989989995956421
+ 0.9909909963607788 0.9989989995956421 array([[0.998999]], dtype=float32)
+ 0.9929929971694946]
+2024-12-12 14:33:03 INFO     Average T@NPV0.95: [[0.99619627]] +- 0.0003062849573325366
+2024-12-12 14:33:03 INFO     Median T@NPV0.95: 0.9989989995956421 +- 0.0003062849573325366
+2024-12-12 14:33:03 INFO     R@P0.975 Values: [0.9218107  0.99196786 0.9227468  0.95089287 0.9265306  0.7829787
+ 0.88744587 0.8076923  0.9234043  0.9009009 ]
+2024-12-12 14:33:03 INFO     Average R@P0.975: 0.901637077331543 +- 0.05969860777258873
+2024-12-12 14:33:03 INFO     Median R@P0.975: 0.9222787618637085 +- 0.05969860777258873
+2024-12-12 14:33:03 INFO     R@P0.975 Thresholds: [0.6256256  0.2002002  0.6666667  0.26126125 0.4174174  0.7147147
+ 0.6006006  0.6506507  0.3183183  0.5455455 ]
+2024-12-12 14:33:03 INFO     Average T@P0.975: 0.5001000761985779 +- 0.17642466723918915
+2024-12-12 14:33:03 INFO     Median T@P0.975: 0.5730730295181274 +- 0.17642466723918915
+2024-12-12 14:33:03 INFO     S@NPV0.975 Values: [0.99953556 1.         0.9990758  0.9995398  1.         0.99953747
+ 0.9995383  0.99954295 0.99907494 0.9995402 ]
+2024-12-12 14:33:03 INFO     Average S@NPV0.975: 0.9995385408401489 +- 0.00029240536969155073
+2024-12-12 14:33:03 INFO     Median S@NPV0.975: 0.9995390176773071 +- 0.00029240536969155073
+2024-12-12 14:33:03 INFO     S@NPV0.975 Thresholds: [0.9769769906997681 0.9989989995956421 0.9849849939346313
+ 0.9819819927215576 array([[0.998999]], dtype=float32) 0.9579579830169678
+ 0.9909909963607788 0.9599599838256836 array([[0.9479479]], dtype=float32)
+ 0.9929929971694946]
+2024-12-12 14:33:03 INFO     Average T@NPV0.975: [[0.97917926]] +- 0.00029240536969155073
+2024-12-12 14:33:03 INFO     Median T@NPV0.975: 0.9834834933280945 +- 0.00029240536969155073
+2024-12-12 14:33:03 INFO     R@P0.99 Values: [0.90123457 0.97590363 0.888412   0.9285714  0.922449   0.7829787
+ 0.8484849  0.8076923  0.9191489  0.9009009 ]
+2024-12-12 14:33:03 INFO     Average R@P0.99: 0.8875776529312134 +- 0.05559702590107918
+2024-12-12 14:33:03 INFO     Median R@P0.99: 0.9010677337646484 +- 0.05559702590107918
+2024-12-12 14:33:03 INFO     R@P0.99 Thresholds: [0.7507508  0.6666667  0.7277277  0.6666667  0.5005005  0.7147147
+ 0.7507508  0.6506507  0.33333334 0.5455455 ]
+2024-12-12 14:33:03 INFO     Average T@P0.99: 0.6307307481765747 +- 0.12685132026672363
+2024-12-12 14:33:03 INFO     Median T@P0.99: 0.6666666865348816 +- 0.12685132026672363
+2024-12-12 14:33:03 INFO     S@NPV0.99 Values: [0.9986066  0.99906844 0.9976895  0.9990796  0.9990702  0.99028677
+ 0.9953832  0.99360144 0.99907494 0.9972414 ]
+2024-12-12 14:33:03 INFO     Average S@NPV0.99: 0.9969102144241333 +- 0.002818870358169079
+2024-12-12 14:33:03 INFO     Median S@NPV0.99: 0.9981480836868286 +- 0.002818870358169079
+2024-12-12 14:33:03 INFO     S@NPV0.99 Thresholds: [0.7497497200965881 0.8878878951072693 0.7267267107963562
+ 0.9329329133033752 array([[0.8878879]], dtype=float32)
+ 0.49949949979782104 0.5995995998382568 0.6246246099472046
+ array([[0.9479479]], dtype=float32) 0.544544517993927]
+2024-12-12 14:33:03 INFO     Average T@NPV0.99: [[0.7401401]] +- 0.002818870358169079
+2024-12-12 14:33:03 INFO     Median T@NPV0.99: 0.7382382154464722 +- 0.002818870358169079
+2024-12-12 14:33:03 INFO     R@P0.995 Values: [0.8847737  0.9116466  0.3004292  0.6160714  0.85714287 0.6851064
+ 0.36363637 0.6923077  0.7617021  0.9009009 ]
+2024-12-12 14:33:03 INFO     Average R@P0.995: 0.6973717212677002 +- 0.20684561133384705
+2024-12-12 14:33:03 INFO     Median R@P0.995: 0.727004885673523 +- 0.20684561133384705
+2024-12-12 14:33:03 INFO     R@P0.995 Thresholds: [0.8008008 0.8888889 0.985986  0.982983  0.8888889 0.958959  0.993994
+ 0.960961  0.9489489 0.5455455]
+2024-12-12 14:33:03 INFO     Average T@P0.995: 0.8955956697463989 +- 0.12970522046089172
+2024-12-12 14:33:03 INFO     Median T@P0.995: 0.9539539813995361 +- 0.12970522046089172
+2024-12-12 14:33:03 INFO     S@NPV0.995 Values: [0.993033   0.99906844 0.99214417 0.98987573 0.9795444  0.9773358
+ 0.99215144 0.9702925  0.98566145 0.9921839 ]
+2024-12-12 14:33:03 INFO     Average S@NPV0.995: 0.9871290326118469 +- 0.008366210386157036
+2024-12-12 14:33:03 INFO     Median S@NPV0.995: 0.9910099506378174 +- 0.008366210386157036
+2024-12-12 14:33:03 INFO     S@NPV0.995 Thresholds: [0.49949949979782104 0.8878878951072693 0.49949949979782104
+ 0.2602602541446686 array([[0.14214215]], dtype=float32)
+ 0.13313312828540802 0.39939939975738525 0.15515515208244324
+ array([[0.14214215]], dtype=float32) 0.2852852940559387]
+2024-12-12 14:33:03 INFO     Average T@NPV0.995: [[0.34044042]] +- 0.008366210386157036
+2024-12-12 14:33:03 INFO     Median T@NPV0.995: 0.27277277410030365 +- 0.008366210386157036
+2024-12-12 14:33:03 INFO     R@P0.999 Values: [0.7037037  0.9116466  0.3004292  0.6160714  0.85714287 0.6851064
+ 0.36363637 0.6923077  0.7617021  0.21621622]
+2024-12-12 14:33:03 INFO     Average R@P0.999: 0.6107962131500244 +- 0.225367471575737
+2024-12-12 14:33:03 INFO     Median R@P0.999: 0.6887070536613464 +- 0.225367471575737
+2024-12-12 14:33:03 INFO     R@P0.999 Thresholds: [0.977978  0.8888889 0.985986  0.982983  0.8888889 0.958959  0.993994
+ 0.960961  0.9489489 0.993994 ]
+2024-12-12 14:33:03 INFO     Average T@P0.999: 0.9581581950187683 +- 0.03747221454977989
+2024-12-12 14:33:03 INFO     Median T@P0.999: 0.9694694876670837 +- 0.03747221454977989
+2024-12-12 14:33:03 INFO     S@NPV0.999 Values: [0.9665583  0.99813694 0.9875231  0.9590428  0.9609484  0.8455134
+ 0.9409049  0.96389395 0.8811286  0.9650575 ]
+2024-12-12 14:33:03 INFO     Average S@NPV0.999: 0.9468708038330078 +- 0.04501805081963539
+2024-12-12 14:33:03 INFO     Median S@NPV0.999: 0.962421178817749 +- 0.04501805081963539
+2024-12-12 14:33:03 INFO     S@NPV0.999 Thresholds: [0.023023022338747978 0.6656656861305237 0.2212212234735489
+ 0.041041042655706406 array([[0.04504504]], dtype=float32)
+ 0.014014014042913914 0.027027027681469917 0.12412412464618683
+ array([[0.01901902]], dtype=float32) 0.06806806474924088]
+2024-12-12 14:33:03 INFO     Average T@NPV0.999: [[0.12482482]] +- 0.04501805081963539
+2024-12-12 14:33:03 INFO     Median T@NPV0.999: [[0.04304304]] +- 0.04501805081963539
+2024-12-12 14:33:03 INFO     R@P1.0 Values: [0.7037037  0.9116466  0.3004292  0.6160714  0.85714287 0.6851064
+ 0.36363637 0.6923077  0.7617021  0.21621622]
+2024-12-12 14:33:03 INFO     Average R@P1.0: 0.6107962131500244 +- 0.225367471575737
+2024-12-12 14:33:03 INFO     Median R@P1.0: 0.6887070536613464 +- 0.225367471575737
+2024-12-12 14:33:03 INFO     R@P1.0 Thresholds: [0.977978  0.8888889 0.985986  0.982983  0.8888889 0.958959  0.993994
+ 0.960961  0.9489489 0.993994 ]
+2024-12-12 14:33:03 INFO     Average T@P1.0: 0.9581581950187683 +- 0.03747221454977989
+2024-12-12 14:33:03 INFO     Median T@P1.0: 0.9694694876670837 +- 0.03747221454977989
+2024-12-12 14:33:03 INFO     S@NPV1.0 Values: [0.9163957  0.99254775 0.8817006  0.87942934 0.         0.79925996
+ 0.878578   0.77330893 0.         0.94850576]
+2024-12-12 14:33:03 INFO     Average S@NPV1.0: 0.706972599029541 +- 0.3586094081401825
+2024-12-12 14:33:03 INFO     Median S@NPV1.0: 0.879003643989563 +- 0.3586094081401825
+2024-12-12 14:33:03 INFO     S@NPV1.0 Thresholds: [0.015015015378594398 0.11011011153459549 0.008008007891476154
+ 0.005005004815757275 0.0 0.009009009227156639 0.007007007021456957
+ 0.0020020019728690386 0.0 0.047047048807144165]
+2024-12-12 14:33:03 INFO     Average T@NPV1.0: 0.020320320664905012 +- 0.3586094081401825
+2024-12-12 14:33:03 INFO     Median T@NPV1.0: 0.007507507456466556 +- 0.3586094081401825
+2024-12-12 14:33:03 INFO     Metrics: tps={0.12482482194900513: 2281.0}, fps={0.12482482194900513: 391.0}, tns={0.12482482194900513: 21250.0}, fns={0.12482482194900513: 44.0},precision=0.853667676448822, recall=0.9810752868652344, accuracy=0.9818493127822876, npv=0.9979336857795715, sensitivity=0.9819324612617493
+2024-12-12 14:33:03 INFO     Metrics: tps={0.12482482194900513: 2281.0, 0.34044042229652405: 2215.0}, fps={0.12482482194900513: 391.0, 0.34044042229652405: 122.0}, tns={0.12482482194900513: 21250.0, 0.34044042229652405: 21519.0}, fns={0.12482482194900513: 44.0, 0.34044042229652405: 110.0},precision=0.9477963447570801, recall=0.9526881575584412, accuracy=0.9903196096420288, npv=0.9949142336845398, sensitivity=0.9943625330924988
+2024-12-12 14:33:03 INFO     Metrics: tps={0.12482482194900513: 2281.0, 0.34044042229652405: 2215.0, 0.7401400804519653: 2079.0}, fps={0.12482482194900513: 391.0, 0.34044042229652405: 122.0, 0.7401400804519653: 20.0}, tns={0.12482482194900513: 21250.0, 0.34044042229652405: 21519.0, 0.7401400804519653: 21621.0}, fns={0.12482482194900513: 44.0, 0.34044042229652405: 110.0, 0.7401400804519653: 246.0},precision=0.9904716610908508, recall=0.8941935300827026, accuracy=0.9889009594917297, npv=0.988750159740448, sensitivity=0.9990758299827576
+2024-12-12 14:33:03 INFO     Metrics: tps={0.12482482194900513: 2281.0, 0.34044042229652405: 2215.0, 0.7401400804519653: 2079.0, 0.5: 2176.0}, fps={0.12482482194900513: 391.0, 0.34044042229652405: 122.0, 0.7401400804519653: 20.0, 0.5: 79.0}, tns={0.12482482194900513: 21250.0, 0.34044042229652405: 21519.0, 0.7401400804519653: 21621.0, 0.5: 21562.0}, fns={0.12482482194900513: 44.0, 0.34044042229652405: 110.0, 0.7401400804519653: 246.0, 0.5: 149.0},precision=0.9649667143821716, recall=0.9359139800071716, accuracy=0.9904865026473999, npv=0.9931371212005615, sensitivity=0.9963495135307312
+2024-12-12 14:33:03 INFO     Metrics: tps={0.12482482194900513: 2281.0, 0.34044042229652405: 2215.0, 0.7401400804519653: 2079.0, 0.5: 2176.0, 0.6307307481765747: 2124.0}, fps={0.12482482194900513: 391.0, 0.34044042229652405: 122.0, 0.7401400804519653: 20.0, 0.5: 79.0, 0.6307307481765747: 41.0}, tns={0.12482482194900513: 21250.0, 0.34044042229652405: 21519.0, 0.7401400804519653: 21621.0, 0.5: 21562.0, 0.6307307481765747: 21600.0}, fns={0.12482482194900513: 44.0, 0.34044042229652405: 110.0, 0.7401400804519653: 246.0, 0.5: 149.0, 0.6307307481765747: 201.0},precision=0.9810623526573181, recall=0.9135484099388123, accuracy=0.9899023771286011, npv=0.990780234336853, sensitivity=0.9981054663658142
+2024-12-12 14:33:03 INFO     Metrics: tps={0.12482482194900513: 2281.0, 0.34044042229652405: 2215.0, 0.7401400804519653: 2079.0, 0.5: 2176.0, 0.6307307481765747: 2124.0, 0.9581581950187683: 1980.0}, fps={0.12482482194900513: 391.0, 0.34044042229652405: 122.0, 0.7401400804519653: 20.0, 0.5: 79.0, 0.6307307481765747: 41.0, 0.9581581950187683: 8.0}, tns={0.12482482194900513: 21250.0, 0.34044042229652405: 21519.0, 0.7401400804519653: 21621.0, 0.5: 21562.0, 0.6307307481765747: 21600.0, 0.9581581950187683: 21633.0}, fns={0.12482482194900513: 44.0, 0.34044042229652405: 110.0, 0.7401400804519653: 246.0, 0.5: 149.0, 0.6307307481765747: 201.0, 0.9581581950187683: 345.0},precision=0.9959758520126343, recall=0.85161292552948, accuracy=0.9852707982063293, npv=0.9843024611473083, sensitivity=0.999630331993103
+2024-12-12 14:33:03 INFO     K_METRICS_COMPLETE
+2024-12-12 14:33:03 INFO     P@K100 = 1.000
+2024-12-12 14:33:03 INFO     FPs@K100 = 0.000
+2024-12-12 14:33:03 INFO     FNs@K100 = 1.000
+2024-12-12 14:33:03 INFO     P@K200 = 1.000
+2024-12-12 14:33:03 INFO     FPs@K200 = 0.000
+2024-12-12 14:33:03 INFO     FNs@K200 = 1.000
+2024-12-12 14:33:03 INFO     P@K300 = 1.000
+2024-12-12 14:33:03 INFO     FPs@K300 = 0.000
+2024-12-12 14:33:03 INFO     FNs@K300 = 1.000
+2024-12-12 14:33:03 INFO     P@K400 = 1.000
+2024-12-12 14:33:03 INFO     FPs@K400 = 0.000
+2024-12-12 14:33:03 INFO     FNs@K400 = 1.000
+2024-12-12 14:33:03 INFO     P@K500 = 1.000
+2024-12-12 14:33:03 INFO     FPs@K500 = 0.000
+2024-12-12 14:33:03 INFO     FNs@K500 = 1.000
+2024-12-12 14:33:03 INFO     P@K600 = 1.000
+2024-12-12 14:33:03 INFO     FPs@K600 = 0.000
+2024-12-12 14:33:03 INFO     FNs@K600 = 1.000
+2024-12-12 14:33:03 INFO     P@K700 = 1.000
+2024-12-12 14:33:03 INFO     FPs@K700 = 0.000
+2024-12-12 14:33:03 INFO     FNs@K700 = 1.000
+2024-12-12 14:33:03 INFO     P@K800 = 1.000
+2024-12-12 14:33:03 INFO     FPs@K800 = 0.000
+2024-12-12 14:33:03 INFO     FNs@K800 = 1.000
+2024-12-12 14:33:03 INFO     P@K900 = 1.000
+2024-12-12 14:33:03 INFO     FPs@K900 = 0.000
+2024-12-12 14:33:03 INFO     FNs@K900 = 1.000
+2024-12-12 14:33:03 INFO     P@K1000 = 1.000
+2024-12-12 14:33:03 INFO     FPs@K1000 = 0.000
+2024-12-12 14:33:03 INFO     FNs@K1000 = 1.000
+2024-12-12 14:33:03 INFO     P@K1100 = 1.000
+2024-12-12 14:33:03 INFO     FPs@K1100 = 0.000
+2024-12-12 14:33:03 INFO     FNs@K1100 = 1.000
+2024-12-12 14:33:03 INFO     P@K1200 = 1.000
+2024-12-12 14:33:03 INFO     FPs@K1200 = 0.000
+2024-12-12 14:33:03 INFO     FNs@K1200 = 1.000
+2024-12-12 14:33:03 INFO     P@K1300 = 1.000
+2024-12-12 14:33:03 INFO     FPs@K1300 = 0.000
+2024-12-12 14:33:03 INFO     FNs@K1300 = 1.000
+2024-12-12 14:33:03 INFO     P@K1400 = 1.000
+2024-12-12 14:33:03 INFO     FPs@K1400 = 0.000
+2024-12-12 14:33:03 INFO     FNs@K1400 = 1.000
+2024-12-12 14:33:03 INFO     P@K1500 = 1.000
+2024-12-12 14:33:03 INFO     FPs@K1500 = 0.000
+2024-12-12 14:33:03 INFO     FNs@K1500 = 1.000
+2024-12-12 14:33:03 INFO     P@K1600 = 0.999
+2024-12-12 14:33:03 INFO     FPs@K1600 = 2.000
+2024-12-12 14:33:03 INFO     FNs@K1600 = 1.000
+2024-12-12 14:33:03 INFO     P@K1700 = 0.999
+2024-12-12 14:33:03 INFO     FPs@K1700 = 2.000
+2024-12-12 14:33:03 INFO     FNs@K1700 = 1.000
+2024-12-12 14:33:03 INFO     P@K1800 = 0.998
+2024-12-12 14:33:03 INFO     FPs@K1800 = 3.000
+2024-12-12 14:33:03 INFO     FNs@K1800 = 1.000
+2024-12-12 14:33:03 INFO     P@K1900 = 0.997
+2024-12-12 14:33:03 INFO     FPs@K1900 = 5.000
+2024-12-12 14:33:03 INFO     FNs@K1900 = 1.000
+2024-12-12 14:33:03 INFO     P@K2000 = 0.995
+2024-12-12 14:33:03 INFO     FPs@K2000 = 10.000
+2024-12-12 14:33:03 INFO     FNs@K2000 = 1.000
+2024-12-12 14:33:03 INFO     P@K2100 = 0.990
+2024-12-12 14:33:03 INFO     FPs@K2100 = 21.000
+2024-12-12 14:33:03 INFO     FNs@K2100 = 1.000
+2024-12-12 14:33:03 INFO     P@K2325 = 0.965
+2024-12-12 14:33:03 INFO     FPs@K2325 = 79.000
+2024-12-12 14:33:03 INFO     FNs@K2325 = 1.000
+2024-12-12 14:33:03 INFO     FNs DF:
+                object_id            type  expected_class predicted_class  prediction_value      period  fold
+479   KIC 11027624_394.62  planet_transit             1.0               0          0.000519  394.625000     4
+1466   KIC 10989274_16.18  planet_transit             1.0               0          0.002809   16.178000     7
+1337   KIC 8311864_384.85  planet_transit             1.0               0          0.005747  384.846000     3
+2029     KIC 6448890_10.5  planet_transit             1.0               0          0.006944   10.500700     4
+1464  KIC 10937029_328.24  planet_transit             1.0               0          0.007353  328.240000     6
+2125    KIC 11446443_2.47  planet_transit             1.0               0          0.008658    2.470610     2
+1349   KIC 11176127_22.93  planet_transit             1.0               0          0.008658   22.928800     2
+267     KIC 6444896_19.54  planet_transit             1.0               0          0.009901   19.535200     5
+1736    KIC 1718189_13.06  planet_transit             1.0               0          0.014218   13.060800     5
+626      KIC 4735826_7.55  planet_transit             1.0               0          0.014218    7.547430     5
+897    KIC 11521793_16.01  planet_transit             1.0               0          0.014218   16.007500     5
+258     KIC 10397751_3.45  planet_transit             1.0               0          0.015873    3.446210     0
+856     KIC 8873450_24.28  planet_transit             1.0               0          0.019231   24.278200     8
+1659   KIC 7703955_265.48  planet_transit             1.0               0          0.021277  265.478000     0
+405     KIC 9757613_17.25  planet_transit             1.0               0          0.023810   17.251200     0
+1961    KIC 8410727_25.27  planet_transit             1.0               0          0.026667   25.265200     8
+925     KIC 9757613_12.28  planet_transit             1.0               0          0.026667   12.283000     8
+1176    KIC 3832474_60.33  planet_transit             1.0               0          0.026667   60.325200     8
+1660    KIC 10397751_2.01  planet_transit             1.0               0          0.026667    2.005470     8
+1221    KIC 8609450_13.64  planet_transit             1.0               0          0.027397   13.639700     6
+1138   KIC 11401755_13.85  planet_transit             1.0               0          0.027397   13.849700     6
+1666    KIC 3234843_29.73  planet_transit             1.0               0          0.033333   29.727100     5
+1032    KIC 11138155_4.96  planet_transit             1.0               0          0.040000    4.959320     5
+2096   KIC 3645438_386.37  planet_transit             1.0               0          0.041667  386.372000     3
+2235    KIC 11017901_7.79          planet             1.0               0          0.041667    7.794300     3
+1122     KIC 9141746_2.85  planet_transit             1.0               0          0.045455    2.851790     4
+1031    KIC 7434875_20.48  planet_transit             1.0               0          0.047619   20.482500     7
+1716   KIC 12365184_69.72          planet             1.0               0          0.047619   69.724700     9
+1933     KIC 6294819_0.68  planet_transit             1.0               0          0.058824    0.675646     9
+1827     KIC 8277797_1.65  planet_transit             1.0               0          0.068966    1.653890     9
+2059    KIC 5640085_43.57  planet_transit             1.0               0          0.068966   43.573900     9
+2192   KIC 11401755_16.23  planet_transit             1.0               0          0.071429   16.231700     8
+1684      KIC 9873254_0.9  planet_transit             1.0               0          0.086957    0.900369     3
+1265   KIC 10329196_85.76  planet_transit             1.0               0          0.086957   85.757000     3
+1678   KIC 8105398_224.15  planet_transit             1.0               0          0.107143  224.151000     6
+2003     KIC 3749365_1.97  planet_transit             1.0               0          0.107143    1.973760     6
+2319  KIC 11757451_177.67  planet_transit             1.0               0          0.107143  177.669000     6
+751     KIC 6448890_21.41  planet_transit             1.0               0          0.111111   21.405400     5
+381     KIC 11962284_8.84  planet_transit             1.0               0          0.111111    8.839230     5
+1386     KIC 8895758_0.97  planet_transit             1.0               0          0.111111    0.968978     5
+1215   KIC 9141355_469.62  planet_transit             1.0               0          0.111111  469.621000     8
+384     KIC 6587280_20.03  planet_transit             1.0               0          0.111111   20.026200     1
+1689    KIC 8745553_62.14  planet_transit             1.0               0          0.111111   62.136600     8
+1713     KIC 3657758_2.37  planet_transit             1.0               0          0.125000    2.370290     7
+242     KIC 5113822_23.64  planet_transit             1.0               0          0.125000   23.641500     0
+423     KIC 8806123_36.86  planet_transit             1.0               0          0.125000   36.856900     0
+897    KIC 9715631_425.48  planet_transit             1.0               0          0.125000  425.484000     7
+2049    KIC 6850504_19.58  planet_transit             1.0               0          0.133333   19.577500     5
+997      KIC 7100673_2.89  planet_transit             1.0               0          0.133333    2.892210     5
+1650    KIC 8056665_84.69  planet_transit             1.0               0          0.136364   84.687700     4
+1285  KIC 10028792_191.23  planet_transit             1.0               0          0.136364  191.230000     4
+307    KIC 8891684_374.88  planet_transit             1.0               0          0.136364  374.882000     4
+2193   KIC 5860968_122.36  planet_transit             1.0               0          0.142857  122.357000     4
+1180     KIC 7747457_1.52  planet_transit             1.0               0          0.142857    1.518500     8
+359   KIC 10189546_117.04  planet_transit             1.0               0          0.142857  117.042000     4
+1278     KIC 6541920_32.0          planet             1.0               0          0.142857   31.995500     8
+274      KIC 8278371_0.68  planet_transit             1.0               0          0.142857    0.677372     4
+1437   KIC 8120608_129.95  planet_transit             1.0               0          0.142857  129.946000     4
+1902     KIC 9471268_2.25  planet_transit             1.0               0          0.142857    2.248300     4
+154    KIC 9002278_267.28          planet             1.0               0          0.155556  267.281000     7
+513     KIC 10905239_3.49          planet             1.0               0          0.155556    3.487690     7
+140      KIC 9579641_7.13  planet_transit             1.0               0          0.155556    7.125950     7
+889   KIC 11037818_259.34  planet_transit             1.0               0          0.155556  259.344000     7
+708    KIC 8056665_207.59  planet_transit             1.0               0          0.155556  207.588000     7
+967     KIC 10187017_5.29  planet_transit             1.0               0          0.155556    5.286960     7
+2113    KIC 6521045_35.33          planet             1.0               0          0.155556   35.333100     7
+872      KIC 6768394_11.9  planet_transit             1.0               0          0.157895   11.898600     9
+1521    KIC 8395660_43.84          planet             1.0               0          0.157895   43.844400     9
+2231    KIC 4815520_31.58          planet             1.0               0          0.157895   31.578600     9
+8       KIC 8150320_42.11  planet_transit             1.0               0          0.157895   42.114200     9
+1677    KIC 7603200_10.31  planet_transit             1.0               0          0.157895   10.313100     9
+7        KIC 6444896_8.69  planet_transit             1.0               0          0.157895    8.689110     9
+1119    KIC 8150320_27.97  planet_transit             1.0               0          0.166667   27.972100     6
+1555    KIC 6103377_20.07  planet_transit             1.0               0          0.200000   20.070800     1
+1981    KIC 9897364_64.27  planet_transit             1.0               0          0.200000   64.272800     5
+687      KIC 6462863_3.74  planet_transit             1.0               0          0.222222    3.743160     2
+299     KIC 12557548_0.65  planet_transit             1.0               0          0.222222    0.653558     2
+597     KIC 5972334_38.65  planet_transit             1.0               0          0.230769   38.652400     6
+1176    KIC 6878240_22.25  planet_transit             1.0               0          0.230769   22.250800     6
+1128    KIC 6026924_56.64  planet_transit             1.0               0          0.230769   56.644700     6
+1738     KIC 6768394_8.92  planet_transit             1.0               0          0.250000    8.918950     2
+2176     KIC 5440317_2.32  planet_transit             1.0               0          0.260870    2.319430     3
+976     KIC 7368664_12.87          planet             1.0               0          0.260870   12.874700     3
+234    KIC 11303322_38.13  planet_transit             1.0               0          0.260870   38.130200     3
+1508     KIC 8561063_1.87  planet_transit             1.0               0          0.260870    1.865110     3
+1410     KIC 5371777_0.99  planet_transit             1.0               0          0.260870    0.991642     3
+228     KIC 8480285_29.67  planet_transit             1.0               0          0.260870   29.666300     3
+306     KIC 11014932_2.93  planet_transit             1.0               0          0.285714    2.927210     9
+2142    KIC 7603200_23.09  planet_transit             1.0               0          0.285714   23.088900     9
+845     KIC 6522242_41.41  planet_transit             1.0               0          0.315789   41.408300     7
+976     KIC 8022489_11.17  planet_transit             1.0               0          0.315789   11.172500     7
+628     KIC 6541920_22.69          planet             1.0               0          0.315789   22.687200     7
+960    KIC 10426656_10.94  planet_transit             1.0               0          0.315789   10.937300     7
+1168    KIC 3832474_143.2  planet_transit             1.0               0          0.315789  143.201000     7
+63      KIC 6061119_27.81  planet_transit             1.0               0          0.315789   27.807600     7
+574     KIC 11650401_3.95  planet_transit             1.0               0          0.318182    3.946620     8
+1926  KIC 10005758_134.48  planet_transit             1.0               0          0.318182  134.479000     8
+994   KIC 10005758_284.05  planet_transit             1.0               0          0.318182  284.053000     8
+1113   KIC 11442793_331.6  planet_transit             1.0               0          0.318182  331.603000     8
+756     KIC 11337566_7.13  planet_transit             1.0               0          0.318182    7.128150     8
+393     KIC 6368175_21.19  planet_transit             1.0               0          0.318182   21.185900     8
+1153     KIC 5980208_0.79  planet_transit             1.0               0          0.318182    0.789165     8
+906    KIC 11122894_74.93  planet_transit             1.0               0          0.333333   74.931000     0
+388   KIC 11442793_124.92  planet_transit             1.0               0          0.333333  124.915000     4
+1235     KIC 6442340_7.78  planet_transit             1.0               0          0.333333    7.782010     5
+2327      KIC 757450_8.88          planet             1.0               0          0.333333    8.884920     9
+2219     KIC 1161345_4.29  planet_transit             1.0               0          0.333333    4.287650     4
+758     KIC 5474613_13.62  planet_transit             1.0               0          0.333333   13.616600     9
+101     KIC 7366258_26.44  planet_transit             1.0               0          0.333333   26.444400     8
+2005     KIC 8395660_6.16          planet             1.0               0          0.400000    6.164840     6
+464      KIC 8544996_4.08  planet_transit             1.0               0          0.400000    4.082280     6
+126     KIC 5185897_11.42  planet_transit             1.0               0          0.416667   11.419400     4
+335      KIC 5175986_0.87  planet_transit             1.0               0          0.416667    0.868324     4
+1372    KIC 8395660_23.98          planet             1.0               0          0.416667   23.980100     4
+1211     KIC 8609450_9.22  planet_transit             1.0               0          0.416667    9.220820     4
+323   KIC 10026502_101.95  planet_transit             1.0               0          0.416667  101.953000     4
+909      KIC 4741126_7.64  planet_transit             1.0               0          0.470588    7.638480     5
+1443    KIC 11499192_4.14  planet_transit             1.0               0          0.470588    4.135930     5
+1593   KIC 12116489_12.39  planet_transit             1.0               0          0.470588   12.386000     5
+2319   KIC 10723367_19.99  planet_transit             1.0               0          0.470588   19.986500     5
+246     KIC 11361646_1.89  planet_transit             1.0               0          0.470588    1.888990     5
+348      KIC 6690836_0.57  planet_transit             1.0               0          0.470588    0.568875     5
+2097    KIC 7289317_16.83  planet_transit             1.0               0          0.470588   16.832000     5
+2002    KIC 6442340_23.44  planet_transit             1.0               0          0.470588   23.443000     5
+1818     KIC 3351888_1.63  planet_transit             1.0               0          0.500000    1.625520     2
+2159    KIC 10337517_4.29  planet_transit             1.0               0          0.500000    4.292670     2
+519      KIC 9415172_5.71  planet_transit             1.0               0          0.500000    5.714620     2
+214     KIC 5695396_25.52          planet             1.0               0          0.500000   25.517000     2
+1548     KIC 6521045_6.89          planet             1.0               0          0.500000    6.887060     2
+1410    KIC 3642335_60.87  planet_transit             1.0               0          0.500000   60.866200     2
+1983   KIC 11497958_63.34  planet_transit             1.0               0          0.500000   63.335000     2
+624     KIC 12405333_0.76  planet_transit             1.0               0          0.500000    0.764865     2
+2038     KIC 8573193_8.19  planet_transit             1.0               0          0.500000    8.185080     2
+1518  KIC 11560897_110.98  planet_transit             1.0               0          0.500000  110.980000     2
+2396     KIC 7175184_10.1  planet_transit             1.0               0          0.500000   10.104600     9
+1537   KIC 11773022_85.32  planet_transit             1.0               0          0.500000   85.316800     0
+1839   KIC 5437945_220.13  planet_transit             1.0               0          0.500000  220.129000     0
+1518     KIC 3554031_4.18  planet_transit             1.0               0          0.500000    4.176320     0
+2023    KIC 8753896_14.51  planet_transit             1.0               0          0.500000   14.512100     0
+2033    KIC 7366258_51.54  planet_transit             1.0               0          0.500000   51.540500     0
+1475    KIC 8247638_99.64  planet_transit             1.0               0          0.500000   99.641900     0
+1209     KIC 2556650_2.85  planet_transit             1.0               0          0.500000    2.852350     0
+1347   KIC 9009953_234.24  planet_transit             1.0               0          0.500000  234.239000     4
+1098  KIC 12735740_282.53  planet_transit             1.0               0          0.500000  282.526000     0
+2038     KIC 5358624_3.53          planet             1.0               0          0.500000    3.525630     9
+1190    KIC 5202905_14.84  planet_transit             1.0               0          0.500000   14.844500     5
+661    KIC 11954842_12.98  planet_transit             1.0               0          0.500000   12.985000     3
+2015   KIC 11497958_10.86  planet_transit             1.0               0          0.500000   10.864400     2
+424     KIC 11905011_5.65  planet_transit             1.0               0               NaN    5.651760     8
+2024-12-12 14:33:03 INFO     FPs DF:
+                object_id                  type  expected_class predicted_class  prediction_value      period  fold
+453     KIC 11760959_3.47                    fp             0.0               1          0.993464    3.470180     9
+759      KIC 8869680_7.03                    fp             0.0               1          0.993014    7.033780     6
+265      KIC 2446113_6.72                    fp             0.0               1          0.985611    6.717250     2
+153      KIC 5544450_4.29                    fa             0.0               1          0.985611    4.293960     2
+2023     KIC 7732285_4.39                    fp             0.0               1          0.982456    4.390460     3
+132     KIC 5297298_34.19                    fp             0.0               1          0.977778   34.193600     0
+1006   KIC 8681125_153.78          tce_odd_even             0.0               1          0.960000  153.783000     7
+1898    KIC 3542117_12.58                    fp             0.0               1          0.958333   12.575400     5
+653   KIC 11392618_110.92                    fp             0.0               1          0.948718  110.922000     8
+406      KIC 7767559_4.41                    fp             0.0               1          0.948718    4.409410     8
+954      KIC 7375795_19.3                    fp             0.0               1          0.933333   19.301100     3
+1909    KIC 7692093_91.17                    fa             0.0               1          0.888889   91.173400     4
+732    KIC 8564976_152.83                    fp             0.0               1          0.888889  152.827000     1
+906     KIC 7842621_17.06                tce_og             0.0               1          0.888889   17.056300     4
+1524     KIC 6290935_3.42         tce_candidate             0.0               1          0.888889    3.422510     1
+734      KIC 6933567_4.54     tce_source_offset             0.0               1          0.800000    4.541160     0
+1157      KIC 5524881_7.2                    fp             0.0               1          0.750000    7.195480     6
+165     KIC 3533469_10.22                    fp             0.0               1          0.750000   10.215100     6
+185      KIC 7222086_2.44                    fp             0.0               1          0.750000    2.439010     0
+2042      KIC 5632093_0.5         tce_candidate             0.0               1          0.750000    0.501554     6
+2155      KIC 7767559_2.2         tce_candidate             0.0               1          0.727273    2.204760     2
+2023   KIC 10399321_21.58                    fp             0.0               1          0.727273   21.581900     2
+2366     KIC 6699368_3.69                    fp             0.0               1          0.727273    3.690320     2
+899      KIC 8953414_2.67                    fp             0.0               1          0.714286    2.665970     5
+435     KIC 4067336_10.13                    fp             0.0               1          0.714286   10.127400     5
+1012    KIC 9718066_41.01         tce_candidate             0.0               1          0.714286   41.013600     5
+176      KIC 9772531_31.2                    fp             0.0               1          0.714286   31.201700     5
+484   KIC 10341072_142.47     tce_source_offset             0.0               1          0.666667  142.469000     3
+790      KIC 5209712_0.57         tce_secondary             0.0               1          0.666667    0.566914     1
+314      KIC 5816144_7.38                    fp             0.0               1          0.666667    7.384730     3
+1754   KIC 12507325_80.78                tce_og             0.0               1          0.666667   80.783900     5
+307     KIC 10686752_0.66     tce_source_offset             0.0               1          0.666667    0.656806     1
+781      KIC 6889235_2.59  tce_centroids_offset             0.0               1          0.666667    2.594330     0
+2121     KIC 9418619_3.08         tce_candidate             0.0               1          0.666667    3.075090     2
+1568      KIC 8766268_5.3                    fp             0.0               1          0.650000    5.297530     7
+1610     KIC 9880467_8.97                    fp             0.0               1          0.650000    8.973470     7
+1746     KIC 9533489_1.19         tce_secondary             0.0               1          0.650000    1.190740     7
+1221     KIC 8804455_2.39                    fp             0.0               1          0.650000    2.392640     7
+2278   KIC 12004971_10.81                    fp             0.0               1          0.650000   10.813100     7
+745     KIC 5898983_40.14                    fp             0.0               1          0.650000   40.143600     7
+1349     KIC 8192911_7.54                    fp             0.0               1          0.650000    7.538790     7
+1851      KIC 8766285_5.3                    fp             0.0               1          0.625000    5.297090     7
+512     KIC 8261920_15.45         tce_candidate             0.0               1          0.625000   15.450200     0
+385     KIC 7553237_15.16                tce_og             0.0               1          0.625000   15.158700     7
+1311     KIC 9873759_4.99                    fp             0.0               1          0.625000    4.994580     0
+486      KIC 6372633_1.05     tce_source_offset             0.0               1          0.625000    1.053050     7
+2312    KIC 4851239_62.39                tce_og             0.0               1          0.625000   62.385200     7
+593    KIC 5959837_117.46                tce_og             0.0               1          0.625000  117.462000     7
+80       KIC 8655354_3.36         tce_candidate             0.0               1          0.625000    3.359820     0
+804      KIC 6964159_25.5                    fp             0.0               1          0.625000   25.503700     7
+233      KIC 6695801_1.11                    fp             0.0               1          0.600000    1.106550     6
+1025     KIC 3861139_0.72         tce_candidate             0.0               1          0.600000    0.716696     6
+1737     KIC 2573108_5.09                    fa             0.0               1          0.600000    5.092230     6
+1330   KIC 11621897_21.68                    fp             0.0               1          0.600000   21.680900     6
+2355   KIC 6185476_215.14          tce_odd_even             0.0               1          0.600000  215.143000     6
+628      KIC 2989706_1.26                    fp             0.0               1          0.600000    1.257680     6
+2174  KIC 10850327_203.55         tce_candidate             0.0               1          0.555556  203.549000     6
+126      KIC 8029546_0.85         tce_candidate             0.0               1          0.555556    0.848169     6
+429      KIC 4568298_0.56                    fp             0.0               1          0.555556    0.562553     5
+474       KIC 5608566_4.4                    fp             0.0               1          0.555556    4.397000     6
+2281    KIC 5790807_41.68     tce_source_offset             0.0               1          0.555556   41.682300     5
+215      KIC 9602658_3.56                    fp             0.0               1          0.555556    3.556440     5
+1116    KIC 7900450_25.48                    fa             0.0               1          0.555556   25.481600     6
+2293   KIC 11909839_10.41                    fp             0.0               1          0.555556   10.406000     5
+1314   KIC 10666242_87.24                    fp             0.0               1          0.545455   87.244100     9
+891    KIC 10514430_16.12         tce_candidate             0.0               1          0.545455   16.119900     5
+2145    KIC 11656840_7.44                    fp             0.0               1          0.545455    7.442650     9
+81     KIC 4757997_162.23          tce_odd_even             0.0               1          0.545455  162.232000     5
+126     KIC 11912916_3.75                    fp             0.0               1          0.545455    3.747860     5
+2039     KIC 6752502_4.31                    fp             0.0               1          0.545455    4.305200     9
+1348     KIC 9655393_0.98                tce_og             0.0               1          0.545455    0.978285     5
+1035     KIC 4659837_41.4                tce_og             0.0               1          0.545455   41.395400     9
+1598     KIC 8264546_0.84         tce_secondary             0.0               1          0.545455    0.843164     5
+794    KIC 10470206_46.57                    fp             0.0               1          0.545455   46.566700     5
+395    KIC 11081512_15.74                    fp             0.0               1          0.545455   15.739400     9
+634       KIC 4739565_0.9                    fp             0.0               1          0.545455    0.898919     5
+2190    KIC 11673686_2.31  tce_centroids_offset             0.0               1          0.545455    2.309370     5
+2186     KIC 5709906_3.39                    fp             0.0               1          0.545455    3.391600     5
+1115     KIC 9655288_1.08         tce_secondary             0.0               1          0.545455    1.082130     5
+2024-12-12 14:33:03 INFO     Keras R@P0.95: 0.9496774077415466, [[0.4174174]]
+2024-12-12 14:33:03 INFO     Keras S@NPV0.95: 1.0, [[0.998999]]
+2024-12-12 14:33:03 INFO     Keras R@P0.975: 0.9200000166893005, [[0.6006006]]
+2024-12-12 14:33:03 INFO     Keras S@NPV0.975: 0.9998151659965515, [[0.984985]]
+2024-12-12 14:33:03 INFO     Keras R@P0.99: 0.8941935300827026, [[0.7277277]]
+2024-12-12 14:33:03 INFO     Keras S@NPV0.99: 0.9984288811683655, [[0.6656657]]
+2024-12-12 14:33:03 INFO     Keras R@P0.995: 0.8675268888473511, [[0.9339339]]
+2024-12-12 14:33:03 INFO     Keras S@NPV0.995: 0.9937156438827515, [[0.33233234]]
+2024-12-12 14:33:03 INFO     Keras R@P0.999: 0.615913987159729, [[0.993994]]
+2024-12-12 14:33:03 INFO     Keras S@NPV0.999: 0.9643269777297974, [[0.02702703]]
+2024-12-12 14:33:03 INFO     Keras R@P1.0: 0.615913987159729, [[0.993994]]
+Unexpected exception in thresholdAtNPV. {{function_node __wrapped__GatherV2_device_/job:localhost/replica:0/task:0/device:CPU:0}} indices[0] = 0 is not in [0, 0) [Op:GatherV2]
+Unexpected exception in thresholdAtNPV. {{function_node __wrapped__GatherV2_device_/job:localhost/replica:0/task:0/device:CPU:0}} indices[0] = 0 is not in [0, 0) [Op:GatherV2]
+2024-12-12 14:33:04 INFO     Keras S@NPV1.0: 0.0, 0.0
+2024-12-12 14:33:05 INFO     Predictions Santerne:
+                object_id            type  expected_class predicted_class  prediction_value     period  fold santerne_label
+133    KIC 6471021_125.63          planet             1.0               1          1.000000  125.63000     5      candidate
+416      KIC 3937519_3.41  planet_transit             1.0               1          1.000000    3.41304     1      candidate
+191     KIC 11554435_9.43          planet             1.0               1          1.000000    9.43416     5         planet
+2146      KIC 7529266_8.6          planet             1.0               1          1.000000    8.60015     4         planet
+715    KIC 11773022_45.16  planet_transit             1.0               1          1.000000   45.15530     5         planet
+102     KIC 8751933_86.65  planet_transit             1.0               1          1.000000   86.64770     8         planet
+1184    KIC 9478990_21.09          planet             1.0               1          1.000000   21.08720     7             BD
+643     KIC 7950644_10.29          planet             1.0               1          1.000000   10.29100     4         planet
+1823   KIC 4150804_160.88  planet_transit             1.0               1          1.000000  160.88400     4      candidate
+1001     KIC 9631995_7.89          planet             1.0               1          1.000000    7.89145     1         planet
+2044    KIC 2975770_71.53  planet_transit             1.0               1          1.000000   71.52540     1      candidate
+2019     KIC 5728139_5.33          planet             1.0               1          1.000000    5.33408     1         planet
+1569    KIC 5812701_17.86  planet_transit             1.0               1          1.000000   17.85520     8         planet
+1545     KIC 9305831_3.25          planet             1.0               1          1.000000    3.24673     1         planet
+1452    KIC 10874614_3.23          planet             1.0               1          1.000000    3.23470     5         planet
+2363    KIC 2987027_17.28  planet_transit             1.0               1          1.000000   17.27630     1      candidate
+2180   KIC 9025971_141.24  planet_transit             1.0               1          1.000000  141.24100     8         planet
+956    KIC 11974540_24.67  planet_transit             1.0               1          0.993464   24.66920     9             EB
+1845   KIC 11391018_30.36  planet_transit             1.0               1          0.993464   30.36040     9             EB
+1851    KIC 3247268_86.68          planet             1.0               1          0.993464   86.67860     9         planet
+751     KIC 8890783_58.36  planet_transit             1.0               1          0.993464   58.36200     9      candidate
+1878  KIC 11442793_210.59  planet_transit             1.0               1          0.991150  210.59300     6         planet
+300      KIC 6046540_7.34          planet             1.0               1          0.991150    7.34072     6         planet
+1623     KIC 8359498_3.58          planet             1.0               1          0.991150    3.57878     6         planet
+661     KIC 7046804_11.72  planet_transit             1.0               1          0.991150   11.72010     6             BD
+925   KIC 10028792_114.74  planet_transit             1.0               1          0.991150  114.73600     6         planet
+2174    KIC 10748390_4.89  planet_transit             1.0               1          0.985611    4.88780     2         planet
+1330  KIC 10795103_214.31  planet_transit             1.0               1          0.985611  214.31200     2      candidate
+1712     KIC 6849046_4.23  planet_transit             1.0               1          0.985611    4.22538     2         planet
+610    KIC 10723750_50.79          planet             1.0               1          0.982456   50.79040     3         planet
+2324     KIC 6922244_3.52          planet             1.0               1          0.948718    3.52250     8         planet
+1890   KIC 2581316_217.83          planet             1.0               1          0.933333  217.83200     3         planet
+36      KIC 11804465_4.44          planet             1.0               1          0.727273    4.43796     2         planet
+615   KIC 11773022_130.18  planet_transit             1.0               1          0.714286  130.17800     5         planet
+389     KIC 11046458_3.31          planet             1.0               1          0.666667    3.31187     1         planet
+1985     KIC 7778437_5.01  planet_transit             1.0               1          0.650000    5.01423     7      candidate
+396      KIC 9818381_3.02          planet             1.0               1          0.625000    3.02409     7         planet
+856      KIC 9651668_2.68          planet             1.0               1          0.600000    2.68433     6         planet
+1725   KIC 7303287_125.87  planet_transit             1.0               1          0.600000  125.86600     6         planet
+1208    KIC 11359879_4.94          planet             1.0               1          0.555556    4.94278     5         planet
+1000    KIC 6462863_22.34  planet_transit             1.0               1          0.545455   22.34300     9         planet
+664      KIC 8191672_3.55          planet             1.0               1          0.545455    3.54846     9         planet
+1098  KIC 12735740_282.53  planet_transit             1.0               0          0.500000  282.52600     0         planet
+906    KIC 11122894_74.93  planet_transit             1.0               0          0.333333   74.93100     0         planet
+1113   KIC 11442793_331.6  planet_transit             1.0               0          0.318182  331.60300     8         planet
+1926  KIC 10005758_134.48  planet_transit             1.0               0          0.318182  134.47900     8      candidate
+976     KIC 7368664_12.87          planet             1.0               0          0.260870   12.87470     3         planet
+1716   KIC 12365184_69.72          planet             1.0               0          0.047619   69.72470     9         planet
+2125    KIC 11446443_2.47  planet_transit             1.0               0          0.008658    2.47061     2         planet
+2024-12-12 14:33:05 INFO     Santerne threshold=0.007 tps=49, tns=21, fps=18, fns=0
+2024-12-12 14:33:05 INFO     Santerne threshold=0.007 accuracy=0.7954545454545454
+2024-12-12 14:33:05 INFO     Santerne threshold=0.043 tps=48, tns=33, fps=6, fns=1
+2024-12-12 14:33:05 INFO     Santerne threshold=0.043 accuracy=0.9204545454545454
+2024-12-12 14:33:05 INFO     Santerne threshold=0.5 tps=43, tns=38, fps=1, fns=6
+2024-12-12 14:33:05 INFO     Santerne threshold=0.5 accuracy=0.9204545454545454
+2024-12-12 14:33:05 INFO     Santerne threshold=0.667 tps=34, tns=39, fps=0, fns=15
+2024-12-12 14:33:05 INFO     Santerne threshold=0.667 accuracy=0.8295454545454546
+2024-12-12 14:33:05 INFO     Santerne threshold=0.969 tps=30, tns=39, fps=0, fns=19
+2024-12-12 14:33:05 INFO     Santerne threshold=0.969 accuracy=0.7840909090909091
+2024-12-12 14:33:05 INFO     Predictions Santerne planets:
+                object_id            type  expected_class predicted_class  prediction_value     period  fold santerne_label
+191     KIC 11554435_9.43          planet             1.0               1          1.000000    9.43416     5         planet
+2146      KIC 7529266_8.6          planet             1.0               1          1.000000    8.60015     4         planet
+715    KIC 11773022_45.16  planet_transit             1.0               1          1.000000   45.15530     5         planet
+102     KIC 8751933_86.65  planet_transit             1.0               1          1.000000   86.64770     8         planet
+643     KIC 7950644_10.29          planet             1.0               1          1.000000   10.29100     4         planet
+1001     KIC 9631995_7.89          planet             1.0               1          1.000000    7.89145     1         planet
+2019     KIC 5728139_5.33          planet             1.0               1          1.000000    5.33408     1         planet
+1569    KIC 5812701_17.86  planet_transit             1.0               1          1.000000   17.85520     8         planet
+1545     KIC 9305831_3.25          planet             1.0               1          1.000000    3.24673     1         planet
+1452    KIC 10874614_3.23          planet             1.0               1          1.000000    3.23470     5         planet
+2180   KIC 9025971_141.24  planet_transit             1.0               1          1.000000  141.24100     8         planet
+1851    KIC 3247268_86.68          planet             1.0               1          0.993464   86.67860     9         planet
+1878  KIC 11442793_210.59  planet_transit             1.0               1          0.991150  210.59300     6         planet
+300      KIC 6046540_7.34          planet             1.0               1          0.991150    7.34072     6         planet
+1623     KIC 8359498_3.58          planet             1.0               1          0.991150    3.57878     6         planet
+925   KIC 10028792_114.74  planet_transit             1.0               1          0.991150  114.73600     6         planet
+2174    KIC 10748390_4.89  planet_transit             1.0               1          0.985611    4.88780     2         planet
+1712     KIC 6849046_4.23  planet_transit             1.0               1          0.985611    4.22538     2         planet
+610    KIC 10723750_50.79          planet             1.0               1          0.982456   50.79040     3         planet
+2324     KIC 6922244_3.52          planet             1.0               1          0.948718    3.52250     8         planet
+1890   KIC 2581316_217.83          planet             1.0               1          0.933333  217.83200     3         planet
+36      KIC 11804465_4.44          planet             1.0               1          0.727273    4.43796     2         planet
+615   KIC 11773022_130.18  planet_transit             1.0               1          0.714286  130.17800     5         planet
+389     KIC 11046458_3.31          planet             1.0               1          0.666667    3.31187     1         planet
+396      KIC 9818381_3.02          planet             1.0               1          0.625000    3.02409     7         planet
+856      KIC 9651668_2.68          planet             1.0               1          0.600000    2.68433     6         planet
+1725   KIC 7303287_125.87  planet_transit             1.0               1          0.600000  125.86600     6         planet
+1208    KIC 11359879_4.94          planet             1.0               1          0.555556    4.94278     5         planet
+1000    KIC 6462863_22.34  planet_transit             1.0               1          0.545455   22.34300     9         planet
+664      KIC 8191672_3.55          planet             1.0               1          0.545455    3.54846     9         planet
+1098  KIC 12735740_282.53  planet_transit             1.0               0          0.500000  282.52600     0         planet
+906    KIC 11122894_74.93  planet_transit             1.0               0          0.333333   74.93100     0         planet
+1113   KIC 11442793_331.6  planet_transit             1.0               0          0.318182  331.60300     8         planet
+976     KIC 7368664_12.87          planet             1.0               0          0.260870   12.87470     3         planet
+1716   KIC 12365184_69.72          planet             1.0               0          0.047619   69.72470     9         planet
+2125    KIC 11446443_2.47  planet_transit             1.0               0          0.008658    2.47061     2         planet
+2024-12-12 14:33:05 INFO     Santerne planets Mean prediction value=0.7733929982512362+-0.29313682914917216
+2024-12-12 14:33:05 INFO     Santerne planets Median prediction value=0.9840338230133057+-0.29313682914917216
+2024-12-12 14:33:05 INFO     Predictions Santerne EBs:
+                object_id            type  expected_class predicted_class  prediction_value      period  fold santerne_label
+956    KIC 11974540_24.67  planet_transit             1.0               1      9.934641e-01   24.669200     9             EB
+1845   KIC 11391018_30.36  planet_transit             1.0               1      9.934641e-01   30.360400     9             EB
+1314   KIC 10666242_87.24              fp             0.0               1      5.454546e-01   87.244100     9             EB
+432    KIC 11045383_41.17              fp             0.0               0      2.222222e-01   41.166800     2             EB
+2158     KIC 8958035_7.98              fp             0.0               0      1.578947e-01    7.981190     9             EB
+2165   KIC 6665223_119.41              fp             0.0               0      1.428571e-01  119.408000     8             EB
+345      KIC 9967884_5.43              fp             0.0               0      1.250000e-01    5.428350     0             EB
+1258    KIC 4044005_17.51              fp             0.0               0      1.111111e-01   17.512000     8             EB
+1221    KIC 8219673_20.13              fp             0.0               0      2.666667e-02   20.131500     8             EB
+26      KIC 8506766_48.94              fp             0.0               0      2.666667e-02   48.937900     8             EB
+237     KIC 9846086_37.87              fp             0.0               0      2.127660e-02   37.865100     0             EB
+1215     KIC 9724993_7.86              fp             0.0               0      2.127660e-02    7.863360     0             EB
+1512    KIC 6775985_27.96              fp             0.0               0      2.127660e-02   27.960800     0             EB
+312   KIC 11357192_186.52              fp             0.0               0      1.421801e-02  186.517000     5             EB
+1369    KIC 2309719_54.36              fp             0.0               0      8.658009e-03   54.356300     2             EB
+1363     KIC 4639868_53.1              fp             0.0               0      8.658009e-03   53.100900     2             EB
+954     KIC 5179609_43.93              fp             0.0               0      6.944444e-03   43.931200     4             EB
+2085    KIC 5688997_23.87              fp             0.0               0      2.808989e-03   23.870400     7             EB
+1712  KIC 11909686_185.95              fp             0.0               0      2.808989e-03  185.953000     7             EB
+1077    KIC 12365000_1.26              fp             0.0               0      1.343104e-08    1.262770     7             EB
+2369   KIC 6470149_165.74              fp             0.0               0      0.000000e+00  165.740000     9             EB
+2249     KIC 7837526_28.3              fp             0.0               0      0.000000e+00   28.297200     6             EB
+1190     KIC 8197761_9.87              fp             0.0               0      0.000000e+00    9.868670     9             EB
+475      KIC 4851217_1.24             tce             0.0               0      0.000000e+00    1.235130     9             EB
+838      KIC 6629332_2.16              fp             0.0               0      0.000000e+00    2.155280     2             EB
+1052    KIC 4769799_21.93              fp             0.0               0      0.000000e+00   21.929000     0             EB
+1247   KIC 10735331_213.4              fp             0.0               0      0.000000e+00  213.399000     0             EB
+170      KIC 5598639_0.65              fp             0.0               0      0.000000e+00    0.648778     0             EB
+106    KIC 4058169_282.54              fp             0.0               0      0.000000e+00  282.536000     1             EB
+1760     KIC 6965293_2.54    tce_odd_even             0.0               0      0.000000e+00    2.538920     5             EB
+722    KIC 7431665_281.51              fp             0.0               0      0.000000e+00  281.513000     3             EB
+2024-12-12 14:33:05 INFO     Santerne EBs Mean prediction value=0.11137830530387832+-0.2548112573539327
+2024-12-12 14:33:05 INFO     Santerne EBs Median prediction value=0.008658008649945259+-0.2548112573539327
+2024-12-12 14:33:05 INFO     Predictions Santerne CEBs:
+               object_id type  expected_class predicted_class  prediction_value     period  fold santerne_label
+951    KIC 8509781_70.34   fp             0.0               0          0.026667   70.33590     8            CEB
+821    KIC 6056992_10.43   fp             0.0               0          0.019231   10.43110     8            CEB
+2208   KIC 3441784_52.57   fp             0.0               0          0.008658   52.56900     2            CEB
+518    KIC 11147460_2.05   fp             0.0               0          0.000000    2.05387     6            CEB
+1719    KIC 7763269_6.41   fp             0.0               0          0.000000    6.40806     8            CEB
+1223    KIC 8453324_1.26   fp             0.0               0          0.000000    1.26227     1            CEB
+584    KIC 12645761_2.71   fp             0.0               0          0.000000    2.70958     1            CEB
+771   KIC 5779852_252.08   fp             0.0               0          0.000000  252.07900     0            CEB
+2355  KIC 8494410_208.87   fp             0.0               0          0.000000  208.86900     0            CEB
+2024-12-12 14:33:05 INFO     Santerne CEBs Mean prediction value=0.00606171621216668+-0.009575403334477478
+2024-12-12 14:33:05 INFO     Santerne CEBs Median prediction value=0.0+-0.009575403334477478
+2024-12-12 14:33:05 INFO     Predictions Santerne BDs:
+              object_id            type  expected_class predicted_class  prediction_value   period  fold santerne_label
+1184  KIC 9478990_21.09          planet             1.0               1           1.00000  21.0872     7             BD
+661   KIC 7046804_11.72  planet_transit             1.0               1           0.99115  11.7201     6             BD
+2024-12-12 14:33:05 INFO     Santerne BDs Mean prediction value=0.9955752193927765+-0.004424780607223511
+2024-12-12 14:33:05 INFO     Santerne BDs Median prediction value=0.9955752193927765+-0.004424780607223511
+2024-12-12 14:33:05 INFO     Predictions Santerne uncertain:
+                object_id            type  expected_class predicted_class  prediction_value     period  fold santerne_label
+133    KIC 6471021_125.63          planet             1.0               1          1.000000  125.63000     5      candidate
+416      KIC 3937519_3.41  planet_transit             1.0               1          1.000000    3.41304     1      candidate
+1823   KIC 4150804_160.88  planet_transit             1.0               1          1.000000  160.88400     4      candidate
+2044    KIC 2975770_71.53  planet_transit             1.0               1          1.000000   71.52540     1      candidate
+2363    KIC 2987027_17.28  planet_transit             1.0               1          1.000000   17.27630     1      candidate
+751     KIC 8890783_58.36  planet_transit             1.0               1          0.993464   58.36200     9      candidate
+1330  KIC 10795103_214.31  planet_transit             1.0               1          0.985611  214.31200     2      candidate
+1985     KIC 7778437_5.01  planet_transit             1.0               1          0.650000    5.01423     7      candidate
+1926  KIC 10005758_134.48  planet_transit             1.0               0          0.318182  134.47900     8      candidate
+1044     KIC 5449777_7.22              fp             0.0               0          0.027397    7.21695     6      candidate
+
+Process finished with exit code 0
