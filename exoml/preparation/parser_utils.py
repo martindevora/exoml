@@ -116,12 +116,12 @@ def create_star_csv(create_star_input):
             if ra is not None and dec is not None:
                 ticid = Catalogs.query_region(
                     SkyCoord(ra, dec, unit="deg"),
-                    radius=create_star_input.search_radius * create_star_input.pixel_size,
+                    radius=(create_star_input.search_radius * (create_star_input.pixel_size / 3600)) * u.deg,
                     catalog="TIC"
                 )[0]["ID"]
             df = Catalogs.query_object(
                 "TIC" + str(ticid),
-                radius=create_star_input.search_radius * create_star_input.pixel_size,
+                radius=(create_star_input.search_radius * (create_star_input.pixel_size / 3600)) * u.deg,
                 catalog="TIC"
             )
             stars = df.to_pandas()
@@ -167,21 +167,20 @@ def create_star_csv(create_star_input):
     logging.info('Processed object id ' + str(create_star_input.object_id))
 
 def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_period, epoch, ra, dec, star_info: StarInfo,
-                    long_cadence, tpf_files=None, modes=['all']):
+                    authors: list[str], cadences: list[int], cadence_name, tpf_files=None, modes=['all']):
     lc_df = None
-    cadence = 'long' if long_cadence else 'short'
     if 'quality' in lc_data.columns:
         lc_data = lc_data.drop(['quality'], axis=1)
+    lc_data = lc_data.loc[~lc_data['flux'].isna()]
     lcbuilder = LcBuilder()
     mission, mission_prefix, id = lcbuilder.parse_object_info(object_id)
-    author = lcbuilder.get_default_author(object_id, cadence)
     if tpf_files is None:
-        tpfs = lightkurve.search_targetpixelfile(object_id, exptime=cadence, author=author).download_all()
+        tpfs = lightkurve.search_targetpixelfile(object_id, exptime=cadences, author=authors).download_all()
     else:
         tpfs = []
         for file in tpf_files:
             tpfs.append(lightkurve.TessTargetPixelFile(file, ignore_missing_simple=True))
-    lc_filename = str(file_prefix) + '_lc_' + str(cadence) + '.csv'
+    lc_filename = str(file_prefix) + '_lc_' + str(cadence_name) + '.csv'
     transit_duration = transit_duration if transit_duration < transit_period else transit_period / 2
     duration_to_period = transit_duration / transit_period
     if 'all' in modes or 'lc' in modes:
@@ -198,9 +197,14 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
             flux_values = flux_values / median_flux
         time_values = np.array(lc_data.time)
         series_len = len(time_values)
+        median_cadence = LcbuilderHelper.compute_cadence(time_values) / 3600 / 24
         for j in np.arange(0, 1, 1):
-            logging.info("Detrending no %s for target %s with %s points with duration %s", j, object_id, series_len, transit_duration * (4 + j))
-            flux_detrend_j = detrend(time_values, np.array(lc_data.flux), transit_duration * (4 + j), smooth=not long_cadence)
+            detrend_window = transit_duration * (4 + j)
+            logging.info("Detrending no %s for target %s with %s points with duration %s", j, object_id, series_len, detrend_window)
+            if detrend_window > median_cadence * 2:
+                flux_detrend_j = detrend(time_values, np.array(lc_data.flux), detrend_window, smooth=False)
+            else:
+                flux_detrend_j = np.array(lc_data.flux)
             lc_df['flux_' + str(j)] = flux_detrend_j
         logging.info("Detrending bck for target %s with %s points with duration %s", object_id, series_len, transit_duration * 4)
         bck_flux_detrended = np.array(lc_data.background_flux)
@@ -292,14 +296,14 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
             og_df['halo_flux'] = list(chain.from_iterable(og_halo_flux_list))
             og_df['og_flux'] = og_df['halo_flux'] - og_df['core_flux']
             og_df.fillna(1, inplace=True)
-            og_df.to_csv(file_prefix + '_og_' + str(cadence) + '.csv')
+            og_df.to_csv(file_prefix + '_og_' + str(cadence_name) + '.csv')
         if 'all' in modes or 'centroids' in modes:
             centroid_coords_df = pd.DataFrame(columns=['time', 'centroids_ra', 'centroids_dec'])
             centroid_coords_df['centroids_ra'] = list(chain.from_iterable(centroids_offsets_ra_list))
             centroid_coords_df['centroids_dec'] = list(chain.from_iterable(centroids_offsets_dec_list))
             centroid_coords_df['time'] = list(chain.from_iterable(centroids_offsets_time_list))
             centroid_coords_df.fillna(0, inplace=True)
-            centroid_coords_df.to_csv(file_prefix + '_cent_' + str(cadence) + '.csv')
+            centroid_coords_df.to_csv(file_prefix + '_cent_' + str(cadence_name) + '.csv')
         if 'all' in modes or 'source_offset' in modes:
             if len(source_offsets_diffimg) > 0:
                 source_offset_diffimg_ra = np.nanmedian(np.array(source_offsets_diffimg)[:, 0])
@@ -336,25 +340,46 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
                                'ra_err': source_offset_bls_ra_err, 'dec_err': source_offset_bls_dec_err}, ignore_index=True)
             offsets_df = offsets_df.append({'name': 'mean', 'ra': offset_ra, 'dec': offset_dec,
                                'ra_err': offset_ra_err, 'dec_err': offset_dec_err}, ignore_index=True)
-            offsets_df.to_csv(file_prefix + '_offset_' + str(cadence) + '.csv')
+            offsets_df.to_csv(file_prefix + '_offset_' + str(cadence_name) + '.csv')
     if 'all' in modes or 'metrics' in modes:
         logging.info("Computing bootstrap fap for %s", object_id)
         if lc_df is None:
             lc_df = pd.read_csv(lc_filename)
-        bootstrap_fap = Watson.compute_bootstrap_fap(lc_df['#time'].to_numpy(), lc_df['flux'].to_numpy(), transit_period, transit_duration, star_info, flux_err=None)
+        if np.isnan(star_info.mass):
+            star_info.mass = 1
+        if np.isnan(star_info.mass_min):
+            star_info.mass_min = star_info.mass - star_info.mass / 100
+        if np.isnan(star_info.mass_max):
+            star_info.mass_max = star_info.mass + star_info.mass / 100
+        if np.isnan(star_info.radius):
+            star_info.radius = 1
+        if np.isnan(star_info.radius_min):
+            star_info.radius_min = star_info.radius - star_info.radius / 100
+        if np.isnan(star_info.radius_max):
+            star_info.radius_max = star_info.radius + star_info.radius / 100
+        if np.isnan(star_info.teff):
+            star_info.teff = 6000
+        lc_df = lc_df.loc[(~lc_df['flux_0'].isna()) & (lc_df['flux_0'] > 0)]
+        bootstrap_fap = Watson.compute_bootstrap_fap(lc_df['#time'].to_numpy(), lc_df['flux_0'].to_numpy(), transit_period, transit_duration, star_info, flux_err=None)
         logging.info("Computing metrics for %s", object_id)
         lc_df['time_folded'] = foldedleastsquares.fold(lc_df['#time'].to_numpy(), transit_period, epoch + transit_period / 2)
         lc_df['time_folded_sec'] = foldedleastsquares.fold(lc_df['#time'].to_numpy(), transit_period, epoch)
+        lc_df_it = lc_df[(lc_df['time_folded'] > 0.5 - duration_to_period / 2) & (lc_df['time_folded'] < 0.5 + duration_to_period / 2)]
+        lc_df_it = lc_df_it.sort_values(by=['time_folded'])
         lc_df_secit = lc_df[(lc_df['time_folded_sec'] > 0.5 - duration_to_period / 2) & (lc_df['time_folded_sec'] < 0.5 + duration_to_period / 2)]
+        lc_df_secit = lc_df_secit.sort_values(by=['time_folded_sec'])
         sec_depth = 1 - lc_df_secit['flux_0'].dropna().median()
         sec_depth_err = lc_df_secit['flux_0'].dropna().std()
-        lc_df_it = lc_df[(lc_df['time_folded'] > 0.5 - duration_to_period / 2) & (lc_df['time_folded'] < 0.5 + duration_to_period / 2)]
         depth = 1 - lc_df_it['flux_0'].dropna().median()
         depth_err = lc_df_it['flux_0'].dropna().std()
-        rad_p = np.sqrt(ufloat(depth, depth_err) * (ufloat(star_info.radius, np.nanmax([star_info.radius - star_info.radius_min, star_info.radius_max - star_info.radius])) ** 2))
+        if depth <= 0:
+            depth = 1 - lc_df_it['flux_0'].dropna().min()
+        if sec_depth <= 0:
+            sec_depth = 1 - lc_df_secit['flux_0'].dropna().min()
+        rad_p = (ufloat(depth, depth_err) * (ufloat(star_info.radius, np.nanmax([star_info.radius - star_info.radius_min, star_info.radius_max - star_info.radius])) ** 2)) ** 0.5
         rp = rad_p.n
         rp_err = rad_p.s
-        rp_rs = rp / star_info.radius
+        rp = LcbuilderHelper.convert_from_to(rp, u.R_sun, u.R_earth)
         habitability_calculator = HabitabilityCalculator()
         planet_eq_temp, planet_eq_temp_low_err, planet_eq_temp_up_err = (
             habitability_calculator.calculate_teq(star_info.mass, star_info.mass - star_info.mass_min, star_info.mass_max - star_info.mass,
@@ -374,11 +399,6 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
             planet_eff_temp, planet_eff_temp_low_err, planet_eff_temp_up_err
         )
         albedo_stat = habitability_calculator.calculate_albedo_stat(albedo, albedo_low_err, albedo_up_err)
-        #planet_eq_temp = star_info.teff * ((star_info.radius / (2 * semimajor_axis)) ** (1 / 2)) * ((1 - albedo) ** (1 / 4))
-        if sec_depth < 0 or rp_rs < 0:
-            planet_eff_temp = np.nan
-        else:
-            planet_eff_temp = star_info.teff * (sec_depth ** (1 / 4)) * (rp_rs ** (1 / 2))
         statistics_df = pd.DataFrame(columns=['name', 'value'])
         statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['depth'], 'value': [depth]}, orient='columns')], ignore_index=True)
         statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['depth_err'], 'value': [depth_err]}, orient='columns')], ignore_index=True)
@@ -386,14 +406,14 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
         statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['sec_depth'], 'value': [sec_depth]}, orient='columns')], ignore_index=True)
         statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['sec_depth_err'], 'value': [sec_depth_err]}, orient='columns')], ignore_index=True)
         statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['teff'], 'value': [planet_eff_temp]}, orient='columns')], ignore_index=True)
-        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['teff_err'], 'value': [np.nanmax(planet_eff_temp_low_err, planet_eff_temp_up_err)]}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['teff_err'], 'value': [np.nanmax([planet_eff_temp_low_err, planet_eff_temp_up_err])]}, orient='columns')], ignore_index=True)
         statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['teq'], 'value': [planet_eq_temp]}, orient='columns')], ignore_index=True)
-        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['teq_err'], 'value': [np.nanmax(planet_eq_temp_low_err, planet_eq_temp_up_err)]}, orient='columns')], ignore_index=True)
+        statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['teq_err'], 'value': [np.nanmax([planet_eq_temp_low_err, planet_eq_temp_up_err])]}, orient='columns')], ignore_index=True)
         statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['temp_stat'], 'value': [temp_stat]}, orient='columns')], ignore_index=True)
         statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['geom_albedo'], 'value': [albedo]}, orient='columns')], ignore_index=True)
         statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['geom_albedo_err'], 'value': [np.nanmax([albedo_low_err, albedo_up_err])]}, orient='columns')], ignore_index=True)
         statistics_df = pd.concat([statistics_df, pd.DataFrame.from_dict({'name': ['albedo_stat'], 'value': [albedo_stat]}, orient='columns')], ignore_index=True)
-        statistics_df.to_csv(file_prefix + '_metrics_' + str(cadence) + '.csv')
+        statistics_df.to_csv(file_prefix + '_metrics_' + str(cadence_name) + '.csv')
     return lc_df
 
 class CreateTargetInput:
@@ -427,12 +447,17 @@ def create_target_csv(create_target_input):
     try:
         logging.info("PID %s: Trying to get short cadence info for %s", pid, file_planet_prefix)
         file_name = file_planet_prefix + '_metrics_short.csv'
+        authors = [constants.KEPLER_AUTHOR] if mission_id.startswith('KIC') else [constants.SPOC_AUTHOR]
+        cadences = [60] if mission_id.startswith('KIC') else [120]
         if create_target_input.force or not os.path.exists(file_name):
             if create_target_input.lc_file is None:
                 lcbuild_short = \
-                    mission_lightcurve_builder.build(MissionObjectInfo('all', mission_id, cadence='short', high_rms_enabled=False),
-                                                     create_target_input.target_dir,
-                                                     create_target_input.cache_dir)
+                    mission_lightcurve_builder.build(MissionObjectInfo('all' if 'Sectors' not in create_target_input.injected_files_df else [int(item) for item in create_target_input.injected_files_df['Sectors'].split(",")],
+                                                                       mission_id, author=authors,
+                                                                       cadence=cadences,
+                                                                       high_rms_enabled=False),
+                                                                       create_target_input.target_dir,
+                                                                       create_target_input.cache_dir)
                 if os.path.exists(tpfs_dir):
                     for f in glob.glob(tpfs_dir + f"*{mission_id}*.fits"):
                         os.remove(f)
@@ -460,7 +485,8 @@ def create_target_csv(create_target_input):
                             create_target_input.injected_files_df['duration(h)'] / 24,
                             create_target_input.injected_files_df['period'],
                             create_target_input.injected_files_df['epoch'],
-                            lcbuild_short.star_info.ra, lcbuild_short.star_info.dec, lcbuild_short.star_info, False,
+                            lcbuild_short.star_info.ra, lcbuild_short.star_info.dec, lcbuild_short.star_info,
+                            authors=authors, cadences=cadences, cadence_name='short',
                             modes=create_target_input.mode)
             for f in pathlib.Path(tpfs_dir).glob(f"*{file_id.split('_')[1]}*"):
                 os.remove(f)
@@ -469,19 +495,22 @@ def create_target_csv(create_target_input):
         logging.exception("PID %s: Failed short cadence for %s", pid, file_planet_prefix)
     logging.info(f"lc file is {create_target_input.lc_file}")
     if create_target_input.lc_file is None:
+        authors = [constants.KEPLER_AUTHOR] if mission_id.startswith('KIC') else [constants.SPOC_AUTHOR, constants.TESS_SPOC_AUTHOR]
+        cadences = [1800] if mission_id.startswith('KIC') else [200, 600, 1800]
         try:
             logging.info("PID %s: Trying to get long cadence info for %s", pid, file_planet_prefix)
             file_name = file_planet_prefix + '_metrics_long.csv'
             if create_target_input.force or not os.path.exists(file_name):
                 lcbuild_long = \
-                    mission_lightcurve_builder.build(MissionObjectInfo('all', mission_id, cadence='long', high_rms_enabled=False),
-                                                         create_target_input.target_dir,
-                                                         create_target_input.cache_dir)
+                    mission_lightcurve_builder.build(MissionObjectInfo('all' if 'Sectors' not in create_target_input.injected_files_df else [int(item) for item in create_target_input.injected_files_df['Sectors'].split(",")],
+                                            mission_id, author=authors, cadence=cadences, high_rms_enabled=False),
+                                            create_target_input.target_dir, create_target_input.cache_dir)
                 prepare_lc_data(file_planet_prefix, mission_id, lcbuild_long.lc_data,
                                 create_target_input.injected_files_df['duration(h)'] / 24,
                                 create_target_input.injected_files_df['period'],
                                 create_target_input.injected_files_df['epoch'],
-                                lcbuild_long.star_info.ra, lcbuild_long.star_info.dec, lcbuild_long.star_info, True,
+                                lcbuild_long.star_info.ra, lcbuild_long.star_info.dec, lcbuild_long.star_info,
+                                authors=authors, cadences=cadences, cadence_name='long',
                                 modes=create_target_input.mode)
                 for f in pathlib.Path(tpfs_dir).glob(f"*{file_id.split('_')[1]}*"):
                     os.remove(f)

@@ -19,11 +19,25 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
     def __init__(self, injected_objects_df, lcs_dir, batch_size, input_sizes, type_to_label, zero_epsilon=1e-7,
                  measurements_per_point=1, plot_inputs=False, fixed_target_id=None, store_arrays=False,
                  from_arrays=True, shuffle_batch=True, validation_objects_df=None, mask_previous_signals=False,
-                 flag_incomplete=False, throw_nan_exception=False, offset_mode='mean'):
+                 flag_incomplete=False, throw_nan_exception=False, offset_mode='mean', explain=False):
         super().__init__(zero_epsilon, shuffle_batch=shuffle_batch, flag_incomplete=flag_incomplete, throw_nan_exception=throw_nan_exception)
         self.injected_objects_df = injected_objects_df
+        self.injected_objects_df = injected_objects_df
+        self.EXPLAIN_PERIOD_VALUE = [self.zero_epsilon, 0.5, 1 - self.zero_epsilon]
+        self.EXPLAIN_DURATION_VALUE = [self.zero_epsilon, 0.5, 1 - self.zero_epsilon]
+        self.EXPLAIN_RADIUS_VALUE = [self.zero_epsilon, 0.5, 1 - self.zero_epsilon]
+        self.EXPLAIN_GTCN_VALUE = [self.zero_epsilon, 0.5, 1 - self.zero_epsilon]
+        self.EXPLAIN_GTR_VALUE = [self.zero_epsilon, 0.5, 1 - self.zero_epsilon]
+        self.EXPLAIN_OFFSET_VALUE = [self.zero_epsilon, 0.5, 1 - self.zero_epsilon]
+        self.EXPLAIN_BFAP_VALUE = [self.zero_epsilon, 0.5, 1 - self.zero_epsilon]
+        self.EXPLAIN_ODDEVEN_VALUE = [self.zero_epsilon, 0.5, 1 - self.zero_epsilon]
+        self.EXPLAIN_TEMP_VALUE = [self.zero_epsilon, 0.5, 1 - self.zero_epsilon]
+        self.EXPLAIN_ALBEDO_VALUE = [self.zero_epsilon, 0.5, 1 - self.zero_epsilon]
+        self.EXPLAIN_STARTEFF_VALUE = [self.zero_epsilon, 0.5, 1 - self.zero_epsilon]
+        self.EXPLAIN_STARRAD_VALUE = [self.zero_epsilon, 0.5, 1 - self.zero_epsilon]
         self.kics_lcs_dir = lcs_dir + '/q1_q17/lcs/'
-        self.tics_lcs_dir = lcs_dir + '/ete6/lcs/'
+        self.ete6_lcs_dir = lcs_dir + '/ete6/lcs/'
+        self.tess_lcs_dir = lcs_dir + '/tess/lcs/'
         self.batch_size = batch_size
         self.input_sizes = input_sizes
         self.random_number_generator = default_rng()
@@ -36,6 +50,112 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
         self.validation_objects_df = validation_objects_df
         self.mask_previous_signals = mask_previous_signals
         self.offset_mode = offset_mode
+        self.explain = explain
+        if self.explain:
+            final_df = pd.DataFrame(columns=['object_id', 'period', 'duration(h)', 'depth_primary', 'radius(earth)', 'type',
+                                             'EXPLAIN_PERIOD_VALUE', 'EXPLAIN_DURATION_VALUE', 'EXPLAIN_RADIUS_VALUE', 'EXPLAIN_GTCN_VALUE',
+                                             'EXPLAIN_GTR_VALUE', 'EXPLAIN_OFFSET_VALUE', 'EXPLAIN_BFAP_VALUE',
+                                             'EXPLAIN_ODDEVEN_VALUE', 'EXPLAIN_TEMP_VALUE', 'EXPLAIN_ALBEDO_VALUE',
+                                             'EXPLAIN_STARTEFF_VALUE', 'EXPLAIN_STARRAD_VALUE',
+                                             'EXPLAIN_GLOBAL_VIEW', 'EXPLAIN_MAIN_VIEW', 'EXPLAIN_SECONDARY_VIEW',
+                                             'EXPLAIN_ODD_VIEW', 'EXPLAIN_EVEN_VIEW', 'EXPLAIN_CENTROIDS_RA_VIEW',
+                                             'EXPLAIN_CENTROIDS_DEC_VIEW','EXPLAIN_OG_VIEW'])
+            for index, row in self.injected_objects_df.iterrows():
+                row_copy_df = row.copy().to_frame().T
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_GLOBAL_VIEW'] = True
+                row_copy_df['object_id'] = row_copy_df['object_id'] + '_global'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_MAIN_VIEW'] = True
+                row_copy_df['object_id'] = row_copy_df['object_id'] + '_main'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_SECONDARY_VIEW'] = True
+                row_copy_df['object_id'] = row_copy_df['object_id'] + '_secondary'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_ODD_VIEW'] = True
+                row_copy_df['object_id'] = row_copy_df['object_id'] + '_odd'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_EVEN_VIEW'] = True
+                row_copy_df['object_id'] = row_copy_df['object_id'] + '_even'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_CENTROIDS_RA_VIEW'] = True
+                row_copy_df['object_id'] = row_copy_df['object_id'] + '_ra'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_CENTROIDS_DEC_VIEW'] = True
+                row_copy_df['object_id'] = row_copy_df['object_id'] + '_dec'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_OG_VIEW'] = True
+                row_copy_df['object_id'] = row_copy_df['object_id'] + '_og'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                for value in self.EXPLAIN_PERIOD_VALUE:
+                    row_copy_df = row.copy().to_frame().T
+                    row_copy_df['EXPLAIN_PERIOD_VALUE'] = value
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_period_{value}'
+                    final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                for value in self.EXPLAIN_DURATION_VALUE:
+                    row_copy_df = row.copy().to_frame().T
+                    row_copy_df['EXPLAIN_DURATION_VALUE'] = value
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_duration_{value}'
+                    final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                for value in self.EXPLAIN_RADIUS_VALUE:
+                    row_copy_df = row.copy().to_frame().T
+                    row_copy_df['EXPLAIN_RADIUS_VALUE'] = value
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_radius_{value}'
+                    final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                for value in self.EXPLAIN_GTCN_VALUE:
+                    row_copy_df = row.copy().to_frame().T
+                    row_copy_df['EXPLAIN_GTCN_VALUE'] = value
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_gtcn_{value}'
+                    final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                for value in self.EXPLAIN_GTR_VALUE:
+                    row_copy_df = row.copy().to_frame().T
+                    row_copy_df['EXPLAIN_GTR_VALUE'] = value
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_gtr_{value}'
+                    final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                for value in self.EXPLAIN_OFFSET_VALUE:
+                    row_copy_df = row.copy().to_frame().T
+                    row_copy_df['EXPLAIN_OFFSET_VALUE'] = value
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_offset_{value}'
+                    final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                for value in self.EXPLAIN_BFAP_VALUE:
+                    row_copy_df = row.copy().to_frame().T
+                    row_copy_df['EXPLAIN_BFAP_VALUE'] = value
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_bfap_{value}'
+                    final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                for value in self.EXPLAIN_ODDEVEN_VALUE:
+                    row_copy_df = row.copy().to_frame().T
+                    row_copy_df['EXPLAIN_ODDEVEN_VALUE'] = value
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_oddeven_{value}'
+                    final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                for value in self.EXPLAIN_TEMP_VALUE:
+                    row_copy_df = row.copy().to_frame().T
+                    row_copy_df['EXPLAIN_TEMP_VALUE'] = value
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_temp_{value}'
+                    final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                for value in self.EXPLAIN_ALBEDO_VALUE:
+                    row_copy_df = row.copy().to_frame().T
+                    row_copy_df['EXPLAIN_ALBEDO_VALUE'] = value
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_albedo_{value}'
+                    final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                for value in self.EXPLAIN_STARTEFF_VALUE:
+                    row_copy_df = row.copy().to_frame().T
+                    row_copy_df['EXPLAIN_STARTEFF_VALUE'] = value
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_starteff_{value}'
+                    final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                for value in self.EXPLAIN_STARRAD_VALUE:
+                    row_copy_df = row.copy().to_frame().T
+                    row_copy_df['EXPLAIN_STARRAD_VALUE'] = value
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_starrad_{value}'
+                    final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+            self.injected_objects_df = final_df
 
     def __len__(self):
         return (np.ceil(len(self.injected_objects_df) / float(self.batch_size))).astype(int)
@@ -143,7 +263,6 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
         if self.shuffle_batch:
             injected_objects_df = shuffle(injected_objects_df)
         star_array = np.empty((len(target_indexes), self.input_sizes[0], 1))
-        star_neighbours_array = np.empty((len(target_indexes), self.input_sizes[1], 1))
         #[period, planet radius, number of transits, ratio of good transits, transit depth, transit_offset_pos - transit_offset_err]
         scalar_values = np.empty((len(target_indexes), 12, 1))
         global_flux_array = np.empty((len(target_indexes), self.input_sizes[2], self.measurements_per_point))
@@ -173,12 +292,13 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
             #TODO refactor to use mission for object_id
             object_id = target_row['object_id'].split(' ')
             mission_id = object_id[0]
-            target_id = int(object_id[1])
+            target_id = int(object_id[1].split('_')[0])
             period = target_row['period']
-            lcs_dir = self.kics_lcs_dir if mission_id == 'KIC' else self.tics_lcs_dir
-            file_prefix = lcs_dir + '/' + mission_id + '_' + str(target_id) + '_' + str(round(period, 2)) \
-                if mission_id == 'KIC' else lcs_dir + '/' + mission_id + ' ' + str(target_id) + '_' + str(
-                round(period, 2))
+            lcs_dir = self.kics_lcs_dir if mission_id == 'KIC' else self.ete6_lcs_dir if 'OI' not in self.injected_objects_df else self.tess_lcs_dir
+            if mission_id == 'KIC' or 'OI' in self.injected_objects_df:
+                file_prefix = lcs_dir + '/' + mission_id + '_' + str(target_id) + '_' + str(round(period, 2))
+            else:
+                file_prefix = lcs_dir + '/' + mission_id + ' ' + str(target_id) + '_' + str(round(period, 2))
             if 'pl_orbper' in target_row and not np.isnan(target_row['pl_orbper']):
                 period = target_row['pl_orbper']
             elif 'koi_period' in target_row and not np.isnan(target_row['koi_period']):
@@ -187,6 +307,7 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 period = target_row['tce_period_x']
             elif 'tce_period_y' in target_row and not np.isnan(target_row['tce_period_y']):
                 period = target_row['tce_period_y']
+            #period = target_row['koi_period']
             epoch = target_row['epoch']
             if 'pl_tranmid' in target_row and not np.isnan(target_row['pl_tranmid']):
                 epoch = target_row['pl_tranmid'] - 2454833.0
@@ -194,20 +315,57 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 epoch = target_row['koi_time0bk']
             elif 'tce_time0bk' in target_row and not np.isnan(target_row['tce_time0bk']):
                 epoch = target_row['tce_time0bk']
+            #epoch = target_row['koi_time0bk']
             duration = target_row['duration(h)'] / 24
+            metrics_short_filename = file_prefix + '_metrics_short.csv'
+            metrics_long_filename = file_prefix + '_metrics_long.csv'
             if 'tce_ptemp_stat' in target_row and not np.isnan(target_row['tce_ptemp_stat']):
                 temperature_stat = target_row['tce_ptemp_stat']
-            else:
-                #TODO calculate ef_temp with (D^1/4) * Teff / (Rp/R*)^1/2, where Rp/R* is tce_ror, Teff is tce_steff, and D is wst_depth.
-                #TODO calculate eq_temp with Teq = Tstar * np.sqrt(Rstar / (2 * a)) * (1 - albedo) ** (1 / 4) where albedo is assumed as 0.3
-                #TODO calculate statistic with (Teff / Teq) / (uncertainty of Teff / Teq)
+            elif mission_id == 'TIC':
                 temperature_stat = 0
+                if os.path.exists(metrics_short_filename):
+                    metrics_df = pd.read_csv(metrics_short_filename)
+                    temperature_stat = metrics_df.loc[metrics_df['name'] == 'temp_stat'].iloc[0]['value']
+                if os.path.exists(metrics_long_filename):
+                    metrics_df = pd.read_csv(metrics_long_filename)
+                    if temperature_stat is None:
+                        temperature_stat = metrics_df.loc[metrics_df['name'] == 'temp_stat'].iloc[0]['value']
+                    else:
+                        temperature_stat = np.nanmean([temperature_stat,
+                                                    metrics_df.loc[metrics_df['name'] == 'temp_stat'].iloc[0][
+                                                        'value']])
             if 'tce_albedo_stat' in target_row and not np.isnan(target_row['tce_albedo']):
                 albedo_stat = target_row['tce_albedo_stat']
-            else:
-                #TODO calculate albedo statistic with (tce_albedo - 1) / tce_albedo_err where tce_albedo is D * (a^2) / (Rp^2),
-                #TODO tce_albedo is given by D * (a^2) / (Rp^2) where D is wst_depth
+            elif mission_id == 'TIC':
                 albedo_stat = 0
+                if os.path.exists(metrics_short_filename):
+                    metrics_df = pd.read_csv(metrics_short_filename)
+                    albedo_stat = metrics_df.loc[metrics_df['name'] == 'albedo_stat'].iloc[0]['value']
+                if os.path.exists(metrics_long_filename):
+                    metrics_df = pd.read_csv(metrics_long_filename)
+                    if albedo_stat is None:
+                        albedo_stat = metrics_df.loc[metrics_df['name'] == 'albedo_stat'].iloc[0]['value']
+                    else:
+                        albedo_stat = np.nanmean([albedo_stat,
+                                                    metrics_df.loc[metrics_df['name'] == 'albedo_stat'].iloc[0][
+                                                        'value']])
+            if 'boot_fap' in target_row and not np.isnan(target_row['boot_fap']):
+                bootstrap_fap = target_row['boot_fap']
+                if np.isnan(bootstrap_fap) or bootstrap_fap <= 0:
+                    bootstrap_fap = self.zero_epsilon
+            elif mission_id == 'TIC':
+                bootstrap_fap = 1 - self.zero_epsilon
+                if os.path.exists(metrics_short_filename):
+                    metrics_df = pd.read_csv(metrics_short_filename)
+                    bootstrap_fap = metrics_df.loc[metrics_df['name'] == 'bootstrap_fap'].iloc[0]['value']
+                if os.path.exists(metrics_long_filename):
+                    metrics_df = pd.read_csv(metrics_long_filename)
+                    if bootstrap_fap is None:
+                        bootstrap_fap = metrics_df.loc[metrics_df['name'] == 'bootstrap_fap'].iloc[0]['value']
+                    else:
+                        bootstrap_fap = np.nanmean([bootstrap_fap,
+                                                    metrics_df.loc[metrics_df['name'] == 'bootstrap_fap'].iloc[0][
+                                                        'value']])
             duration_to_period = duration / period
             type = target_row['type']
             batch_data_values[i] = [float(x) for x in self.type_to_label[type]]
@@ -218,7 +376,6 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                     logging.info("FAILED FILE PREFIX: %s", file_prefix)
                     raise e
                 star_array[i] = [[e] for e in np.loadtxt(file_prefix + '_input_star.csv', delimiter=',')]
-                star_neighbours_array[i] = [[e] for e in np.loadtxt(file_prefix + '_input_nb.csv', delimiter=',')]
                 global_flux_array[i] = np.loadtxt(file_prefix + '_input_global.csv', delimiter=',').reshape(-1, 1)
                 global_flux_array_err[i] = np.loadtxt(file_prefix + '_input_global_err.csv', delimiter=',').reshape(-1, 1)
                 folded_flux_even_array[i] = np.loadtxt(file_prefix + '_input_even.csv', delimiter=',').reshape(-1, 1)
@@ -254,6 +411,12 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 if os.path.exists(lc_long_filename):
                     read_df = pd.read_csv(lc_long_filename, usecols=['#time', 'flux_0'], low_memory=True)
                     lc_df = read_df if lc_df is None else lc_df.append(read_df, ignore_index=True)
+                if os.path.exists(lc_short_filename):
+                    read_df = pd.read_csv(lc_short_filename, usecols=['#time', 'flux_0'], low_memory=True)
+                    lc_df = read_df if lc_df is None else lc_df.append(read_df, ignore_index=True)
+                if lc_df is None:
+                    logging.warning("No curve for target " + file_prefix)
+                    raise ValueError("No curve for target " + file_prefix)
                 if os.path.exists(centroids_long_filename):
                     read_centroids_df = pd.read_csv(centroids_long_filename, usecols=['time', 'centroids_ra', 'centroids_dec'],
                                                     low_memory=True)
@@ -272,9 +435,6 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                                              low_memory=True)
                     read_og_df = self.compute_og_df(read_og_df, object_id, duration)
                     og_df = read_og_df if og_df is None else og_df.append(read_og_df, ignore_index=True)
-                if os.path.exists(lc_short_filename):
-                    read_df = pd.read_csv(lc_short_filename, usecols=['#time', 'flux_0'], low_memory=True)
-                    lc_df = read_df if lc_df is None else lc_df.append(read_df, ignore_index=True)
                 if os.path.exists(centroids_short_filename):
                     read_centroids_df = pd.read_csv(centroids_short_filename, usecols=['time', 'centroids_ra', 'centroids_dec'],
                                                     low_memory=True)
@@ -293,9 +453,6 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                                              low_memory=True)
                     read_og_df = self.compute_og_df(read_og_df, object_id, duration)
                     og_df = read_og_df if og_df is None else og_df.append(read_og_df, ignore_index=True)
-                if lc_df is None:
-                    logging.warning("No curve for target " + file_prefix)
-                    raise ValueError("No curve for target " + file_prefix)
                 lc_df = lc_df.sort_values(by=['#time'])
                 if self.mask_previous_signals:
                     lc_df = self.mask_other_signals(lc_df, target_row, '#time')
@@ -376,30 +533,8 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 planet_radius = planet_radius / 300
                 depth = depth if depth < 1 else 1 - self.zero_epsilon
                 planet_radius = planet_radius if planet_radius < 1 else 1 - self.zero_epsilon
-                metrics_short_filename = file_prefix + '_metrics_short.csv'
-                metrics_long_filename = file_prefix + '_metrics_short.csv'
-                if 'boot_fap' in target_row and not np.isnan(target_row['boot_fap']):
-                    bootstrap_fap = target_row['boot_fap']
-                    if np.isnan(bootstrap_fap) or bootstrap_fap <= 0:
-                        bootstrap_fap = self.zero_epsilon
-                else:
-                    bootstrap_fap = 1 - self.zero_epsilon
-                    # TODO compute
-                    # if os.path.exists(metrics_short_filename):
-                    #     metrics_df = pd.read_csv(metrics_short_filename)
-                    #     bootstrap_fap = metrics_df.loc[metrics_df['name'] == 'bootstrap_fap'].iloc[0]['bootstrap_fap']
-                    # if os.path.exists(metrics_long_filename):
-                    #     metrics_df = pd.read_csv(metrics_long_filename)
-                    #     if bootstrap_fap is None:
-                    #         bootstrap_fap = metrics_df.loc[metrics_df['name'] == 'bootstrap_fap'].iloc[0]['bootstrap_fap']
-                    #     else:
-                    #         bootstrap_fap = np.nanmean([bootstrap_fap, metrics_df.loc[metrics_df['name'] == 'bootstrap_fap'].iloc[0]['bootstrap_fap']])
-                    # if np.isnan(bootstrap_fap):
-                    #     bootstrap_fap = np.random.uniform(self.zero_epsilon, 1 - self.zero_epsilon)
                 #['ld_a', 'ld_b', 'Teff', 'lum', 'logg', 'radius', 'mass', 'v', 'j', 'h', 'k'])
                 neighbours_array = star_neighbours_df.to_numpy().flatten()
-                star_neighbours_array[i] = np.transpose([neighbours_array if len(neighbours_array) == 9 * 15 \
-                    else neighbours_array + np.zeros(9 * 15 - len(neighbours_array))])
                 star_array[i] = np.transpose([star_df.to_numpy()])
                 time = lc_df['#time'].to_numpy()
                 # Global flux
@@ -548,7 +683,6 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 logging.info("Storing arrays into prefix " + file_prefix)
                 np.savetxt(file_prefix + '_input_scalar_values.csv', scalar_values[i], delimiter=',')
                 np.savetxt(file_prefix + '_input_star.csv', star_array[i], delimiter=',')
-                np.savetxt(file_prefix + '_input_nb.csv', star_neighbours_array[i], delimiter=',')
                 np.savetxt(file_prefix + '_input_global.csv', global_flux_array[i], delimiter=',')
                 np.savetxt(file_prefix + '_input_global_err.csv', global_flux_array_err[i], delimiter=',')
                 np.savetxt(file_prefix + '_input_even.csv', folded_flux_even_array[i], delimiter=',')
@@ -567,29 +701,55 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 np.savetxt(file_prefix + '_input_centroids_err.csv', folded_centroids_array_err[i], delimiter=',')
                 np.savetxt(file_prefix + '_input_og.csv', folded_og_array[i], delimiter=',')
                 np.savetxt(file_prefix + '_input_og_err.csv', folded_og_array_err[i], delimiter=',')
+            if self.explain:
+                if 'EXPLAIN_PERIOD_VALUE' in target_row and not np.isnan(target_row['EXPLAIN_PERIOD_VALUE']):
+                    scalar_values[i, 0] = target_row['EXPLAIN_PERIOD_VALUE']
+                if 'EXPLAIN_DURATION_VALUE' in target_row and not np.isnan(target_row['EXPLAIN_DURATION_VALUE']):
+                    scalar_values[i, 1] = target_row['EXPLAIN_DURATION_VALUE']
+                if 'EXPLAIN_RADIUS_VALUE' in target_row and not np.isnan(target_row['EXPLAIN_RADIUS_VALUE']):
+                    scalar_values[i, 3] = target_row['EXPLAIN_RADIUS_VALUE']
+                if 'EXPLAIN_GTCN_VALUE' in target_row and not np.isnan(target_row['EXPLAIN_GTCN_VALUE']):
+                    scalar_values[i, 4] = target_row['EXPLAIN_GTCN_VALUE']
+                if 'EXPLAIN_GTR_VALUE' in target_row and not np.isnan(target_row['EXPLAIN_GTR_VALUE']):
+                    scalar_values[i, 5] = target_row['EXPLAIN_GTR_VALUE']
+                if 'EXPLAIN_OFFSET_VALUE' in target_row and not np.isnan(target_row['EXPLAIN_OFFSET_VALUE']):
+                    scalar_values[i, 7] = target_row['EXPLAIN_OFFSET_VALUE']
+                if 'EXPLAIN_ODDEVEN_VALUE' in target_row and not np.isnan(target_row['EXPLAIN_ODDEVEN_VALUE']):
+                    scalar_values[i, 8] = target_row['EXPLAIN_ODDEVEN_VALUE']
+                if 'EXPLAIN_BFAP_VALUE' in target_row and not np.isnan(target_row['EXPLAIN_BFAP_VALUE']):
+                    scalar_values[i, 9] = target_row['EXPLAIN_BFAP_VALUE']
+                if 'EXPLAIN_TEMP_VALUE' in target_row and not np.isnan(target_row['EXPLAIN_TEMP_VALUE']):
+                    scalar_values[i, 10] = target_row['EXPLAIN_TEMP_VALUE']
+                if 'EXPLAIN_ALBEDO_VALUE' in target_row and not np.isnan(target_row['EXPLAIN_ALBEDO_VALUE']):
+                    scalar_values[i, 11] = target_row['EXPLAIN_ALBEDO_VALUE']
+                if 'EXPLAIN_STARTEFF_VALUE' in target_row and not np.isnan(target_row['EXPLAIN_STARTEFF_VALUE']):
+                    star_array[i, 2] = target_row['EXPLAIN_STARTEFF_VALUE']
+                if 'EXPLAIN_STARRAD_VALUE' in target_row and not np.isnan(target_row['EXPLAIN_STARRAD_VALUE']):
+                    star_array[i, 6] = target_row['EXPLAIN_STARRAD_VALUE']
+                if 'EXPLAIN_GLOBAL_VIEW' in target_row and not np.isnan(target_row['EXPLAIN_GLOBAL_VIEW']):
+                    global_flux_array[i] = np.zeros(global_flux_array[i].shape)
+                if 'EXPLAIN_MAIN_VIEW' in target_row and not np.isnan(target_row['EXPLAIN_MAIN_VIEW']):
+                    folded_flux_odd_array[i] = np.zeros(folded_flux_odd_array[i].shape)
+                if 'EXPLAIN_SECONDARY_VIEW' in target_row and not np.isnan(target_row['EXPLAIN_SECONDARY_VIEW']):
+                    folded_flux_even_array[i] = np.zeros(folded_flux_even_array[i].shape)
+                if 'EXPLAIN_ODD_VIEW' in target_row and not np.isnan(target_row['EXPLAIN_ODD_VIEW']):
+                    folded_flux_odd_har_array[i] = np.zeros(folded_flux_odd_har_array[i].shape)
+                if 'EXPLAIN_EVEN_VIEW' in target_row and not np.isnan(target_row['EXPLAIN_EVEN_VIEW']):
+                    folded_flux_even_har_array[i] = np.zeros(folded_flux_even_har_array[i].shape)
+                if 'EXPLAIN_CENTROIDS_RA_VIEW' in target_row and not np.isnan(target_row['EXPLAIN_CENTROIDS_RA_VIEW']):
+                    folded_centroids_array[i, :, 0] = np.zeros(folded_centroids_array[i].shape[0])
+                if 'EXPLAIN_CENTROIDS_DEC_VIEW' in target_row and not np.isnan(target_row['EXPLAIN_CENTROIDS_DEC_VIEW']):
+                    folded_centroids_array[i, :, 1] = np.zeros(folded_centroids_array[i].shape[0])
+                if 'EXPLAIN_OG_VIEW' in target_row and not np.isnan(target_row['EXPLAIN_OG_VIEW']):
+                    folded_og_array[i] = np.zeros(folded_og_array[i].shape)
             i = i + 1
-        filter_channels = np.array([0, 1, 6, 7, 8, 9, 10, 11])
         return [scalar_values[:, [0, 1, 3, 4, 5, 8, 9, 10, 11]], scalar_values[:, [7]],
                 star_array[:, [2, 6]], #Only Teff, Rad
-                # star_neighbours_array,
                 global_flux_array,
                 folded_flux_even_array,
                 folded_flux_odd_array,
-                # folded_flux_even_subhar_array,
-                # folded_flux_odd_subhar_array,
                 folded_flux_even_har_array,
                 folded_flux_odd_har_array,
                 folded_centroids_array,
                 folded_og_array], \
             batch_data_values
-        # return [star_array,
-        #         #star_neighbours_array,
-        #         global_flux_array, global_flux_array_err,
-        #         folded_flux_even_array, folded_flux_even_array_err,
-        #         folded_flux_odd_array, folded_flux_odd_array_err,
-        #         folded_flux_even_subhar_array, folded_flux_even_subhar_array_err,
-        #         folded_flux_odd_subhar_array, folded_flux_odd_subhar_array_err,
-        #         folded_flux_even_har_array, folded_flux_even_har_array_err,
-        #         folded_flux_odd_har_array, folded_flux_odd_har_array_err,
-        #         folded_centroids_array, folded_centroids_array_err, folded_og_array, folded_og_array_err], \
-        #     batch_data_values

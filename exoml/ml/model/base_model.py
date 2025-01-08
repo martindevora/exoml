@@ -139,7 +139,7 @@ class BaseModel(WithLogging):
     Base class providing standard methods for model building.
     """
 
-    model = None
+    model: keras.Model = None
 
     def __init__(self, name, input_size, class_ids, type_to_label, hyperparams) -> None:
         super().__init__()
@@ -661,6 +661,131 @@ class BaseModel(WithLogging):
                     else:
                         logging.warning("dry_run was activated and 'training' will not be launched")
 
+    def fine_tune_cv(self, training_dir, output_dir, hyperparams, continue_from, folds=10, retry_indexes=[],
+                 plot_metrics=False, devices=None, regenerate_fine_tuning_set=True, validate_only_ft=False,
+                     train_only_ft=True):
+        root_model_name = self._get_model_dir()
+        # We don't use SparseCategoricalCrossentropy because our targets are one-hot encoded
+        loss, accuracy = self.instance_loss_accuracy()
+        metrics = [accuracy] + self.instance_metrics() + hyperparams.metrics
+        if regenerate_fine_tuning_set:
+            dataset, fold_indexes = self.prepare_training_data_cv(training_dir, folds)
+            dataset_length = len(dataset)
+            logging.info("Preparing fine tuning data with (training_dir," + str(training_dir) +
+                         ") (train_percent," + str(hyperparams.train_percent) +
+                         ") (test_percent," + str(hyperparams.validation_percent) +
+                         ") and CV Folds with indexes %s", fold_indexes)
+            for index, fold_index in enumerate(fold_indexes):
+                model_name = root_model_name.strip("/") + f'_{index}/'
+                model_path = output_dir + '/' + model_name
+                previous_fold_index = fold_indexes[index - 1] if index > 0 else 0
+                training_set = pd.concat([dataset.iloc[0:previous_fold_index], dataset.iloc[fold_index:]])
+                validation_set = dataset.iloc[previous_fold_index:fold_index]
+                logging.info("Generating fine-tuning for K-fold no %s", index)
+                BaseModel.log_sets_distribution(training_set, validation_set, dataset_length, self.class_ids)
+                training_set.to_csv(model_path + 'ft_train_dataset.csv')
+                validation_set.to_csv(model_path + 'ft_validation_dataset.csv')
+        for index in np.arange(folds):
+            with self.train_strategy(devices).scope():
+                model_name = root_model_name.strip("/") + f'_{index}/'
+                model_chk_name = root_model_name.strip("/") + f'_chk_{index}/'
+                model_path = output_dir + '/' + model_name
+                model_chk_path = output_dir + '/' + model_chk_name
+                original_checkpoint_callback = None
+                if len(retry_indexes) == 0 or (len(retry_indexes) > 0 and index in retry_indexes):
+                    logging.info("Preparing training for K-fold no %s", index)
+                    training_set = pd.read_csv(model_path + '/ft_train_dataset.csv')
+                    if not train_only_ft:
+                        training_set = pd.concat([training_set, pd.read_csv(model_path + '/train_dataset.csv')])
+                    validation_set = pd.read_csv(model_path + '/ft_validation_dataset.csv')
+                    if not validate_only_ft:
+                        validation_set = pd.concat([validation_set, pd.read_csv(model_path + '/validation_dataset.csv')])
+                    train_dataset_size = len(training_set)
+                    validation_dataset_size = len(validation_set)
+                    BaseModel.log_sets_distribution(training_set, validation_set, train_dataset_size + train_dataset_size, self.class_ids)
+                    logging.info("Initializing optimizer with (initial_learning_rate," +
+                                 str(hyperparams.initial_learning_rate) + ")")
+                    steps_per_epoch = int(hyperparams.dataset_iterations_per_epoch * train_dataset_size // hyperparams.batch_size)
+                    optimizer = self.build_optimizer(hyperparams, steps_per_epoch)
+                    if not hyperparams.dry_run:
+                        logging.info("Initializing training and validation generators with (batch_size," + str(hyperparams.batch_size) +
+                                     ") (self.input_size," + str(self.input_size) +
+                                     ") (zero_epsilon," + str(hyperparams.zero_epsilon) +
+                                     ")")
+                        training_batch_generator = self.instance_generator(training_set, training_dir, hyperparams.batch_size,
+                                                                           self.input_size, self.type_to_label, hyperparams.zero_epsilon)
+                        validation_batch_generator = self.instance_generator(validation_set, training_dir, hyperparams.batch_size,
+                                                                             self.input_size, self.type_to_label, hyperparams.zero_epsilon,
+                                                                             shuffle=False)
+                        callbacks = []
+                        for callback in hyperparams.callbacks:
+                            new_callback = callback
+                            logging.info(f"callback class {callback.__class__.__name__}")
+                            if callback.__class__.__name__ == ModelDirDataAwareCallback.__name__:
+                                new_callback.set_model_dir(model_name)
+                            if callback.__class__.__name__ == ValidationDataAwareCallback.__name__:
+                                new_callback.set_validation_data(validation_batch_generator)
+                            if callback.__class__.__name__ == ModelCheckpointCallback.__name__:
+                                if original_checkpoint_callback is None:
+                                    original_checkpoint_callback = copy.deepcopy(callback)
+                                    logging.info(f"Stored original checkpoint callback with "
+                                                 f"{original_checkpoint_callback.original_path} "
+                                                 f",{original_checkpoint_callback.filepath} and "
+                                                 f"{original_checkpoint_callback.best}")
+                                new_callback = copy.deepcopy(original_checkpoint_callback)
+                                logging.info(f"Switched modelCheckpointCallback to {model_path} "
+                                             f",{model_chk_path} and {new_callback.best}")
+                                new_callback.original_path = model_path
+                                new_callback.filepath = model_chk_path
+                            callbacks = callbacks + [new_callback]
+                        additional_callbacks = [BatchAwareCsvLogger(model_name + '/training_log.csv', steps_per_epoch)]
+                        if plot_metrics:
+                            additional_callbacks = additional_callbacks + [
+                                MetricsPlotCallback(self, model_name, steps_per_epoch)]
+                        hyperparams.callbacks = additional_callbacks + hyperparams.callbacks
+                        callbacks = additional_callbacks + callbacks
+                        if hyperparams.early_stopping_patience > 0 and hyperparams.early_stopping_delta > 0:
+                            callbacks = callbacks + [ExoMlEarlyStopping(
+                                monitor="val_loss",
+                                min_delta=hyperparams.early_stopping_delta,
+                                patience=hyperparams.early_stopping_patience,
+                                verbose=0,
+                                mode="auto",
+                                baseline=None,
+                                restore_best_weights=False,
+                            )]
+                        model_validation_steps = int(validation_dataset_size // hyperparams.batch_size)
+                        class_weights = hyperparams.class_loss_weights if hyperparams.class_loss_weights is not None \
+                            else training_batch_generator.class_weights()
+                        if isinstance(class_weights, str) and 'auto' == class_weights:
+                            class_weights = self.compute_class_weights(training_set)
+                        logging.info("Initializing training with (epochs," + str(hyperparams.epochs) +
+                                     ") (steps_per_epoch," + str(steps_per_epoch) +
+                                     ") (model_validation_steps," + str(model_validation_steps) +
+                                     ")")
+                        continue_from_model = continue_from + str(index)
+                        logging.info(f"Continuing model fit from checkpoint {continue_from_model}")
+                        self.load_model(continue_from_model)
+                        # for layer in self.model.layers:
+                        #     if not isinstance(layer, (keras.layers.GaussianNoise, keras.layers.InputLayer, keras.layers.Dense)):
+                        #         layer.trainable = False
+                        self.compile(optimizer,
+                                     hyperparams.custom_loss if hyperparams.custom_loss is not None else loss,
+                                     metrics=metrics,
+                                     run_eagerly=hyperparams.run_eagerly)
+                        self.__write_hyperparameters(hyperparams, model_name)
+                        fit_history = self.model.fit(x=training_batch_generator,
+                                       steps_per_epoch=steps_per_epoch,
+                                       epochs=hyperparams.epochs, verbose=1, class_weight=class_weights,
+                                       validation_data=validation_batch_generator,
+                                       validation_steps=model_validation_steps,
+                                       callbacks=callbacks,
+                                       use_multiprocessing=hyperparams.cores > 0, workers=1 if hyperparams.cores <= 0
+                            else hyperparams.cores)
+                        self.save(output_dir, model_name)
+                    else:
+                        logging.warning("dry_run was activated and 'training' will not be launched")
+
     def train_strategy(self, devices=None):
         gpus = tf.config.list_physical_devices('GPU')
         num_gpus = len(gpus)
@@ -721,7 +846,7 @@ class BaseModel(WithLogging):
                                                   custom_objects=custom_objects))
         return self
 
-    def set_model(self, model):
+    def set_model(self, model: keras.Model):
         """
         Stores the model in a class attribute
         :param model: the model to be stored
@@ -730,3 +855,4 @@ class BaseModel(WithLogging):
 
     def _get_model_dir(self):
         return self.name + '_model/'
+

@@ -29,12 +29,6 @@ def row_regenerator(row_regenerator_input: RowRegeneratorInput):
     duration = row['duration(h)']
     type = row['type']
     object_id_tuple = object_id.split(' ')
-    mission_id = object_id_tuple[0]
-    target_id = int(object_id_tuple[1])
-    lcs_dir = kic_dir if mission_id == 'KIC' else tic_dir
-    file_prefix = lcs_dir + '/' + mission_id + '_' + str(target_id) + '_' + str(round(period, 2)) \
-        if mission_id == 'KIC' else lcs_dir + '/' + str(mission_id) + ' ' + str(target_id) + '_' + str(round(period, 2))
-    # if not os.path.exists(file_prefix + '_input_og.csv'):
     logging.info("Doing " + object_id + " " + str(row_regenerator_input.index) + " item of " + str(len(row_regenerator_input.df)) + '. Type=' + type + ', P=' +
                  str(np.round(period, 2)) + ', D=' + str(np.round(duration, 2)) + ', T0=' + str(np.round(t0, 2)))
     index = row_regenerator_input.df.index[(row_regenerator_input.df['object_id'] == object_id) &
@@ -80,18 +74,21 @@ def statistics(df, title, labels):
             results = pool.map(row_regenerator, inputs, chunksize=1)
         scalar_values = np.zeros((12, len(results)))
         for index, result in enumerate(results):
-            scalar_values[0][index] = result[0][0]
-            scalar_values[1][index] = result[0][1]
-            scalar_values[2][index] = result[0][2]
-            scalar_values[3][index] = result[0][3]
-            scalar_values[4][index] = result[0][4]
-            scalar_values[5][index] = result[0][5]
-            scalar_values[6][index] = result[0][6]
-            scalar_values[7][index] = result[0][7]
-            scalar_values[8][index] = result[0][8]
-            scalar_values[9][index] = result[1][0]
-            scalar_values[10][index] = result[2][0]
-            scalar_values[11][index] = result[2][1]
+            try:
+                scalar_values[0][index] = result[0][0]
+                scalar_values[1][index] = result[0][1]
+                scalar_values[2][index] = result[0][2]
+                scalar_values[3][index] = result[0][3]
+                scalar_values[4][index] = result[0][4]
+                scalar_values[5][index] = result[0][5]
+                scalar_values[6][index] = result[0][6]
+                scalar_values[7][index] = result[0][7]
+                scalar_values[8][index] = result[0][8]
+                scalar_values[9][index] = result[1][0]
+                scalar_values[10][index] = result[2][0]
+                scalar_values[11][index] = result[2][1]
+            except:
+                logging.info("Error")
         logging.info(f"-------{label} statistics-------")
         logging.info(f"Period-> mean: {np.mean(scalar_values[0])}, median: {np.median(scalar_values[0])}, "
                      f"std: {np.std(scalar_values[0])}, min: {np.min(scalar_values[0])}, "
@@ -173,7 +170,7 @@ kic_dir = data_dir + "q1_q17/lcs"
 #     if 'input' in filename:
 #         logging.info("Removing %s", filename)
 #         os.remove(kic_dir + '/' + filename)
-tic_dir = data_dir + "ete6/lcs"
+ete6_dir = data_dir + "ete6/lcs"
 # for filename in os.listdir(tic_dir):
 #     if 'input' in filename:
 #         logging.info("Removing %s", filename)
@@ -183,6 +180,7 @@ tic_dir = data_dir + "ete6/lcs"
 df1 = pd.read_csv(data_dir + "q1_q17/classified_tces.csv")
 df2 = pd.read_csv(data_dir + "ete6/injected_objects.csv")
 #df3 = pd.read_csv(data_dir + "q1_q17/injected_objects_candidates.csv")
+df4 = pd.read_csv(data_dir + "tess/tess_tois.csv")
 # df = [df3]
 # df = pd.concat(df)
 #df = pd.merge(df1, df2, on=['object_id', 'period', 'epoch', 'duration(h)', 'type', 'depth_primary', 'radius(earth)', 'boot_fap'], how="outer")
@@ -204,16 +202,190 @@ df2 = pd.read_csv(data_dir + "ete6/injected_objects.csv")
 #range = df.index[df['type'] == 'tce_secondary'].tolist()
 
 cores = 1
-df = df1
+df = df4
 df = df.reset_index(drop=True)
 df_len = len(df)
 range_df = range(0, df_len)
-range_df = df.index[df['object_id'] == 'KIC 9772531'].tolist()
+range_df = [8143]
+#range_df = df.index[(df['object_id'] == 'KIC 8480285') & (df['period'] < 30) & (df['period'] > 28)].tolist()
+range_df = df.index[df['object_id'].isin(['TIC 380619414'
+        'TIC 138359318',
+        'TIC 14570099',
+        'TIC 158324245',
+        'TIC 164786087',
+        'TIC 166527623',
+        'TIC 329148988',
+        'TIC 404243877',
+        'TIC 112604564',
+        'TIC 97735908',
+        'TIC 144700903',
+        'TIC 164173105',
+        'TIC 251848941',
+        'TIC 363548415',
+        'TIC 97409519',
+        'TIC 142276270',
+        'TIC 175236511',
+        'TIC 35516889',
+        'TIC 366443426',
+        'TIC 27491137',
+        'TIC 16740101',
+        'TIC 424865156',
+        'TIC 34068865',
+        'TIC 466840711',
+        'TIC 392476080',
+        'TIC 467971286',
+        'TIC 339522221',
+        'TIC 459730973',
+        'TIC 134537478',
+        'TIC 116264089',
+        'TIC 129979528',
+        'TIC 365007485',
+        'TIC 22529346',
+        'TIC 259506033',
+        'TIC 207077681',
+        'TIC 267572272',
+        'TIC 257774438',
+        'TIC 7088246',
+        'TIC 37718056',
+        'TIC 257527578',
+        'TIC 150096001',
+        'TIC 55652896',
+        'TIC 427761355',
+        'TIC 48217457',
+        'TIC 112099249',
+        'TIC 142276270',
+        'TIC 232568235',
+        'TIC 236445129',
+        'TIC 14614418',
+        'TIC 434226736',
+        'TIC 100566492',
+        'TIC 86396382',
+        'TIC 55652896',
+        'TIC 4610830',
+        'TIC 436575927',
+        'TIC 330690135',
+        'TIC 432549364',
+        'TIC 293435336',
+        'TIC 240681314',
+        'TIC 354619337',
+        'TIC 178284730',
+        'TIC 388811663',
+        'TIC 55092869',
+        'TIC 284475976',
+        'TIC 245392284',
+        'TIC 27534138',
+        'TIC 375942197',
+        'TIC 176868951'])]
+
+# range_df = df.index[~df['pl_tranmid'].isna()]
+
+# range_df = df.index[~df['object_id'].isin(["TIC 9837861",
+# "TIC 114103136",
+# "TIC 303867090",
+# "TIC 365683032",
+# "TIC 233059608",
+# "TIC 349790953",
+# "TIC 241102583",
+# "TIC 124709665",
+# "TIC 374847873",
+# "TIC 244089109",
+# "TIC 269450900",
+# "TIC 317520667",
+# "TIC 233602827",
+# "TIC 367366318",
+# "TIC 242460075",
+# "TIC 98286422",
+# "TIC 110178537",
+# "TIC 305512837",
+# "TIC 20892672",
+# "TIC 167227214",
+# "TIC 194179013",
+# "TIC 16102323",
+# "TIC 350153977",
+# "TIC 23863106",
+# "TIC 325670253",
+# "TIC 183979262",
+# "TIC 331034236",
+# "TIC 387527558",
+# "TIC 257060897",
+# "TIC 284326455",
+# "TIC 369861731",
+# "TIC 15827263",
+# "TIC 610976842",
+# "TIC 24094603",
+# "TIC 232038798",
+# "TIC 1965256662",
+# "TIC 229400092",
+# "TIC 104866616",
+# "TIC 376740324",
+# "TIC 233602827",
+# "TIC 429302040",
+# "TIC 258777134",
+# "TIC 387690507",
+# "TIC 277987172",
+# "TIC 290348382",
+# "TIC 45684223",
+# "TIC 155986102",
+# "TIC 29830212",
+# "TIC 468997317",
+# "TIC 1717732429",
+# "TIC 286696848",
+# "TIC 219821826",
+# "TIC 271749758",
+# "TIC 139158696",
+# "TIC 160162987",
+# "TIC 1101909431",
+# "TIC 235678745",
+# "TIC 232982558",
+# "TIC 269701147",
+# "TIC 219854519",
+# "TIC 230086768",
+# "TIC 394029948",
+# "TIC 374908020",
+# "TIC 364075352",
+# "TIC 29781292",
+# "TIC 141488193",
+# "TIC 157698565",
+# "TIC 229742722",
+# "TIC 466206508",
+# "TIC 33878688",
+# "TIC 164652245",
+# "TIC 232608943",
+# "TIC 55525572",
+# "TIC 261257684",
+# "TIC 29781292",
+# "TIC 150151262",
+# "TIC 367855829",
+# "TIC 27769688",
+# "TIC 349095149",
+# "TIC 388130235",
+# "TIC 260128333",
+# "TIC 309792357",
+# "TIC 209464063",
+# "TIC 362220495",
+# "TIC 224313733",
+# "TIC 309402106",
+# "TIC 349576261",
+# "TIC 298663873",
+# "TIC 307958020",
+# "TIC 70887357",
+# "TIC 251086776",
+# "TIC 332630868",
+# "TIC 434100688",
+# "TIC 304142124",
+# "TIC 150151262",
+# "TIC 441739020",
+# "TIC 350618622"])]
+
+
+#range_df = df.index[(df['object_id'] == 'KIC 11017901')].tolist()
 inputs = []
-for i in range_df:
-    inputs = inputs + [RowRegeneratorInput(df, i, plot_inputs=True, from_arrays=False, store_arrays=False, throw_nan_exception=True)]
 with Pool(processes=cores, maxtasksperchild=1) as pool:
+    for i in range_df:
+        inputs = inputs + [RowRegeneratorInput(df, i, plot_inputs=False, from_arrays=False, store_arrays=True, throw_nan_exception=True)]
     results = pool.map(row_regenerator, inputs, chunksize=1)
-#statistics(df2, 'ete6', ['planet', 'none', 'EB', 'bckEB'])
-statistics(df1, 'q1q17', ['planet_transit', 'planet', 'fp', 'fa', 'tce', 'tce_og',
-                        'tce_secondary', 'tce_source_offset', 'tce_centroids_offset', 'tce_odd_even', 'tce_candidate', 'fp_candidate'])
+# for index, input in enumerate(inputs):
+#     print(input.df.iloc[input.index]['object_id'] + ' ' + str(results[index][0][5]))
+# statistics(df2, 'ete6', ['planet', 'none', 'EB', 'bckEB'])
+# statistics(df1, 'q1q17', ['planet_transit', 'planet', 'fp', 'fa', 'tce', 'tce_og',
+#                         'tce_secondary', 'tce_source_offset', 'tce_centroids_offset', 'tce_odd_even', 'tce_candidate', 'fp_candidate'])

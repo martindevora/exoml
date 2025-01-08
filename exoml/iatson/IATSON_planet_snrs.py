@@ -667,7 +667,7 @@ class IATSON_planet(ImbalancedBinaryModel):
                     prediction_for_object = calibrator.predict([prediction_for_object]).tolist() if calibrator is not None \
                         else [prediction_for_object]
                     prediction_values = prediction_values + prediction_for_object
-                avg_prediction_value = np.nanmean(prediction_values)
+                avg_prediction_value = np.nanmedian(prediction_values)
                 std_prediction_value = np.nanstd(prediction_values)
                 average_predictions_df = pd.concat([average_predictions_df, pd.DataFrame.from_dict(
                     {'object_id': [prediction_row['object_id']],

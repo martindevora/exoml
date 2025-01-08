@@ -26,4 +26,15 @@ cores = 1
 #uncompress_data('/mnt/DATA-2/ete6/planets/Planets/')
 #create_injection_dataframe(root_dir, lcs_dir)
 #create_star_csvs(lcs_dir, 50, 4, TicStarCatalog(), targets_df, cores, force=False, ids=['TIC 318948330'])
-create_target_csvs(lcs_dir, root_dir, cores=cores, force=True, mode=['source_offset'])
+create_target_csvs(lcs_dir, root_dir, cores=cores, force=True, mode=['metrics'],
+                   ids=['TIC 9625658'])
+
+# import matplotlib.pyplot as plt
+# from foldedleastsquares import fold
+#
+# time_folded = fold(time, period, 1004.844738 + period / 2)
+# indexes = np.argsort(time_folded)
+#
+# plt.scatter(time_folded[indexes], flux[indexes])
+# plt.xlim(0.5 - duration / period * 2, 0.5 + duration / period * 2)
+# plt.show()

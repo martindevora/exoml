@@ -25,6 +25,7 @@ def create_targets_df(tces_dir):
     disc_df = pd.read_csv(tces_dir + '/PSCompPars_2023.06.30_07.30.12.csv', comment='#')
                           #usecols=['pl_name','hostname','tic_id','sy_snum','sy_pnum','discoverymethod','disc_year','disc_facility','rv_flag','tran_flag','pl_controv_flag','pl_orbper','pl_orbsmax','pl_rade','pl_radj','pl_bmasse','pl_bmassj','pl_bmassprov','pl_orbeccen','pl_insol','pl_eqt','ttv_flag','st_spectype','st_teff','st_rad','st_mass','st_met','st_metratio','st_logg','rastr','ra','decstr','dec','sy_dist','sy_vmag','sy_jmag','sy_hmag','sy_kmag','sy_gaiamag','sy_tmag','sy_kepmag','st_nphot','st_nrvc', 'disc_refname'])
     tces_df = tces_df[tces_df['tce_rogue_flag'] == 0]
+    kois_df = kois_df[~((kois_df['koi_disposition'] == 'CONFIRMED') & (kois_df['koi_pdisposition'] == 'FALSE POSITIVE'))]
     tces_df['cent_so'] = (tces_df['tce_fwm_srao'] ** 2 + tces_df['tce_fwm_sdeco'] ** 2) ** 0.5
     tces_df['cent_so_err'] = (((tces_df['tce_fwm_srao'] / np.sqrt(tces_df['tce_fwm_srao'] ** 2 + tces_df['tce_fwm_sdeco'] ** 2)) * tces_df['tce_fwm_srao_err']) ** 2 + \
                               ((tces_df['tce_fwm_sdeco'] / np.sqrt(tces_df['tce_fwm_srao'] ** 2 + tces_df['tce_fwm_sdeco'] ** 2)) * tces_df['tce_fwm_sdeco_err']) ** 2) ** 0.5
@@ -165,6 +166,7 @@ def create_targets_multi_df(tces_dir):
     tces_df = pd.read_csv(tces_dir + '/q1_q17_dr25_tce_2023.07.03_23.17.12.csv', comment='#')
     disc_df = pd.read_csv(tces_dir + '/PSCompPars_2023.06.30_07.30.12.csv', comment='#')
     tces_df = tces_df[tces_df['tce_rogue_flag'] == 0]
+    kois_df = kois_df[~((kois_df['koi_disposition'] == 'CONFIRMED') & (kois_df['koi_pdisposition'] == 'FALSE POSITIVE'))]
     tces_df['cent_so'] = (tces_df['tce_fwm_srao'] ** 2 + tces_df['tce_fwm_sdeco'] ** 2) ** 0.5
     tces_df['cent_so_err'] = (((tces_df['tce_fwm_srao'] / np.sqrt(tces_df['tce_fwm_srao'] ** 2 + tces_df['tce_fwm_sdeco'] ** 2)) * tces_df['tce_fwm_srao_err']) ** 2 + \
                               ((tces_df['tce_fwm_sdeco'] / np.sqrt(tces_df['tce_fwm_srao'] ** 2 + tces_df['tce_fwm_sdeco'] ** 2)) * tces_df['tce_fwm_sdeco_err']) ** 2) ** 0.5
@@ -398,7 +400,7 @@ def download_synth_targets(download_dir, wget_files, df_file):
 def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_count() - 1, force=False, ids=None,
                        mode='all', mission_prefix='KIC'):
     tces_df = pd.read_csv(csv, comment='#')
-    tces_df = tces_df.sort_values(by=["kepid"], ascending=True)
+    tces_df = tces_df.sort_values(by=["object_id"], ascending=True)
     #tces_df = tces_df.drop_duplicates(subset=["kepid"], keep='last')
     tces_df = tces_df.sort_values(by=["period"], ascending=True)
     #tces_df = tces_df.sample(frac=1).reset_index(drop=True)
