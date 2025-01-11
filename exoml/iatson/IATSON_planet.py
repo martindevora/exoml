@@ -658,20 +658,31 @@ class IATSON_planet(ImbalancedBinaryModel):
 
     def predict_cv(self, input, models_dir, calibrator_path=None):
         models = os.listdir(models_dir)
-        predictions = []
-        predictions_cal = []
-        calibrator = self.load_calibrator(calibrator_path)
+        predictions_df = None
+        fold = 0
         for model in sorted(models):
             if '_chk_' in model:
-                self.load_model(f'{models_dir}/{model}')
+                predictions = []
+                predictions_cal = []
+                model_dir = f'{models_dir}/{model}'
+                self.load_model(model_dir)
                 prediction, _ = self.predict(input)
                 input.plot_inputs = False
                 prediction_cal = prediction
+                calibrator = self.load_calibrator(f'{model_dir}/{calibrator_path}')
                 if calibrator:
                     prediction_cal = calibrator.predict(prediction)
-                predictions_cal = predictions_cal + np.array(prediction_cal).flatten().tolist()
-                predictions = predictions + np.array(prediction).flatten().tolist()
-        return predictions, predictions_cal
+                predictions_cal = np.array(prediction_cal).flatten().tolist()
+                predictions = np.array(prediction).flatten().tolist()
+                input.injected_objects_df['fold'] = fold
+                input.injected_objects_df['prediction_value'] = predictions
+                input.injected_objects_df['prediction_value_cal'] = predictions_cal
+                if predictions_df is None:
+                    predictions_df = input.injected_objects_df.copy()
+                else:
+                    predictions_df = pd.concat([predictions_df, input.injected_objects_df])
+                fold = fold + 1
+        return predictions_df
 
     def predict_batch(self, input_generator: Ete6ModelGenerator, expected_outputs=None, dataset=None, training_dir=None, plot_mismatches=False,
                       batch_size=20, cores=os.cpu_count() - 1, threshold=[0.5], calibrator_path=None, explain=False):

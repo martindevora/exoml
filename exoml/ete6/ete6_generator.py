@@ -163,11 +163,11 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
             if cadences_ratio >= required_range_percent:
                 good_quality_t0s.append(t0)
             else:
-                input_df = input_df[(input_df[time_key] < t0 - transit_with_baseline_half_length) |
+                input_df = input_df.loc[(input_df[time_key] < t0 - transit_with_baseline_half_length) |
                                     (input_df[time_key] > t0 + transit_with_baseline_half_length)]
 
         # We don't want time encoding because time will be used for folding and then dropped
-        #input_df["#time"] = value_encode_times(time - time[0])
+        # input_df["#time"] = value_encode_times(time - time[0])
         # red_noise_freq = self.random_number_generator.uniform(0.01, 0.1)
         # flux_std = np.std(input_df['flux'])
         # red_noise_sd = self.random_number_generator.uniform(0, flux_std * 3)
@@ -240,8 +240,9 @@ class Ete6ModelGenerator(tf.keras.utils.Sequence):
         star_df['Teff'] = star_df['Teff'] if star_df['Teff'].iloc[0] <= 1 else 1
         star_df['radius'] = star_df['radius'] / 3 * rad_mod
         star_df['radius'] = star_df['radius'] if star_df['radius'].iloc[0] <= 1 else 1
-        star_df['mass'] = star_df['mass'] / 3 * mass_mod
-        star_df['mass'] = star_df['mass'] if star_df['mass'].iloc[0] <= 1 else 1
+        if 'mass' in star_df:
+            star_df['mass'] = star_df['mass'] / 3 * mass_mod
+            star_df['mass'] = star_df['mass'] if star_df['mass'].iloc[0] <= 1 else 1
         if 'lum' in star_df.columns:
             star_df['lum'] = sigmoid(star_df['lum'])
         if 'logg' in star_df.columns:
