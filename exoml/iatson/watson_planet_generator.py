@@ -57,95 +57,95 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                 final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 row_copy_df = row.copy().to_frame().T
                 row_copy_df['EXPLAIN_GLOBAL_VIEW'] = True
-                row_copy_df['object_id'] = row_copy_df['object_id'] + '_global'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' global view branch'
                 final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 row_copy_df = row.copy().to_frame().T
                 row_copy_df['EXPLAIN_MAIN_VIEW'] = True
-                row_copy_df['object_id'] = row_copy_df['object_id'] + '_main'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' main view branch'
                 final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 row_copy_df = row.copy().to_frame().T
                 row_copy_df['EXPLAIN_SECONDARY_VIEW'] = True
-                row_copy_df['object_id'] = row_copy_df['object_id'] + '_secondary'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' secondary view branch'
                 final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 row_copy_df = row.copy().to_frame().T
                 row_copy_df['EXPLAIN_ODD_VIEW'] = True
-                row_copy_df['object_id'] = row_copy_df['object_id'] + '_odd'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' odd view branch'
                 final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 row_copy_df = row.copy().to_frame().T
                 row_copy_df['EXPLAIN_EVEN_VIEW'] = True
-                row_copy_df['object_id'] = row_copy_df['object_id'] + '_even'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' even view branch'
                 final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 row_copy_df = row.copy().to_frame().T
                 row_copy_df['EXPLAIN_CENTROIDS_RA_VIEW'] = True
-                row_copy_df['object_id'] = row_copy_df['object_id'] + '_ra'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' centroids ra branch'
                 final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 row_copy_df = row.copy().to_frame().T
                 row_copy_df['EXPLAIN_CENTROIDS_DEC_VIEW'] = True
-                row_copy_df['object_id'] = row_copy_df['object_id'] + '_dec'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' centroids dec branch'
                 final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 row_copy_df = row.copy().to_frame().T
                 row_copy_df['EXPLAIN_OG_VIEW'] = True
-                row_copy_df['object_id'] = row_copy_df['object_id'] + '_og'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' og branch'
                 final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 for value in self.EXPLAIN_PERIOD_VALUE:
                     row_copy_df = row.copy().to_frame().T
                     row_copy_df['EXPLAIN_PERIOD_VALUE'] = value
-                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_period_{value}'
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f' transit period value={value}'
                     final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 for value in self.EXPLAIN_DURATION_VALUE:
                     row_copy_df = row.copy().to_frame().T
                     row_copy_df['EXPLAIN_DURATION_VALUE'] = value
-                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_duration_{value}'
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f' transit duration value={value}'
                     final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 for value in self.EXPLAIN_RADIUS_VALUE:
                     row_copy_df = row.copy().to_frame().T
                     row_copy_df['EXPLAIN_RADIUS_VALUE'] = value
-                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_radius_{value}'
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f' planet radius value={value}'
                     final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 for value in self.EXPLAIN_GTCN_VALUE:
                     row_copy_df = row.copy().to_frame().T
                     row_copy_df['EXPLAIN_GTCN_VALUE'] = value
-                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_gtcn_{value}'
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f' good transit count value={value}'
                     final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 for value in self.EXPLAIN_GTR_VALUE:
                     row_copy_df = row.copy().to_frame().T
                     row_copy_df['EXPLAIN_GTR_VALUE'] = value
-                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_gtr_{value}'
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f' good transit ratio value={value}'
                     final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 for value in self.EXPLAIN_OFFSET_VALUE:
                     row_copy_df = row.copy().to_frame().T
                     row_copy_df['EXPLAIN_OFFSET_VALUE'] = value
-                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_offset_{value}'
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f' source offset value={value}'
                     final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 for value in self.EXPLAIN_BFAP_VALUE:
                     row_copy_df = row.copy().to_frame().T
                     row_copy_df['EXPLAIN_BFAP_VALUE'] = value
-                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_bfap_{value}'
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f' bootstrap fap value={value}'
                     final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 for value in self.EXPLAIN_ODDEVEN_VALUE:
                     row_copy_df = row.copy().to_frame().T
                     row_copy_df['EXPLAIN_ODDEVEN_VALUE'] = value
-                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_oddeven_{value}'
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f' odd/even factor value={value}'
                     final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 for value in self.EXPLAIN_TEMP_VALUE:
                     row_copy_df = row.copy().to_frame().T
                     row_copy_df['EXPLAIN_TEMP_VALUE'] = value
-                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_temp_{value}'
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f' temperature statistic value={value}'
                     final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 for value in self.EXPLAIN_ALBEDO_VALUE:
                     row_copy_df = row.copy().to_frame().T
                     row_copy_df['EXPLAIN_ALBEDO_VALUE'] = value
-                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_albedo_{value}'
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f' albedo statistic value={value}'
                     final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 for value in self.EXPLAIN_STARTEFF_VALUE:
                     row_copy_df = row.copy().to_frame().T
                     row_copy_df['EXPLAIN_STARTEFF_VALUE'] = value
-                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_starteff_{value}'
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f' star teff value={value}'
                     final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 for value in self.EXPLAIN_STARRAD_VALUE:
                     row_copy_df = row.copy().to_frame().T
                     row_copy_df['EXPLAIN_STARRAD_VALUE'] = value
-                    row_copy_df['object_id'] = row_copy_df['object_id'] + f'_starrad_{value}'
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f' star radius value={value}'
                     final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
             self.injected_objects_df = final_df
 
