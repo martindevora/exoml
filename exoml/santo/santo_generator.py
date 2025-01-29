@@ -38,18 +38,30 @@ class SantoGenerator(Sequence):
         file_index: int = self.generator_info_df.loc[index]['file_index']
         flux = np.loadtxt(f'{self.lcs_dir}/{filename}', delimiter=',')
         max_index = np.min([flux.shape[1] - self.input_size, file_index + self.batch_size])
-        train_fluxes = np.full((self.batch_size, self.input_size), self.zero_epsilon)
-        train_tags = np.full((self.batch_size, 1), 0)
+        train_fluxes = np.full((self.batch_size, self.input_size), 0.5)
+        train_tags = np.full((self.batch_size, 1), float(0))
         for iteration_index in np.arange(file_index, max_index):
             flux_data = flux[0][iteration_index:iteration_index + self.input_size] / 2
             train_fluxes[iteration_index - file_index] = flux_data
             tags_data_index = iteration_index + self.input_size // 2 - 1
             tags_data = np.array(flux[1][tags_data_index]).flatten()
             oot_mask = np.abs(tags_data - 1) < 1e-6
-            tags_data[oot_mask] = 0
-            tags_data[~oot_mask] = 1
+            tags_data[oot_mask] = float(0)
+            tags_data[~oot_mask] = float(1)
             train_tags[iteration_index - file_index] = tags_data
-        return train_fluxes, train_tags
+        self.assert_in_range(filename, train_fluxes)
+        np.all(train_tags != train_tags.astype(int)), "train_tags contains integer values!"
+        return np.reshape(train_fluxes, (self.batch_size, 500, 1)), train_tags
+
+    def assert_in_range(self, object_id, array, values_range=(0, 1)):
+        if np.isnan(array).any():
+            raise ValueError("Target " + str(object_id) + " contains NaN values")
+        elif np.max(array) >= values_range[1]:
+            raise ValueError("Target " + str(object_id) + " contains values > 1")
+        elif np.min(array) <= values_range[0]:
+            raise ValueError("Target " + str(object_id) + " contains values < 0")
+        elif np.all(array == values_range[0]):
+            raise ValueError("Target " + str(object_id) + " contains all values == 0")
 
     def on_epoch_end(self):
         if self.shuffle:

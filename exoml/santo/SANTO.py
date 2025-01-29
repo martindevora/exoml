@@ -14,20 +14,22 @@ import numpy as np
 import tensorflow as tf
 import time
 
-from keras.src.losses import BinaryCrossentropy
-from keras.src.metrics import BinaryAccuracy, Precision, Recall, AUC, PrecisionAtRecall, RecallAtPrecision
-from keras.src.optimizers import Adam
+from astropy.timeseries import LombScargle
+from keras.layers.activation.relu import ReLU
+from keras.losses import BinaryCrossentropy
+from keras.metrics import Precision, PrecisionAtRecall, Recall, AUC, BinaryAccuracy
+from keras.optimizers import Adam
 from keras.utils import plot_model
-from keras.src.layers import LeakyReLU
+from keras.layers import LeakyReLU
 from keras_nlp.src.layers import TransformerEncoder
 from lightkurve import TessLightCurve
 from numpy import ndarray
 from sklearn.utils import shuffle
 
 from exoml.ml.callback.early_stopping import ExoMlEarlyStopping
-from exoml.ml.callback.learning_rate import SWA, MultiOptimizer, WarmUpAndLinDecreaseCallback
+from tensorflow_addons.optimizers import MultiOptimizer, SWA
+from exoml.ml.callback.learning_rate import WarmUpAndLinDecreaseCallback
 from exoml.ml.callback.training_data_aware import ModelDirDataAwareCallback, ValidationDataAwareCallback
-from exoml.ml.layers.transformer_classifier import TransformerClassifier
 from exoml.ml.log.get_weights_logger import ModelWeightsLogger
 from exoml.ml.log.with_logging import WithLogging
 from exoml.ml.model.base_model import HyperParams
@@ -56,11 +58,8 @@ class SANTO(WithLogging):
         self.transformer_heads = transformer_heads
 
     def load(self, dir, hyperparams: HyperParams):
-        self.model = tf.keras.models.load_model(dir,
-                           custom_objects={'loss': self.loss(hyperparams)})
+        self.model = tf.keras.models.load_model(dir) #, custom_objects={'loss': self.loss(hyperparams)})
 
-    def loss(self, hyperparams: HyperParams):
-        return weighted_binary_crossentropy_param(hyperparams.class_loss_weights[0])
 
     def inform(self, dir):
         """
@@ -80,10 +79,8 @@ class SANTO(WithLogging):
         ModelWeightsLogger().log_model_weights(self.model)
         return self
 
-    def train(self, lcs_dir, output_dir, hyperparams: HyperParams, validation_set_percent=0.1, input_dim=500,
+    def initialize(self, lcs_dir, output_dir, hyperparams: HyperParams, input_dim=500,
               cores=os.cpu_count() // 2, load_checkpoint=False):
-        print("Begin training")
-        tf.keras.backend.clear_session()
         input_layer = keras.Input(shape=(input_dim, 1), name="input")
         if self.transformer_layers > 0:
             # outputs = TransformerClassifier(transformer_input_size=input_dim, patch_size=input_dim,
@@ -122,6 +119,8 @@ class SANTO(WithLogging):
             leaky_relu_alpha = 0.01
             flux_branch: keras.layers.Layer = input_layer
             # flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
+            #flux_branch = keras.layers.Dense(64, activation=LeakyReLU())(keras.layers.Flatten()(flux_branch))
+
             flux_branch = keras.layers.Conv1D(filters=16, kernel_size=90, padding="same",
                                               activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
             flux_branch = keras.layers.MaxPooling1D(pool_size=10, strides=1)(flux_branch)
@@ -163,24 +162,31 @@ class SANTO(WithLogging):
             flux_branch = keras.layers.Dropout(hyperparams.dropout_rate)(flux_branch)
             outputs: keras.layers.Layer = keras.layers.Dense(1, activation="sigmoid")(flux_branch)
         print("Preparing data sets")
-        target_files: List[str] = os.listdir(lcs_dir)
         self.model: keras.Model = keras.Model(inputs=input_layer, outputs=outputs)
         self.model.run_eagerly = hyperparams.run_eagerly
-        self.inform(output_dir)
         model_path = output_dir + self._get_model_dir()
-        if not os.path.exists(model_path):
-            os.mkdir(model_path)
         train_filenames, validation_filenames, test_filenames = \
             self.prepare_training_data(lcs_dir, model_path, hyperparams.batch_size, hyperparams.train_percent,
                                        hyperparams.validation_percent, hyperparams.training_set_limit,
                                        hyperparams.balance_class_id, hyperparams.balance_class_sampling)
+
+    def train(self, lcs_dir, output_dir, hyperparams: HyperParams, input_dim=500):
+        print("Begin training")
+        tf.keras.backend.clear_session()
+        self.inform(output_dir)
+        model_path = output_dir + self._get_model_dir()
+        if not os.path.exists(model_path):
+            os.mkdir(model_path)
+        train_df = pd.read_csv(model_path + '/train_dataset.csv')
+        train_filenames = train_df.loc[:, 'name'].tolist()
+        validation_df = pd.read_csv(model_path + '/validation_dataset.csv')
+        validation_filenames = validation_df.loc[:, 'name'].tolist()
         training_batch_generator = self.instance_generator(train_filenames, lcs_dir, hyperparams.batch_size,
                                                            input_dim, None, hyperparams.zero_epsilon)
         steps_per_epoch = training_batch_generator.steps_per_epoch()
         optimizer: keras.optimizers.Optimizer = self.build_optimizer(hyperparams, steps_per_epoch)
-        # We don't use SparseCategoricalCrossentropy because our targets are one-hot encoded
-        loss, accuracy = self.instance_loss_accuracy()
-        self.compile(optimizer, hyperparams.custom_loss if hyperparams.custom_loss is not None else loss,
+        loss, accuracy = self.instance_loss_accuracy(hyperparams)
+        self.compile(optimizer, loss,
                      metrics=[accuracy] + self.instance_metrics() + hyperparams.metrics,
                      run_eagerly=hyperparams.run_eagerly)
         if not hyperparams.dry_run:
@@ -263,10 +269,10 @@ class SANTO(WithLogging):
                     plt.show()
                     plt.close(fig)
                     plt.clf()
-                periodogram = (TessLightCurve(times[index], results[index]) \
-                               .to_periodogram(minimum_period=0.5, maximum_period=10, oversample_factor=3))
-                # power_norm = self.running_median(periodogram.power.value, 20)
-                periodogram.plot(view='period', scale='log')
+                frequency, power = LombScargle(times[index], results[index]).autopower()
+                plt.plot(1 / frequency, power)
+                plt.xlim((0, 20))
+                plt.xscale('symlog')
                 plt.show()
         return results
 
@@ -324,8 +330,8 @@ class SANTO(WithLogging):
     def _get_model_dir(self):
         return self.name + '_model/'
 
-    def instance_loss_accuracy(self):
-        return BinaryCrossentropy(), BinaryAccuracy()
+    def instance_loss_accuracy(self, hyperparams: HyperParams):
+        return BinaryCrossentropy() if hyperparams.custom_loss is None else hyperparams.custom_loss, BinaryAccuracy()
 
     def compile(self, optimizer, loss, metrics=None, run_eagerly=False, tuner=False):
         """
@@ -397,7 +403,7 @@ class SANTO(WithLogging):
             test_df['name'] = test_filenames
             test_df.to_csv(test_dataset_filename)
         train_df = pd.DataFrame(columns=['name'])
-        train_df['name'] = train_dataset_filename
+        train_df['name'] = train_filenames
         val_df = pd.DataFrame(columns=['name'])
         val_df['name'] = validation_filenames
         train_df.to_csv(train_dataset_filename)

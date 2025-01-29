@@ -138,9 +138,9 @@ class TransitsInjector(FeaturesInjector):
         star_mass = 1
         flux = np.ones(len(self.time))
         for index in range(0, number_of_planets):
-            period = random.gauss(self.transit_period_avg_std[0], self.transit_period_avg_std[1])
-            if period < 0.5:
-                period = 0.5
+            period = 0
+            while period < 0.5:
+                period = random.gauss(self.transit_period_avg_std[0], self.transit_period_avg_std[1])
             t0 = self.time[0] + period / random.uniform(0, 1)
             if t0 > self.time[-1]:
                 t0 = np.random.uniform(self.time[0], self.time[-1])
@@ -247,44 +247,9 @@ class SantoTestDataGenerator:
             #flux[0] = SinusoidalInjector(time, flux[0], sinusoid_power_boundaries, sinusoid_frequency_boundaries, max_number_of_sinusoid).inject()
             flux[0], flux[1] = PseudoPeriodicInjector(time, flux[0], pseudo_periodic_power_boundaries, pseudo_periodic_frequency_boundaries,
                                              pseudo_periodic_power_std_boundaries, pseudo_periodic_frequency_std_boundaries, max_number_of_pseudo_periodic).inject()
-            flux[0], flux[1] = TransitsInjector(time, flux[0], transit_period_avg_std, transit_depth_boundaries).inject()
             flux[0], flux[1] = FlaresInjector(time, flux[0], flare_amplitude_avg_std, flare_length_avg_std).inject()
+            flux[0], flux[1] = TransitsInjector(time, flux[0], transit_period_avg_std, transit_depth_boundaries).inject()
             #plt.scatter(time, flux[0])
             #plt.show()
             np.savetxt(f'{output_dir}/{curve_index}_model.csv', flux, delimiter=',')
 
-
-if not isinstance(logging.root, logging.RootLogger):
-    logging.root = logging.RootLogger(logging.INFO)
-
-formatter = logging.Formatter(fmt='%(asctime)s %(levelname)-8s %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
-logger = logging.getLogger()
-while len(logger.handlers) > 0:
-    logger.handlers.pop()
-logger.setLevel(logging.INFO)
-handler = logging.StreamHandler(sys.stdout)
-handler.setLevel(logging.INFO)
-handler.setFormatter(formatter)
-logger.addHandler(handler)
-
-SantoTestDataGenerator(output_dir="/home/users/dfe/mdevora/ml/santo/training_data/",
-                       curves_len_boundaries=(15000, 30000),
-                       curves_count=100000,
-                       curves_cadence=120,
-                       white_noise_power_boundaries=(0.001, 0.05),
-                       red_noise_frequency_boundaries=(0.01, 10),
-                       red_noise_power_boundaries=(0.001, 0.05),
-                       sinusoid_frequency_boundaries=(0.01, 10),
-                       sinusoid_power_boundaries=(0.001, 0.05),
-                       pseudo_periodic_frequency_boundaries=(0.01, 10),
-                       pseudo_periodic_power_boundaries=(0.001, 0.05),
-                       pseudo_periodic_frequency_std_boundaries=(0.01, 0.1),
-                       pseudo_periodic_power_std_boundaries=(0.0001, 0.001),
-                       transit_depth_boundaries=(0.0001, 0.05),
-                       transit_period_avg_std=(10, 9.5),
-                       flare_amplitude_avg_std=(0.1, 0.05),
-                       flare_length_avg_std=(0.2, 0.05),
-                       max_number_of_pseudo_periodic=3,
-                       max_number_of_sinusoid=3,
-                       max_number_of_red_noise=5,
-                       only_plot=False)

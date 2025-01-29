@@ -61,7 +61,7 @@ class SantoPredictGenerator(Sequence):
         for iteration_index in np.arange(file_index, max_index):
             flux_data = flux[iteration_index:iteration_index + self.input_size] / 2
             train_fluxes[iteration_index - file_index] = flux_data
-        return train_fluxes, train_tags
+        return train_fluxes, None
 
     def on_epoch_end(self):
         if self.shuffle:
