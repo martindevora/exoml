@@ -519,7 +519,10 @@ class WarmUpAndLinDecreaseCallback(Callback):
                 backend.set_value(optimizer.lr, new_learning_rate)
         else:
             optimizer = self.model.optimizer
-            warmup_slope = (self.top_lr - self.initial_lr) / self.warmup_epochs
+            if self.warmup_epochs <= 0:
+                warmup_slope = 1
+            else:
+                warmup_slope = (self.top_lr - self.initial_lr) / self.warmup_epochs
             decreasing_slope = (self.baseline_lr - self.top_lr) / self.baseline_epochs
             new_lr_decreasing = epoch * decreasing_slope + self.top_lr
             new_lr_warmup = epoch * warmup_slope + self.initial_lr
