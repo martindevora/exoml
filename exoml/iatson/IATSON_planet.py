@@ -30,6 +30,42 @@ from exoml.ml.model.imbalanced_binary_model import ImbalancedBinaryModel
 
 
 class IATSON_planet(ImbalancedBinaryModel):
+    fplanet_ftransit = 0.0308
+    fclosebinary_feclipse = 0.0048
+    fmultiple = 0.48
+    fclosetriple_feclipse = fmultiple * fclosebinary_feclipse
+    fbinary = 0.27
+    fpnonastro = 5e-5
+
+    # Prior of eclipsing binary on the target, TRICERATOPS
+    def P_FP_EB(self, Ptarget):
+        return Ptarget * self.fclosebinary_feclipse
+
+    # Prior of hierarchichal eclipsing binary (triple system where target star has an eclipsing binary companion), TRICERATOPS
+    def P_FP_HEB(self, Ptarget):
+        return Ptarget * self.fclosetriple_feclipse
+
+     # Prior of eclipsing binary on the target, TRICERATOPS
+    def P_FP_HTP(self, Ptarget):
+        return Ptarget * self.fbinary * self.fplanet_ftransit
+
+     # Prior of eclipsing binary on the target, TRICERATOPS
+    def P_FPresolved(self, Psecondsource):
+        return Psecondsource * (self.fclosebinary_feclipse + self.fclosetriple_feclipse + self.fplanet_ftransit)
+
+     # Prior of eclipsing binary on the target, TRICERATOPS
+    def P_FP_BEB(self, Pbackground):
+        return Pbackground * self.fclosebinary_feclipse
+
+     # Prior of eclipsing binary on the target, TRICERATOPS
+    def P_FP_BTP(self, Pbackground):
+        return Pbackground * self.fplanet_ftransit
+
+    def P_0(self, Ptarget, Pbackground, Psecondsource):
+        return (self.P_FP_EB(Ptarget) + self.P_FP_HEB(Ptarget) + self.P_FP_HTP(Ptarget) +
+                self.P_FPresolved(Psecondsource) + self.P_FP_BEB(Pbackground) + self.P_FP_BTP(Pbackground) +
+                self.fpnonastro)
+
     def __init__(self, class_ids, class_names, type_to_label, hyperparams, channels=1, name='IATSON_planet',
                  mode=['q1q17', 'ete6', 'with_tce_candidates', 'no_val', 'with_radius']) -> None:
         super().__init__(name,
@@ -699,15 +735,9 @@ class IATSON_planet(ImbalancedBinaryModel):
             planet_stats = self.test_metrics(expected_outputs, max_prediction_indexes, max_prediction_values, predictions,
                                              dataset if not explain else input_generator.injected_objects_df,
                                              training_dir=training_dir, plot_mismatches=plot_mismatches, explain=explain)
-            if not explain:
-                return max_prediction_indexes, max_prediction_values, [planet_stats]
-            else:
-                return max_prediction_indexes, max_prediction_values, [planet_stats] #TODO return explain df
+            return max_prediction_indexes, max_prediction_values, [planet_stats]
         else:
-            if not explain:
-                return max_prediction_indexes, max_prediction_values
-            else:
-                return max_prediction_indexes, max_prediction_values  #TODO return explain df
+            return max_prediction_indexes, max_prediction_values
 
     def predict_threshold(self, predictions, threshold=[0.5]):
         max_prediction_indexes = np.array([np.argmax(prediction) for prediction in predictions])
@@ -1448,6 +1478,18 @@ class IATSON_planet(ImbalancedBinaryModel):
                                                              self.input_size, zero_epsilon=1e-7,
                                                              transits_mask=transits_mask, plot_inputs=plot_inputs, use_csvs=use_csvs, explain=explain)
         if cv_dir:
+            # if triceratops_df is not None:
+            #     validation_predictions = []
+            #     tp_combined_prediction = 0
+            #     total_combined_prediction = 0
+            #     for prediction in predictions:
+            #         for index, row in triceratops_df.iterrows():
+            #             if row['scenario'] == 'TP' or row['scenario'] == 'PTP' or row['scenario'] == 'DTP':
+            #                 tp_combined_prediction = tp_combined_prediction + row['prob']
+            #             total_combined_prediction = total_combined_prediction + row['prob'] * prediction
+            #         tp_combined_prediction = tp_combined_prediction * prediction
+            #         validation_predictions = validation_predictions + [
+            #             tp_combined_prediction / total_combined_prediction]
             return self.predict_cv(testing_batch_generator, cv_dir, calibrator_path=calibrator_path), testing_batch_generator.injected_objects_df
         else:
             return self.predict(testing_batch_generator, calibrator_path=calibrator_path), testing_batch_generator.injected_objects_df
