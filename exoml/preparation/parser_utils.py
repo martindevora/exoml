@@ -578,7 +578,7 @@ def create_triceratops_prob(create_target_input):
                           (lc_df['time_folded'] < 0.5 + folded_plot_range)]
         bin_centers, bin_means, bin_width, bin_stds = \
             LcbuilderHelper.bin(lc_df['time_folded'].to_numpy(), lc_df['flux'].to_numpy(), bins,
-                                values_err=lc_df['flux_err'].to_numpy())
+                                values_err=lc_df['flux_err'].to_numpy(), bin_err_mode='values_snr')
         bin_centers = (bin_centers - 0.5) * period
         sigma = np.nanmean(bin_stds)
         logging.info("Flux err (ppm) = %s", sigma * 1000000)
