@@ -157,12 +157,12 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
 
     def _plot_df(self, df, type, scenario):
         fig, axs = plt.subplots(2, 3, figsize=(12, 6), constrained_layout=True)
-        axs[0][0].scatter(df['#time'], df['flux'])
-        axs[0][1].scatter(df['#time'], df['centroid_x'])
-        axs[0][2].scatter(df['#time'], df['centroid_y'])
-        axs[1][0].scatter(df['#time'], df['bck_flux'])
-        axs[1][1].scatter(df['#time'], df['motion_x'])
-        axs[1][2].scatter(df['#time'], df['motion_y'])
+        axs[0][0].scatter(df['time'], df['flux'])
+        axs[0][1].scatter(df['time'], df['centroid_x'])
+        axs[0][2].scatter(df['time'], df['centroid_y'])
+        axs[1][0].scatter(df['time'], df['bck_flux'])
+        axs[1][1].scatter(df['time'], df['motion_x'])
+        axs[1][2].scatter(df['time'], df['motion_y'])
         plt.title(type + " " + scenario)
         plt.show()
         plt.clf()
@@ -288,13 +288,13 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
 
     def plot_single_data(self, lc_df, target_row):
         fig, axs = plt.subplots(1, 1, figsize=(8, 4), constrained_layout=True)
-        axs.scatter(lc_df['#time'], lc_df['flux_0'])
+        axs.scatter(lc_df['time'], lc_df['flux_0'])
         axs.set_ylim(0.5 - target_row['tce_depth'] / 0.5e6, 0.505)
         plt.show()
         plt.clf()
         plt.close()
 
-    def mask_other_signals(self, data_df, transits_mask, time_key='#time'):
+    def mask_other_signals(self, data_df, transits_mask, time_key='time'):
         if transits_mask is not None:
             for item_mask in transits_mask:
                 mask = foldedleastsquares.transit_mask(data_df[time_key].to_numpy(), item_mask['P'],
@@ -414,37 +414,37 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                     folded_flux_odd_subhar_array[i] = self.arrays_cache[target_row['object_id']]['folded_flux_odd_subhar_array']
                 else:
                     lc_filename = self.lc_filename
-                    lc_df = pd.read_csv(lc_filename, usecols=['#time', 'flux'], low_memory=True)
+                    lc_df = pd.read_csv(lc_filename, usecols=['time', 'flux'], low_memory=True)
                     if lc_df is None:
                         logging.warning("No curve for target " + file_prefix)
                         raise ValueError("No curve for target " + file_prefix)
-                    lc_df = lc_df.sort_values(by=['#time'])
-                    lc_df = self.mask_other_signals(lc_df, transits_mask=self.transit_masks, time_key='#time')
-                    lc_df['flux'] = wotan.flatten(lc_df['#time'].to_numpy(), lc_df['flux'].to_numpy(), duration * 4,
+                    lc_df = lc_df.sort_values(by=['time'])
+                    lc_df = self.mask_other_signals(lc_df, transits_mask=self.transit_masks, time_key='time')
+                    lc_df['flux'] = wotan.flatten(lc_df['time'].to_numpy(), lc_df['flux'].to_numpy(), duration * 4,
                                                   method='biweight')
                     lc_df, good_transits_count, transits_count = self._prepare_input_lc(lc_df, period, epoch, duration,
-                                                                                        time_key='#time', flux_key='flux')
-                    not_null_times_args = np.argwhere(lc_df['#time'].to_numpy() > 0).flatten()
+                                                                                        time_key='time', flux_key='flux')
+                    not_null_times_args = np.argwhere(lc_df['time'].to_numpy() > 0).flatten()
                     lc_df = lc_df.iloc[not_null_times_args]
-                    time = lc_df['#time'].to_numpy()
+                    time = lc_df['time'].to_numpy()
                     # Global flux
                     # Shifting data 1/4 so that main transit and possible occultation don't get cut by the borders
                     lc_df_sorted_fold = lc_df.copy()
-                    lc_df_sorted_fold['#time'] = self.fold(time, period, epoch + period / 4)
-                    lc_df_sorted_fold = lc_df_sorted_fold.sort_values(by=['#time'])
+                    lc_df_sorted_fold['time'] = self.fold(time, period, epoch + period / 4)
+                    lc_df_sorted_fold = lc_df_sorted_fold.sort_values(by=['time'])
                     global_flux_array[i], global_flux_array_err[i] = \
                         self.bin_by_time(lc_df_sorted_fold.to_numpy(), self.input_sizes[2], target_row['object_id'])
                     # Focus flux even
                     lc_df_focus = lc_df.copy()
-                    lc_df_focus['#time'] = self.fold(time, period, epoch)
-                    lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-                    lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                              (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
+                    lc_df_focus['time'] = self.fold(time, period, epoch)
+                    lc_df_focus = lc_df_focus.sort_values(by=['time'])
+                    lc_df_focus = lc_df_focus[(lc_df_focus['time'] > 0.5 - duration_to_period * 3) &
+                                              (lc_df_focus['time'] < 0.5 + duration_to_period * 3)]
                     folded_flux_even_array[i], folded_flux_even_array_err[i] = \
                         self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[3], target_row['object_id'])
                     # Focus flux odd
                     lc_df_focus = lc_df.copy()
-                    lc_df_focus['#time'] = self.fold(time, period, epoch + period / 2)
+                    lc_df_focus['time'] = self.fold(time, period, epoch + period / 2)
                     lc_df_focus = lc_df_focus.sort_values(by=['#time'])
                     lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
                                               (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
