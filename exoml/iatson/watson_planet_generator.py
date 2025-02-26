@@ -445,21 +445,21 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                     # Focus flux odd
                     lc_df_focus = lc_df.copy()
                     lc_df_focus['time'] = self.fold(time, period, epoch + period / 2)
-                    lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-                    lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                              (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
+                    lc_df_focus = lc_df_focus.sort_values(by=['time'])
+                    lc_df_focus = lc_df_focus[(lc_df_focus['time'] > 0.5 - duration_to_period * 3) &
+                                              (lc_df_focus['time'] < 0.5 + duration_to_period * 3)]
                     folded_flux_odd_array[i], folded_flux_odd_array_err[i] = \
                         self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[4], target_row['object_id'])
                     # Focus flux harmonic even
                     lc_df_focus = lc_df.copy()
                     lc_df_focus['#time'] = self.fold(time, period * 2, epoch)
-                    lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-                    lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                              (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-                    oot_lc_df_focus = lc_df_focus[((lc_df_focus['#time'] <= 0.5 - duration_to_period / 4) |
-                                                   (lc_df_focus['#time'] >= 0.5 + duration_to_period / 4))]
-                    it_lc_df_focus = lc_df_focus[((lc_df_focus['#time'] > 0.5 - duration_to_period / 4) &
-                                                  (lc_df_focus['#time'] < 0.5 + duration_to_period / 4))]
+                    lc_df_focus = lc_df_focus.sort_values(by=['time'])
+                    lc_df_focus = lc_df_focus[(lc_df_focus['time'] > 0.5 - duration_to_period * 3) &
+                                              (lc_df_focus['time'] < 0.5 + duration_to_period * 3)]
+                    oot_lc_df_focus = lc_df_focus[((lc_df_focus['time'] <= 0.5 - duration_to_period / 4) |
+                                                   (lc_df_focus['time'] >= 0.5 + duration_to_period / 4))]
+                    it_lc_df_focus = lc_df_focus[((lc_df_focus['time'] > 0.5 - duration_to_period / 4) &
+                                                  (lc_df_focus['time'] < 0.5 + duration_to_period / 4))]
                     depth_even = (oot_lc_df_focus['flux'].mean() - it_lc_df_focus['flux'].mean()) * np.sqrt(
                         len(it_lc_df_focus)) / oot_lc_df_focus['flux'].std()
                     folded_flux_even_har_array[i], folded_flux_even_har_array_err[i] = \
@@ -467,39 +467,39 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                     # Focus flux harmonic odd
                     lc_df_focus = lc_df.copy()
                     lc_df_focus['#time'] = self.fold(time, period * 2, epoch + period)
-                    lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-                    lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                              (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
-                    oot_lc_df_focus = lc_df_focus[((lc_df_focus['#time'] <= 0.5 - duration_to_period / 4) |
-                                                   (lc_df_focus['#time'] >= 0.5 + duration_to_period / 4))]
-                    it_lc_df_focus = lc_df_focus[((lc_df_focus['#time'] > 0.5 - duration_to_period / 4) &
-                                                  (lc_df_focus['#time'] < 0.5 + duration_to_period / 4))]
+                    lc_df_focus = lc_df_focus.sort_values(by=['time'])
+                    lc_df_focus = lc_df_focus[(lc_df_focus['time'] > 0.5 - duration_to_period * 3) &
+                                              (lc_df_focus['time'] < 0.5 + duration_to_period * 3)]
+                    oot_lc_df_focus = lc_df_focus[((lc_df_focus['time'] <= 0.5 - duration_to_period / 4) |
+                                                   (lc_df_focus['time'] >= 0.5 + duration_to_period / 4))]
+                    it_lc_df_focus = lc_df_focus[((lc_df_focus['time'] > 0.5 - duration_to_period / 4) &
+                                                  (lc_df_focus['time'] < 0.5 + duration_to_period / 4))]
                     depth_odd = (oot_lc_df_focus['flux'].mean() - it_lc_df_focus['flux'].mean()) * np.sqrt(
                         len(it_lc_df_focus)) / oot_lc_df_focus['flux'].std()
                     folded_flux_odd_har_array[i], folded_flux_odd_har_array_err[i] = \
                         self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[8], target_row['object_id'])
                     # Focus flux sub-harmonic even
-                    lc_df_focus = pd.DataFrame(columns=['#time', 'flux'])
+                    lc_df_focus = pd.DataFrame(columns=['time', 'flux'])
                     time, flux0, _ = LcbuilderHelper.mask_transits(time,
                                                                    lc_df.copy()['flux'].to_numpy(), period,
                                                                    duration * 2,
                                                                    epoch)
-                    lc_df_focus['#time'] = time
+                    lc_df_focus['time'] = time
                     lc_df_focus['flux'] = flux0
-                    lc_df_focus['#time'] = self.fold(time, period / 2, epoch)
-                    lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-                    lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                              (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
+                    lc_df_focus['time'] = self.fold(time, period / 2, epoch)
+                    lc_df_focus = lc_df_focus.sort_values(by=['time'])
+                    lc_df_focus = lc_df_focus[(lc_df_focus['time'] > 0.5 - duration_to_period * 3) &
+                                              (lc_df_focus['time'] < 0.5 + duration_to_period * 3)]
                     folded_flux_even_subhar_array[i], folded_flux_even_subhar_array_err[i] = \
                         self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[5], target_row['object_id'])
                     # Focus flux sub-harmonic odd
-                    lc_df_focus = pd.DataFrame(columns=['#time', 'flux'])
-                    lc_df_focus['#time'] = time
+                    lc_df_focus = pd.DataFrame(columns=['time', 'flux'])
+                    lc_df_focus['time'] = time
                     lc_df_focus['flux'] = flux0
-                    lc_df_focus['#time'] = self.fold(time, period / 2, epoch + period / 4)
-                    lc_df_focus = lc_df_focus.sort_values(by=['#time'])
-                    lc_df_focus = lc_df_focus[(lc_df_focus['#time'] > 0.5 - duration_to_period * 3) &
-                                              (lc_df_focus['#time'] < 0.5 + duration_to_period * 3)]
+                    lc_df_focus['time'] = self.fold(time, period / 2, epoch + period / 4)
+                    lc_df_focus = lc_df_focus.sort_values(by=['time'])
+                    lc_df_focus = lc_df_focus[(lc_df_focus['time'] > 0.5 - duration_to_period * 3) &
+                                              (lc_df_focus['time'] < 0.5 + duration_to_period * 3)]
                     folded_flux_odd_subhar_array[i], folded_flux_odd_subhar_array_err[i] = \
                         self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[6], target_row['object_id'])
                     oe_factor = np.abs(depth_even - depth_odd)
