@@ -167,7 +167,7 @@ def create_star_csv(create_star_input):
     logging.info('Processed object id ' + str(create_star_input.object_id))
 
 def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_period, epoch, ra, dec, star_info: StarInfo,
-                    authors: list[str], cadences: list[int], cadence_name, tpf_files=None, modes=['all']):
+                    authors: list[str], cadences: list[int], cadence_name, tpf_files=None, modes=['all'], sectors='all'):
     lc_df = None
     if 'quality' in lc_data.columns:
         lc_data = lc_data.drop(['quality'], axis=1)
@@ -175,7 +175,8 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
     lcbuilder = LcBuilder()
     mission, mission_prefix, id = lcbuilder.parse_object_info(object_id)
     if tpf_files is None:
-        tpfs = lightkurve.search_targetpixelfile(object_id, exptime=cadences, author=authors).download_all()
+        tpfs = lightkurve.search_targetpixelfile(object_id, sector=sectors, campaign=sectors, quarter=sectors,
+                                                 exptime=cadences, author=authors).download_all()
     else:
         tpfs = []
         for file in tpf_files:
@@ -444,6 +445,11 @@ def create_target_csv(create_target_input):
                          str(round(create_target_input.injected_files_df['period'], 2))
     pid = multiprocessing.current_process().pid
     tpfs_dir = create_target_input.target_dir + 'tpfs/'
+    sectors = 'all'
+    if 'Sectors' in create_target_input.injected_files_df:
+        sectors = [int(item) for item in create_target_input.injected_files_df['Sectors'].split(",")]
+    elif 'sectors' in create_target_input.injected_files_df:
+        sectors = [int(create_target_input.injected_files_df['sectors'])] if create_target_input.injected_files_df['sectors'].isdigit() else 'all'
     try:
         logging.info("PID %s: Trying to get short cadence info for %s", pid, file_planet_prefix)
         file_name = file_planet_prefix + '_metrics_short.csv'
@@ -452,7 +458,7 @@ def create_target_csv(create_target_input):
         if create_target_input.force or not os.path.exists(file_name):
             if create_target_input.lc_file is None:
                 lcbuild_short = \
-                    mission_lightcurve_builder.build(MissionObjectInfo('all' if 'Sectors' not in create_target_input.injected_files_df else [int(item) for item in create_target_input.injected_files_df['Sectors'].split(",")],
+                    mission_lightcurve_builder.build(MissionObjectInfo(sectors,
                                                                        mission_id, author=authors,
                                                                        cadence=cadences,
                                                                        high_rms_enabled=False),
@@ -486,7 +492,7 @@ def create_target_csv(create_target_input):
                             create_target_input.injected_files_df['period'],
                             create_target_input.injected_files_df['epoch'],
                             lcbuild_short.star_info.ra, lcbuild_short.star_info.dec, lcbuild_short.star_info,
-                            authors=authors, cadences=cadences, cadence_name='short',
+                            sectors=sectors, authors=authors, cadences=cadences, cadence_name='short',
                             modes=create_target_input.mode)
             for f in pathlib.Path(tpfs_dir).glob(f"*{file_id.split('_')[1]}*"):
                 os.remove(f)
@@ -502,7 +508,7 @@ def create_target_csv(create_target_input):
             file_name = file_planet_prefix + '_metrics_long.csv'
             if create_target_input.force or not os.path.exists(file_name):
                 lcbuild_long = \
-                    mission_lightcurve_builder.build(MissionObjectInfo('all' if 'Sectors' not in create_target_input.injected_files_df else [int(item) for item in create_target_input.injected_files_df['Sectors'].split(",")],
+                    mission_lightcurve_builder.build(MissionObjectInfo(sectors,
                                             mission_id, author=authors, cadence=cadences, high_rms_enabled=False),
                                             create_target_input.target_dir, create_target_input.cache_dir)
                 prepare_lc_data(file_planet_prefix, mission_id, lcbuild_long.lc_data,
@@ -510,7 +516,7 @@ def create_target_csv(create_target_input):
                                 create_target_input.injected_files_df['period'],
                                 create_target_input.injected_files_df['epoch'],
                                 lcbuild_long.star_info.ra, lcbuild_long.star_info.dec, lcbuild_long.star_info,
-                                authors=authors, cadences=cadences, cadence_name='long',
+                                sectors=sectors, authors=authors, cadences=cadences, cadence_name='long',
                                 modes=create_target_input.mode)
                 for f in pathlib.Path(tpfs_dir).glob(f"*{file_id.split('_')[1]}*"):
                     os.remove(f)

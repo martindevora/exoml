@@ -346,29 +346,106 @@ def create_tess_fps_df(df_dir):
     tois_df = tois_df.loc[(~tois_df['period'].isna()) & (tois_df['period'] > 0.0)]
     tois_df.to_csv(f"{df_dir}/tess_cps.csv", index=False)
 
-def create_tess_tces_df(df_dir):
+def create_tess_tces_df(df_dir, single_sector_only=True):
     df = None
-    for file in sorted(glob.glob(f'{df_dir}tess*tcestats.csv')):
+    for file in sorted(glob.glob(f'{df_dir}/single_sector/tess*tcestats.csv')):
         if df is None:
             df = pd.read_csv(file, comment='#')
         else:
             df = pd.concat([df, pd.read_csv(file, comment='#')], ignore_index=True)
-    tois_df = pd.read_csv('/home/martin/.sherlockpipe/tois.csv')
+    if not single_sector_only:
+        for file in sorted(glob.glob(f'{df_dir}/multi_sector/tess*tcestats.csv')):
+            if df is None:
+                df = pd.read_csv(file, comment='#')
+            else:
+                df = pd.concat([df, pd.read_csv(file, comment='#')], ignore_index=True)
+    tois_df = pd.read_csv(pathlib.Path.home() / '.sherlockpipe' / 'tois.csv')
     removed_tces = 0
-    df['type'] = 'tce'
+    df.sort_values(by=['ticid', 'tce_period'], inplace=True)
+    df['type'] = 'tce_candidate'
+    last_tic_id = df.iloc[0]['ticid']
+    last_period = df.iloc[0]['tce_period']
+    row_to_write = None
+    clean_df = pd.DataFrame(columns=df.columns)
     for index, row in df.copy().iterrows():
-        if len(tois_df.loc[(np.abs(tois_df['Period (days)'] - row['tce_period']) < 0.05) & (tois_df['Object Id'].str[4:].astype(int) == row['ticid'])]) > 0:
-            df.loc[df['tceid'] == row['tceid'], 'type'] = 'toi'
-            removed_tces = removed_tces + 1
-    print("Removed tces " + str(removed_tces))
-    df['object_id'] = "TIC " + df['ticid'].apply(lambda x: str(x))
-    df['kepid'] = df['ticid']
-    df['period'] = df['tce_period']
-    df['epoch'] = df['tce_time0bt']
-    df['duration(h)'] = df['tce_duration']
-    df['depth_primary'] = df['tce_depth']
-    df['radius(earth)'] = df['tce_prad']
-    df.to_csv(df_dir + '/tces.csv')
+        if row['ticid'] != last_tic_id or np.abs(1 - (last_period / row['tce_period'])) >= 0.01:
+            clean_df = pd.concat([clean_df, pd.DataFrame([row_to_write])])
+            row_to_write = None
+        if row_to_write is None or \
+                (row_to_write['ticid'] == row['ticid'] and np.abs(1 - (row_to_write['tce_period'] / row['tce_period'])) < 0.01 \
+                and len(row['sectors']) > len(row_to_write['sectors'])) or last_tic_id != row['ticid'] or \
+                np.abs(1 - (last_period / row['tce_period'])) >= 0.01:
+            row_to_write = row
+        last_period = row['tce_period']
+        last_tic_id = row['ticid']
+    clean_df = clean_df.loc[(~clean_df['tce_period'].isna()) & (clean_df['tce_period'] > 0.0)]
+    clean_df.to_csv(df_dir + '/tces.csv')
+    clean_df = pd.read_csv(df_dir + '/tces.csv')
+    for index, row in tois_df.copy().iterrows():
+        if len(clean_df.loc[(np.abs(row['Period (days)'] - clean_df['tce_period']) < 0.05) &
+                           (int(row['Object Id'][4:]) == clean_df['ticid']) &
+                           ((row["Disposition"] == "KP") | (row["Disposition"] == "CP"))]) > 0:
+            clean_df.loc[(np.abs(row['Period (days)'] - clean_df['tce_period']) < 0.05) &
+                           (int(row['Object Id'][4:]) == clean_df['ticid']) &
+                           ((row["Disposition"] == "KP") | (row["Disposition"] == "CP")), 'type'] = 'planet_transit'
+        elif len(clean_df.loc[(np.abs(row['Period (days)'] - clean_df['tce_period']) < 0.05) &
+                           (int(row['Object Id'][4:]) == clean_df['ticid']) &
+                           ((row["Disposition"] == "FP") | (row["Disposition"] == "FA"))]) > 0:
+            clean_df.loc[(np.abs(row['Period (days)'] - clean_df['tce_period']) < 0.05) &
+                           (int(row['Object Id'][4:]) == clean_df['ticid']) &
+                           ((row["Disposition"] == "FP") | (row["Disposition"] == "FA")), 'type'] = 'fp'
+        elif len(clean_df.loc[(np.abs(row['Period (days)'] - clean_df['tce_period']) < 0.05) &
+                           (int(row['Object Id'][4:]) == clean_df['ticid'])]) > 0:
+            clean_df.loc[(np.abs(row['Period (days)'] - clean_df['tce_period']) < 0.05) &
+                         (int(row['Object Id'][4:]) == clean_df['ticid']), 'type'] = 'candidate'
+    clean_df['object_id'] = "TIC " + clean_df['ticid'].apply(lambda x: str(x))
+    clean_df['kepid'] = clean_df['ticid']
+    clean_df['period'] = clean_df['tce_period']
+    clean_df['epoch'] = clean_df['tce_time0bt']
+    clean_df['duration(h)'] = clean_df['tce_duration']
+    clean_df['depth_primary'] = clean_df['tce_depth']
+    clean_df['radius(earth)'] = clean_df['tce_prad']
+    clean_df.to_csv(df_dir + '/tces.csv')
+
+def label_triage_tces_df(df_dir):
+    df = None
+    for file in sorted(glob.glob(f'{df_dir}/triage/spoc*fluxtriage*.txt')):
+        new_df = pd.read_table(file, delim_whitespace=True, header=None)
+        match = re.search(r'sector(\d+)(?:-(\d+))?', file)
+        sector_start = int(match.group(1))
+        sector_end = int(match.group(2)) if match.group(2) else sector_start
+        sectors = f"s{sector_start:04d}"
+        if sector_start != sector_end:
+            sectors = f"{sectors}-s{sector_end:04d}"
+        new_df['sectors'] = sectors
+        if df is None:
+            df = new_df.copy()
+        else:
+            df = pd.concat([df, new_df], ignore_index=True)
+    df.to_csv(f'{df_dir}/triage_tces.csv')
+
+def label_tces_df(df_dir):
+    tces_df = pd.read_csv(df_dir + '/tces.csv')
+    labels_df = pd.read_csv(df_dir + '/hlsp_tess-ebs_tess_lcf-ffi_s0001-s0026_tess_v1.0_cat.csv')
+    for index, row in labels_df.iterrows():
+        tces_df.loc[(row['tess_id'] == tces_df['ticid']) & (np.abs(1 - row['period'] / tces_df['tce_period']) < 0.001), 'type'] = 'EB'
+    labels_df = pd.read_csv(df_dir + '/triage_tces.csv')
+    labels_df = labels_df.loc[labels_df['2'] == 0]
+    for index, row in labels_df.iterrows():
+        tces_df.loc[((tces_df['type'] == 'tce_candidate') | (tces_df['type'] == 'tce')) &
+                    (row['0'] == tces_df['ticid']) & (row['1'] == tces_df['tce_plnt_num']) & (row['2'] == 0) &
+                    (row['sectors'] == tces_df['sectors']), 'type'] = 'FA'
+    def process_sector(sector_value):
+        if '-' in sector_value:
+            return 'all'  # If there is a range, return 'all'
+        else:
+            # Extract the integer value from the sector (e.g., s0038 -> 38)
+            return int(sector_value[1:])  # Remove the 's' and convert to integer
+    # Apply the function to the 'sectors' column
+    tces_df['sectors_original'] = tces_df['sectors']
+    tces_df['sectors'] = tces_df['sectors'].apply(process_sector)
+    tces_df.to_csv(f'{df_dir}/tces.csv')
+
 
 def download_synth_targets(download_dir, wget_files, df_file):
     df = pd.read_csv(df_file, comment='#')
@@ -398,8 +475,11 @@ def download_synth_targets(download_dir, wget_files, df_file):
 
 
 def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_count() - 1, force=False, ids=None,
-                       mode='all', mission_prefix='KIC'):
+                       mode='all', mission_prefix='KIC', limit=0):
     tces_df = pd.read_csv(csv, comment='#')
+    if limit > 0:
+        tces_df = tces_df.sample(frac=1).reset_index(drop=True)
+        tces_df = tces_df.iloc[0:limit]
     tces_df = tces_df.sort_values(by=["object_id"], ascending=True)
     #tces_df = tces_df.drop_duplicates(subset=["kepid"], keep='last')
     tces_df = tces_df.sort_values(by=["period"], ascending=True)
