@@ -452,7 +452,7 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                         self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[4], target_row['object_id'])
                     # Focus flux harmonic even
                     lc_df_focus = lc_df.copy()
-                    lc_df_focus['#time'] = self.fold(time, period * 2, epoch)
+                    lc_df_focus['time'] = self.fold(time, period * 2, epoch)
                     lc_df_focus = lc_df_focus.sort_values(by=['time'])
                     lc_df_focus = lc_df_focus[(lc_df_focus['time'] > 0.5 - duration_to_period * 3) &
                                               (lc_df_focus['time'] < 0.5 + duration_to_period * 3)]
@@ -466,7 +466,7 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                         self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[7], target_row['object_id'])
                     # Focus flux harmonic odd
                     lc_df_focus = lc_df.copy()
-                    lc_df_focus['#time'] = self.fold(time, period * 2, epoch + period)
+                    lc_df_focus['time'] = self.fold(time, period * 2, epoch + period)
                     lc_df_focus = lc_df_focus.sort_values(by=['time'])
                     lc_df_focus = lc_df_focus[(lc_df_focus['time'] > 0.5 - duration_to_period * 3) &
                                               (lc_df_focus['time'] < 0.5 + duration_to_period * 3)]
