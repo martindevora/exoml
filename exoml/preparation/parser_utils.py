@@ -175,7 +175,9 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
     lcbuilder = LcBuilder()
     mission, mission_prefix, id = lcbuilder.parse_object_info(object_id)
     if tpf_files is None:
-        tpfs = lightkurve.search_targetpixelfile(object_id, sector=sectors, campaign=sectors, quarter=sectors,
+        tpfs = lightkurve.search_targetpixelfile(object_id, sector=sectors if isinstance(sectors, list) else None,
+                                                 campaign=sectors if isinstance(sectors, list)  else None,
+                                                 quarter=sectors if isinstance(sectors, list)  else None,
                                                  exptime=cadences, author=authors).download_all()
     else:
         tpfs = []
@@ -501,7 +503,7 @@ def create_target_csv(create_target_input):
         logging.exception("PID %s: Failed short cadence for %s", pid, file_planet_prefix)
     logging.info(f"lc file is {create_target_input.lc_file}")
     if create_target_input.lc_file is None:
-        authors = [constants.KEPLER_AUTHOR] if mission_id.startswith('KIC') else [constants.SPOC_AUTHOR, constants.TESS_SPOC_AUTHOR]
+        authors = [constants.KEPLER_AUTHOR] if mission_id.startswith('KIC') else [constants.SPOC_AUTHOR, constants.TESS_SPOC_AUTHOR, 'QLP']
         cadences = [1800] if mission_id.startswith('KIC') else [200, 600, 1800]
         try:
             logging.info("PID %s: Trying to get long cadence info for %s", pid, file_planet_prefix)

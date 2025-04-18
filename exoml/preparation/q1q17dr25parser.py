@@ -348,17 +348,20 @@ def create_tess_fps_df(df_dir):
 
 def create_tess_tces_df(df_dir, single_sector_only=True):
     df = None
-    for file in sorted(glob.glob(f'{df_dir}/single_sector/tess*tcestats.csv')):
-        if df is None:
-            df = pd.read_csv(file, comment='#')
-        else:
-            df = pd.concat([df, pd.read_csv(file, comment='#')], ignore_index=True)
     if not single_sector_only:
         for file in sorted(glob.glob(f'{df_dir}/multi_sector/tess*tcestats.csv')):
             if df is None:
                 df = pd.read_csv(file, comment='#')
             else:
                 df = pd.concat([df, pd.read_csv(file, comment='#')], ignore_index=True)
+    df.loc[:, 'sectors'] = 'all'
+    for file in sorted(glob.glob(f'{df_dir}/single_sector/tess*tcestats.csv')):
+        if df is None:
+            df = pd.read_csv(file, comment='#')
+        else:
+            df = pd.concat([df, pd.read_csv(file, comment='#')], ignore_index=True)
+    df.sort_values(by=['tceid', 'sectors'], ascending=[True, True], inplace=True)
+    df.drop_duplicates(subset=['tceid'], keep='first', inplace=True)
     tois_df = pd.read_csv(pathlib.Path.home() / '.sherlockpipe' / 'tois.csv')
     removed_tces = 0
     df.sort_values(by=['ticid', 'tce_period'], inplace=True)
@@ -416,12 +419,14 @@ def label_triage_tces_df(df_dir):
         sector_end = int(match.group(2)) if match.group(2) else sector_start
         sectors = f"s{sector_start:04d}"
         if sector_start != sector_end:
-            sectors = f"{sectors}-s{sector_end:04d}"
+            sectors = 'all'
         new_df['sectors'] = sectors
         if df is None:
             df = new_df.copy()
         else:
             df = pd.concat([df, new_df], ignore_index=True)
+    df.sort_values(by=['tceid', 'sectors'], ascending=[True, True], inplace=True)
+    df.drop_duplicates(subset=['tceid'], keep='first', inplace=True)
     df.to_csv(f'{df_dir}/triage_tces.csv')
 
 def label_tces_df(df_dir):
@@ -436,11 +441,12 @@ def label_tces_df(df_dir):
                     (row['0'] == tces_df['ticid']) & (row['1'] == tces_df['tce_plnt_num']) & (row['2'] == 0) &
                     (row['sectors'] == tces_df['sectors']), 'type'] = 'FA'
     def process_sector(sector_value):
-        if '-' in sector_value:
-            return 'all'  # If there is a range, return 'all'
+        if sector_value == 'all':
+            return 'all'
+        elif sector_value.startswith("s"):
+            return int(sector_value[1:])
         else:
-            # Extract the integer value from the sector (e.g., s0038 -> 38)
-            return int(sector_value[1:])  # Remove the 's' and convert to integer
+            return int(sector_value)
     # Apply the function to the 'sectors' column
     tces_df['sectors_original'] = tces_df['sectors']
     tces_df['sectors'] = tces_df['sectors'].apply(process_sector)
@@ -478,7 +484,6 @@ def create_target_csvs(csv, target_dir, cache_dir, cores=multiprocessing.cpu_cou
                        mode='all', mission_prefix='KIC', limit=0):
     tces_df = pd.read_csv(csv, comment='#')
     if limit > 0:
-        tces_df = tces_df.sample(frac=1).reset_index(drop=True)
         tces_df = tces_df.iloc[0:limit]
     tces_df = tces_df.sort_values(by=["object_id"], ascending=True)
     #tces_df = tces_df.drop_duplicates(subset=["kepid"], keep='last')
