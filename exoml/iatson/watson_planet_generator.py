@@ -172,110 +172,13 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
         if self.plot_inputs:
             transposed_err_array = []
             transposed_array = np.transpose(input_array)
-            fig, axs = plt.subplots(2, 2, figsize=(24, 12), constrained_layout=True)
+            fig, axs = plt.subplots(1, 1, figsize=(24, 12), constrained_layout=True)
             current_array = transposed_array[0]
             current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
             current_array = current_array[current_array_mask]
             time_array = current_array
-            axs[0][0].scatter(np.arange(0, len(current_array)), current_array)
-            # axs[0][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
-            axs[0][0].set_title("Time")
-            current_array = transposed_array[1]
-            current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            current_array = current_array[current_array_mask]
-            if input_err_array is not None:
-                transposed_err_array = np.transpose(input_err_array)
-                axs[0][1].errorbar(time_array[current_array_mask], current_array, ls='none',
-                                   yerr=transposed_err_array[1][current_array_mask], color="orange", alpha=0.5)
-            axs[0][1].scatter(time_array[current_array_mask], current_array)
-            if len(transposed_array) > 2:
-                current_array = transposed_array[2]
-                current_array_mask = np.argwhere(
-                    (~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-                current_array = current_array[current_array_mask]
-                if input_err_array is not None:
-                    axs[1][0].errorbar(time_array[current_array_mask], transposed_array[2], ls='none',
-                                       yerr=transposed_err_array[2][current_array_mask], color="orange", alpha=0.5)
-                axs[1][0].scatter(time_array[current_array_mask], current_array)
-            #axs[0][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
-            axs[0][1].set_title("Flux")
-            axs[1][0].set_title("Flux 1")
-            # current_array = transposed_array[8]
-            # current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            # current_array = current_array[current_array_mask]
-            # axs[1][1].errorbar(time_array[current_array_mask], current_array,
-            #                    yerr=transposed_err_array[8][current_array_mask], color="orange", alpha=0.5)
-            # axs[1][1].scatter(time_array[current_array_mask], current_array)
-            # # axs[1][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array),
-            # #                    np.mean(current_array) + 6 * np.std(current_array))
-            # axs[1][1].set_title("Flux 2")
-            # current_array = transposed_array[9]
-            # current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            # current_array = current_array[current_array_mask]
-            # axs[2][0].errorbar(time_array[current_array_mask], current_array,
-            #                    yerr=transposed_err_array[9][current_array_mask], color="orange", alpha=0.5)
-            # axs[2][0].scatter(time_array[current_array_mask], current_array)
-            # # axs[2][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array),
-            # #                    np.mean(current_array) + 6 * np.std(current_array))
-            # axs[2][0].set_title("Flux 3")
-            # current_array = transposed_array[10]
-            # current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            # current_array = current_array[current_array_mask]
-            # axs[2][1].errorbar(time_array[current_array_mask], current_array,
-            #                    yerr=transposed_err_array[10][current_array_mask], color="orange", alpha=0.5)
-            # axs[2][1].scatter(time_array[current_array_mask], current_array)
-            # # axs[2][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array),
-            # #                    np.mean(current_array) + 6 * np.std(current_array))
-            # axs[2][1].set_title("Flux 4")
-            # current_array = transposed_array[11]
-            # current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            # current_array = current_array[current_array_mask]
-            # axs[3][0].errorbar(time_array[current_array_mask], current_array,
-            #                    yerr=transposed_err_array[11][current_array_mask], color="orange", alpha=0.5)
-            # axs[3][0].scatter(time_array[current_array_mask], current_array)
-            # # axs[3][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array),
-            # #                    np.mean(current_array) + 6 * np.std(current_array))
-            # axs[3][0].set_title("Flux 5")
-            # current_array = transposed_array[6]
-            # current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            # current_array = current_array[current_array_mask]
-            # axs[3][1].errorbar(time_array[current_array_mask], current_array,
-            #                    yerr=transposed_err_array[6][current_array_mask], color="orange", alpha=0.5)
-            # axs[3][1].scatter(time_array[current_array_mask], current_array)
-            # # axs[3][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
-            # axs[3][1].set_title("Bck Flux")
-            # current_array = transposed_array[2]
-            # current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            # current_array = current_array[current_array_mask]
-            # axs[4][0].errorbar(time_array[current_array_mask], current_array,
-            #                    yerr=transposed_err_array[2][current_array_mask], color="orange", alpha=0.5)
-            # axs[4][0].scatter(time_array[current_array_mask], current_array)
-            # # axs[4][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
-            # axs[4][0].set_title("Centroid X")
-            # current_array = transposed_array[3]
-            # current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            # current_array = current_array[current_array_mask]
-            # axs[4][1].errorbar(time_array[current_array_mask], current_array,
-            #                    yerr=transposed_err_array[3][current_array_mask], color="orange", alpha=0.5)
-            # axs[4][1].scatter(time_array[current_array_mask], current_array)
-            # # axs[4][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
-            # axs[4][1].set_title("Centroid Y")
-            # current_array = transposed_array[4]
-            # current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            # current_array = current_array[current_array_mask]
-            # axs[5][0].errorbar(time_array[current_array_mask], current_array,
-            #                    yerr=transposed_err_array[4][current_array_mask], color="orange", alpha=0.5)
-            # axs[5][0].scatter(time_array[current_array_mask], current_array)
-            # # axs[5][0].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
-            # axs[5][0].set_title("Motion Y")
-            # current_array = transposed_array[5]
-            # current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            # current_array = current_array[current_array_mask]
-            # axs[5][1].errorbar(time_array[current_array_mask], current_array,
-            #                    yerr=transposed_err_array[5][current_array_mask], color="orange", alpha=0.5)
-            # axs[5][1].scatter(time_array[current_array_mask], current_array)
-            # # axs[5][1].set_ylim(np.mean(current_array) - 6 * np.std(current_array), np.mean(current_array) + 6 * np.std(current_array))
-            # axs[5][1].set_title("Motion Y")
+            axs.scatter(np.arange(0, len(current_array)), current_array)
+            axs.set_title("Flux")
             fig.suptitle(type + " " + scenario)
             if save_dir:
                 if not os.path.exists(save_dir):
