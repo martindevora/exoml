@@ -170,15 +170,29 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
 
     def _plot_input(self, input_array, input_err_array, type, scenario, save_dir=None):
         if self.plot_inputs:
-            transposed_err_array = []
             transposed_array = np.transpose(input_array)
-            fig, axs = plt.subplots(1, 1, figsize=(24, 12), constrained_layout=True)
-            current_array = transposed_array[0]
-            current_array_mask = np.argwhere((~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
-            current_array = current_array[current_array_mask]
-            time_array = current_array
-            axs.scatter(np.arange(0, len(current_array)), current_array)
-            axs.set_title("Flux")
+            if transposed_array.shape[0] <= 1:
+                fig, axs = plt.subplots(1, 1, figsize=(24, 12), constrained_layout=True)
+                current_array = transposed_array[0]
+                current_array_mask = np.argwhere(
+                    (~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
+                current_array = current_array[current_array_mask]
+                axs.scatter(np.arange(0, len(current_array)), current_array)
+                axs.set_title("Flux")
+            else:
+                fig, axs = plt.subplots(2, 1, figsize=(24, 24), constrained_layout=True)
+                current_array = transposed_array[0]
+                current_array_mask = np.argwhere(
+                    (~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
+                current_array = current_array[current_array_mask]
+                axs[0].scatter(np.arange(0, len(current_array)), current_array)
+                axs[0].set_title("Flux 1")
+                current_array = transposed_array[1]
+                current_array_mask = np.argwhere(
+                    (~np.isnan(current_array)) & (current_array > self.zero_epsilon)).flatten()
+                current_array = current_array[current_array_mask]
+                axs[1].scatter(np.arange(0, len(current_array)), current_array)
+                axs[1].set_title("Flux 2")
             fig.suptitle(type + " " + scenario)
             if save_dir:
                 if not os.path.exists(save_dir):
