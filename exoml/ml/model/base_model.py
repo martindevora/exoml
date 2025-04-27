@@ -296,9 +296,10 @@ class BaseModel(WithLogging):
             else:
                 training_dataset = training_dataset[:training_set_limit]
         dataset_length = len(training_dataset)
-        for labels in self.class_ids.values():
-            class_len = len(training_dataset[training_dataset['type'].isin(labels)])
-            logging.info("%s (%s %%) items of class %s", class_len, class_len / len(training_dataset) * 100, labels)
+        if self.class_ids is not None:
+            for labels in self.class_ids.values():
+                class_len = len(training_dataset[training_dataset['type'].isin(labels)])
+                logging.info("%s (%s %%) items of class %s", class_len, class_len / len(training_dataset) * 100, labels)
         train_dataset_filename = output_dir + "/train_dataset.csv"
         validation_dataset_filename = output_dir + "/validation_dataset.csv"
         test_dataset_filename = output_dir + "/test_dataset.csv"
@@ -322,14 +323,15 @@ class BaseModel(WithLogging):
                          len(validation_dataset) / dataset_length * 100)
             logging.info("Testing set is of length %s (%s %%)", len(test_filenames),
                          len(test_filenames) / dataset_length * 100)
-            for labels in self.class_ids.values():
-                class_len = len(training_dataset[training_dataset['type'].isin(labels)])
-                logging.info("Training set contains %s (%s %%) items of class %s", class_len,
-                             class_len / train_dataset_len * 100, labels)
-            for labels in self.class_ids.values():
-                class_len = len(validation_dataset[validation_dataset['type'].isin(labels)])
-                logging.info("Validation set contains %s (%s %%) items of class %s", class_len,
-                             class_len / validation_dataset_len * 100, labels)
+            if self.class_ids is not None:
+                for labels in self.class_ids.values():
+                    class_len = len(training_dataset[training_dataset['type'].isin(labels)])
+                    logging.info("Training set contains %s (%s %%) items of class %s", class_len,
+                                 class_len / train_dataset_len * 100, labels)
+                for labels in self.class_ids.values():
+                    class_len = len(validation_dataset[validation_dataset['type'].isin(labels)])
+                    logging.info("Validation set contains %s (%s %%) items of class %s", class_len,
+                                 class_len / validation_dataset_len * 100, labels)
         return training_dataset, validation_dataset, test_filenames
 
     def prepare_training_data_cv(self, training_dir, folds=10):
