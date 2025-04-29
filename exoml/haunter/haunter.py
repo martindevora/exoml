@@ -1,7 +1,8 @@
 import logging
 import tensorflow as tf
 import numpy as np
-
+import seaborn as sns
+import matplotlib.pyplot as plt
 import keras
 import pandas as pd
 from keras import Model
@@ -9,11 +10,13 @@ from keras.layers import LeakyReLU
 from keras.losses import MeanSquaredError, MeanAbsoluteError
 from keras.metrics import RootMeanSquaredError
 from keras_core.src.metrics import R2Score
+from lcbuilder.helper import LcbuilderHelper
 
 from exoml.haunter.haunter_generator import HaunterModelGenerator
 from exoml.ml.log.with_logging import WithLogging
 from exoml.ml.loss.unsupervised import intransit_weighted_mean_squared_error
 from exoml.ml.metrics.fixed_mean import FixedMean
+import astropy.units as u
 
 from exoml.ml.model.base_model import BaseModel, HyperParams
 
@@ -59,6 +62,98 @@ def r2_fs(y_true, y_pred):
     ss_tot = tf.reduce_sum(tf.square(y_true[:, 2] - tf.reduce_mean(y_true[:, 2])))
     return 1 - ss_res / (ss_tot + 1e-7)
 
+def physics_loss(inputs, outputs_pred):
+    """
+    inputs: Tensor de shape (batch_size, 6) [mass, CMF, Zenv, Zwater_core, Tsurf, Psurf]
+    outputs_pred: Tensor de shape (batch_size, 3) [radius, f_s, entropy]
+    """
+    mass, CMF, Zenv, Zwater_core, Tsurf, Psurf = tf.split(inputs, num_or_size_splits=6, axis=-1)
+    radius, f_s, entropy = tf.split(outputs_pred, num_or_size_splits=3, axis=-1)
+    # Convertimos a unidades físicas reales
+    mass_kg = LcbuilderHelper.convert_from_to(mass, u.M_earth, u.kg)
+    radius_m = LcbuilderHelper.convert_from_to(radius, u.R_earth, u.m)
+    # Densidad media predicha
+    rho_mean = mass_kg / ( (4/3) * np.pi * tf.pow(radius_m, 3) )  # kg/m^3
+    # Restricción 1: Densidad física razonable
+    target_rho_min = 300  # kg/m3 (para planetas ultra-hinchados)
+    target_rho_max = 25000  # kg/m3 (para núcleos de hierro)
+    loss_rho_min = tf.reduce_mean(tf.nn.relu(target_rho_min - rho_mean))
+    loss_rho_max = tf.reduce_mean(tf.nn.relu(rho_mean - target_rho_max))
+    # Restricción 2: Monotonía de entropía respecto a temperatura
+    # Aquí simplemente penalizamos entropías negativas o muy bajas para altas temperaturas
+    loss_entropy = tf.reduce_mean(tf.nn.relu(1000 - entropy))  # Ej: valores menores a 1000 castigados
+    # Restricción 3: Radio crece con masa a escala pequeña
+    mass_norm = mass / tf.reduce_max(mass)
+    radius_norm = radius / tf.reduce_max(radius)
+    loss_mass_radius = tf.reduce_mean(tf.nn.relu(0.5 * mass_norm - radius_norm))  # queremos que radio crezca
+    # Total physics loss
+    total_physics_loss = loss_rho_min + loss_rho_max + 0.1 * loss_entropy + 0.1 * loss_mass_radius
+    return total_physics_loss
+
+
+G = 6.67430e-11  # Constante de gravitación universal en unidades SI (m^3 kg^-1 s^-2)
+M_EARTH = 5.972e24  # Masa de la Tierra en kg
+R_EARTH = 6.371e6   # Radio de la Tierra en metros
+RHO_CORE = 13000.0
+RHO_MANTLE = 5000.0
+RHO_WATER = 1000.0
+RHO_GAS = 0.2
+GAMMA_SCALING = 0.5  # Ajustable según calibración
+
+def combined_loss(y_true, y_pred):
+    # Separate outputs from returned inputs
+    y_pred_outputs = y_pred[:, :3]
+    y_pred_inputs = y_pred[:, 3:]
+    # Original inputs
+    mass = y_pred_inputs[:, 0] * M_EARTH
+    CMF = y_pred_inputs[:, 1]
+    Zenv = y_pred_inputs[:, 2]
+    Zwater = y_pred_inputs[:, 3]
+    Tsurf = y_pred_inputs[:, 4]
+    Psurf = y_pred_inputs[:, 5]
+    # Original outputs
+    radius = y_pred_outputs[:, 0] * R_EARTH
+    entropy = y_pred_outputs[:, 1]
+    f_s = y_pred_outputs[:, 2]
+    # ---------- Average density by mass/radius ----------
+    rho_mean = mass / (4.0 / 3.0 * tf.constant(tf.math.pi) * tf.pow(radius, 3))
+    # ---------- Composition density ----------
+    rho_comp = (
+        CMF * RHO_CORE +
+        Zwater * RHO_WATER +
+        Zenv * RHO_GAS +
+        (1.0 - CMF - Zwater - Zenv) * RHO_MANTLE
+    )
+    # ---------- Surface gravity ----------
+    g_surface = G * mass / tf.square(radius)
+    # ---------- Physical equations (residuals) ----------
+    # Eq1: dP/dr ≈ -rho * g
+    dP_dr_estimate = -rho_mean * g_surface
+    loss_dpdr = tf.reduce_mean(tf.square(Psurf / radius - dP_dr_estimate))
+    # Eq2: dg/dr ≈ -4πGρ - 2Gm/r³
+    dg_dr_estimate = -4 * tf.constant(tf.math.pi) * G * rho_mean - 2 * G * mass / tf.pow(radius, 3)
+    loss_dgdr = tf.reduce_mean(tf.square(dg_dr_estimate))
+    # Eq3: dT/dr ≈ -g γT/φ, using γ ≈ entropy * escalar
+    gamma = entropy * GAMMA_SCALING
+    phi = Psurf / (rho_mean + 1e-6)
+    dT_dr_estimate = -g_surface * gamma * Tsurf / (phi + 1e-6)
+    loss_dTdr = tf.reduce_mean(tf.square(dT_dr_estimate))
+    # Eq6: dm/dr ≈ 4πr²ρ
+    dm_dr_estimate = 4.0 * tf.constant(tf.math.pi) * tf.square(radius) * rho_mean
+    loss_dmdr = tf.reduce_mean(tf.square(mass / radius - dm_dr_estimate))
+    # Densities consistency (estimated by percents of composition vs mass/radius densities)
+    loss_rho_match = tf.reduce_mean(tf.square(rho_mean - rho_comp))
+    # MSE
+    mse_outputs = tf.reduce_mean(tf.square(y_true - y_pred_outputs))
+    total_loss = (
+        mse_outputs +
+        0.2 * loss_dpdr +
+        0.2 * loss_dgdr +
+        0.2 * loss_dTdr +
+        0.2 * loss_dmdr +
+        0.2 * loss_rho_match
+    )
+    return total_loss
 
 class StandardizeMinMaxScaler:
     def __init__(self):
@@ -68,21 +163,62 @@ class StandardizeMinMaxScaler:
         self.max_ = None
 
     def fit(self, data):
-        self.mean_ = np.mean(data, axis=0)
-        self.std_ = np.std(data, axis=0)
+        self.mean_ = np.nanmean(data, axis=0)
+        self.std_ = np.nanstd(data, axis=0)
         standardized = (data - self.mean_) / (self.std_ + 1e-8)
-        self.min_ = np.min(standardized, axis=0)
-        self.max_ = np.max(standardized, axis=0)
+        self.min_ = np.nanmin(standardized, axis=0)
+        self.max_ = np.nanmax(standardized, axis=0)
 
     def transform(self, data):
         standardized = (data - self.mean_) / (self.std_ + 1e-8)
         scaled = (standardized - self.min_) / (self.max_ - self.min_ + 1e-8)
+        indices = np.argwhere(scaled == 0.0).flatten()
+        scaled[indices] = 1e-8
+        indices = np.argwhere(scaled == 1.0).flatten()
+        scaled[indices] = 1 - 1e-8
         return scaled
 
     def inverse_transform(self, data_scaled):
         standardized = data_scaled * (self.max_ - self.min_ + 1e-8) + self.min_
         original = standardized * (self.std_ + 1e-8) + self.mean_
         return original
+
+class MinMaxScaler:
+    def __init__(self):
+        self.mean_ = None
+        self.std_ = None
+        self.min_ = None
+        self.max_ = None
+
+    def fit(self, data):
+        self.min_ = np.nanmin(data, axis=0)
+        self.max_ = np.nanmax(data, axis=0)
+
+    def transform(self, data):
+        scaled = (data - self.min_) / (self.max_ - self.min_ + 1e-8)
+        indices = np.argwhere(scaled == 0.0).flatten()
+        scaled[indices] = 1e-8
+        indices = np.argwhere(scaled == 1.0).flatten()
+        scaled[indices] = 1 - 1e-8
+        return scaled
+
+    def inverse_transform(self, data_scaled):
+        return data_scaled * (self.max_ - self.min_ + 1e-8) + self.min_
+
+class StandardizeScaler:
+    def __init__(self):
+        self.mean_ = None
+        self.std_ = None
+
+    def fit(self, data):
+        self.mean_ = np.nanmean(data, axis=0)
+        self.std_ = np.nanstd(data, axis=0)
+
+    def transform(self, data):
+        return (data - self.mean_) / (self.std_ + 1e-8)
+
+    def inverse_transform(self, data_scaled):
+        return data_scaled * (self.std_ + 1e-8) + self.mean_
 
 
 class Haunter(BaseModel):
@@ -98,6 +234,7 @@ class Haunter(BaseModel):
         nn = keras.layers.Dense(32, activation=LeakyReLU(0.01))(nn)
         nn = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(nn)
         nn = keras.layers.Dense(3, activation="linear")(nn)
+        nn = keras.layers.Concatenate()([nn, input])
         self.set_model(Model(inputs=input, outputs=nn))
         return self
 
@@ -105,49 +242,105 @@ class Haunter(BaseModel):
         training_dir = kwargs.get('training_dir')
         dataset = pd.read_csv(f"{training_dir}/table.dat", sep=' ')
         dataset = dataset.loc[dataset['physical?'] == True]
+        dataset = dataset.loc[dataset['job_path'] != 'run_folders/model_0019663']
         dataset = self.add_standardized_columns(dataset, dataset)
         return dataset
 
+    def instance_scaler(self):
+        return MinMaxScaler()
+
+
     def add_standardized_columns(self, dataset, training_dataset):
-        scaler = StandardizeMinMaxScaler()
+        scaler = self.instance_scaler()
         scaler.fit(training_dataset.loc[:, 'mass_Mearth_input'])
-        dataset.loc[:, 'mass_Mearth_input_norm'] = scaler.transform(dataset.loc[:, 'mass_Mearth_input'])
-        scaler = StandardizeMinMaxScaler()
+        dataset.loc[:, 'mass_Mearth_input_norm'] = scaler.transform(dataset.loc[:, 'mass_Mearth_input'].to_numpy())
+        scaler = self.instance_scaler()
         scaler.fit(training_dataset.loc[:, 'CMF_input'])
-        dataset.loc[:, 'CMF_input_norm'] = scaler.transform(dataset.loc[:, 'CMF_input'])
-        scaler = StandardizeMinMaxScaler()
+        dataset.loc[:, 'CMF_input_norm'] = scaler.transform(dataset.loc[:, 'CMF_input'].to_numpy())
+        scaler = self.instance_scaler()
         scaler.fit(training_dataset.loc[:, 'Zenv_input'])
-        dataset.loc[:, 'Zenv_input_norm'] = scaler.transform(dataset.loc[:, 'Zenv_input'])
-        scaler = StandardizeMinMaxScaler()
+        dataset.loc[:, 'Zenv_input_norm'] = scaler.transform(dataset.loc[:, 'Zenv_input'].to_numpy())
+        scaler = self.instance_scaler()
         scaler.fit(training_dataset.loc[:, 'Zwater_core_input'])
-        dataset.loc[:, 'Zwater_core_input_norm'] = scaler.transform(dataset.loc[:, 'Zwater_core_input'])
-        scaler = StandardizeMinMaxScaler()
+        dataset.loc[:, 'Zwater_core_input_norm'] = scaler.transform(dataset.loc[:, 'Zwater_core_input'].to_numpy())
+        scaler = self.instance_scaler()
         scaler.fit(training_dataset.loc[:, 'Tsurf_K_input'])
-        dataset.loc[:, 'Tsurf_K_input_norm'] = scaler.transform(dataset.loc[:, 'Tsurf_K_input'])
-        scaler = StandardizeMinMaxScaler()
+        dataset.loc[:, 'Tsurf_K_input_norm'] = scaler.transform(dataset.loc[:, 'Tsurf_K_input'].to_numpy())
+        scaler = self.instance_scaler()
         scaler.fit(training_dataset.loc[:, 'Psurf_bar_input'])
-        dataset.loc[:, 'Psurf_bar_input_norm'] = scaler.transform(dataset.loc[:, 'Psurf_bar_input'])
-        scaler = StandardizeMinMaxScaler()
+        dataset.loc[:, 'Psurf_bar_input_norm'] = scaler.transform(dataset.loc[:, 'Psurf_bar_input'].to_numpy())
+        scaler = self.instance_scaler()
         scaler.fit(training_dataset.loc[:, 'radius_Rearth_output'])
-        dataset.loc[:, 'radius_Rearth_output_norm'] = scaler.transform(dataset.loc[:, 'radius_Rearth_output'])
-        scaler = StandardizeMinMaxScaler()
+        dataset.loc[:, 'radius_Rearth_output_norm'] = scaler.transform(dataset.loc[:, 'radius_Rearth_output'].to_numpy())
+        scaler = self.instance_scaler()
         scaler.fit(training_dataset.loc[:, 'entropy_SI_output'])
-        dataset.loc[:, 'entropy_SI_output_norm'] = scaler.transform(dataset.loc[:, 'entropy_SI_output'])
-        scaler = StandardizeMinMaxScaler()
+        dataset.loc[:, 'entropy_SI_output_norm'] = scaler.transform(dataset.loc[:, 'entropy_SI_output'].to_numpy())
+        scaler = self.instance_scaler()
         scaler.fit(training_dataset.loc[:, 'f_s_SI_output'])
-        dataset.loc[:, 'f_s_SI_output_norm'] = scaler.transform(dataset.loc[:, 'f_s_SI_output'])
+        dataset.loc[:, 'f_s_SI_output_norm'] = scaler.transform(dataset.loc[:, 'f_s_SI_output'].to_numpy())
+        logging.info("Mass " + str(training_dataset.loc[:, 'mass_Mearth_input'].mean()) + ' +- ' + str(training_dataset.loc[:, 'mass_Mearth_input'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'mass_Mearth_input'].min()) + ' ' + str(training_dataset.loc[:, 'mass_Mearth_input'].max()))
+        logging.info("CMF " + str(training_dataset.loc[:, 'CMF_input'].mean()) + ' +- ' + str(training_dataset.loc[:, 'CMF_input'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'CMF_input'].min()) + ' ' + str(training_dataset.loc[:, 'CMF_input'].max()))
+        logging.info("Zenv " + str(training_dataset.loc[:, 'Zenv_input'].mean()) + ' +- ' + str(training_dataset.loc[:, 'Zenv_input'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'Zenv_input'].min()) + ' ' + str(training_dataset.loc[:, 'Zenv_input'].max()))
+        logging.info("Zwater " + str(training_dataset.loc[:, 'Zwater_core_input'].mean()) + ' +- ' + str(training_dataset.loc[:, 'Zwater_core_input'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'Zwater_core_input'].min()) + ' ' + str(training_dataset.loc[:, 'Zwater_core_input'].max()))
+        logging.info("Tsurf " + str(training_dataset.loc[:, 'Tsurf_K_input'].mean()) + ' +- ' + str(training_dataset.loc[:, 'Tsurf_K_input'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'Tsurf_K_input'].min()) + ' ' + str(training_dataset.loc[:, 'Tsurf_K_input'].max()))
+        logging.info("Psurf " + str(training_dataset.loc[:, 'Psurf_bar_input'].mean()) + ' +- ' + str(training_dataset.loc[:, 'Psurf_bar_input'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'Psurf_bar_input'].min()) + ' ' + str(training_dataset.loc[:, 'Psurf_bar_input'].max()))
+        logging.info("Radius " + str(training_dataset.loc[:, 'radius_Rearth_output'].mean()) + ' +- ' + str(training_dataset.loc[:, 'radius_Rearth_output'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'radius_Rearth_output'].min()) + ' ' + str(training_dataset.loc[:, 'radius_Rearth_output'].max()))
+        logging.info("Entropy " + str(training_dataset.loc[:, 'entropy_SI_output'].mean()) + ' +- ' + str(training_dataset.loc[:, 'entropy_SI_output'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'entropy_SI_output'].min()) + ' ' + str(training_dataset.loc[:, 'entropy_SI_output'].max()))
+        logging.info("F_S " + str(training_dataset.loc[:, 'f_s_SI_output'].mean()) + ' +- ' + str(training_dataset.loc[:, 'f_s_SI_output'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'f_s_SI_output'].min()) + ' ' + str(training_dataset.loc[:, 'f_s_SI_output'].max()))
         return dataset
 
     def add_destandardized_columns(self, dataset, training_dataset, predictions):
-        scaler = StandardizeMinMaxScaler()
+        logging.info("Mass " + str(training_dataset.loc[:, 'mass_Mearth_input'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'mass_Mearth_input'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'mass_Mearth_input'].min()) + ' ' + str(
+            training_dataset.loc[:, 'mass_Mearth_input'].max()))
+        logging.info(
+            "CMF " + str(training_dataset.loc[:, 'CMF_input'].mean()) + ' +- ' + str(training_dataset.loc[:, 'CMF_input'].std()) +
+            ' ' + str(training_dataset.loc[:, 'CMF_input'].min()) + ' ' + str(training_dataset.loc[:, 'CMF_input'].max()))
+        logging.info(
+            "Zenv " + str(training_dataset.loc[:, 'Zenv_input'].mean()) + ' +- ' + str(training_dataset.loc[:, 'Zenv_input'].std()) +
+            ' ' + str(training_dataset.loc[:, 'Zenv_input'].min()) + ' ' + str(training_dataset.loc[:, 'Zenv_input'].max()))
+        logging.info("Zwater " + str(training_dataset.loc[:, 'Zwater_core_input'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'Zwater_core_input'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'Zwater_core_input'].min()) + ' ' + str(
+            training_dataset.loc[:, 'Zwater_core_input'].max()))
+        logging.info("Tsurf " + str(training_dataset.loc[:, 'Tsurf_K_input'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'Tsurf_K_input'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'Tsurf_K_input'].min()) + ' ' + str(
+            training_dataset.loc[:, 'Tsurf_K_input'].max()))
+        logging.info("Psurf " + str(training_dataset.loc[:, 'Psurf_bar_input'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'Psurf_bar_input'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'Psurf_bar_input'].min()) + ' ' + str(
+            training_dataset.loc[:, 'Psurf_bar_input'].max()))
+        logging.info("Radius " + str(training_dataset.loc[:, 'radius_Rearth_output'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'radius_Rearth_output'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'radius_Rearth_output'].min()) + ' ' + str(
+            training_dataset.loc[:, 'radius_Rearth_output'].max()))
+        logging.info("Entropy " + str(training_dataset.loc[:, 'entropy_SI_output'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'entropy_SI_output'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'entropy_SI_output'].min()) + ' ' + str(
+            training_dataset.loc[:, 'entropy_SI_output'].max()))
+        logging.info(
+            "F_S " + str(training_dataset.loc[:, 'f_s_SI_output'].mean()) + ' +- ' + str(training_dataset.loc[:, 'f_s_SI_output'].std()) +
+            ' ' + str(training_dataset.loc[:, 'f_s_SI_output'].min()) + ' ' + str(training_dataset.loc[:, 'f_s_SI_output'].max()))
+        scaler = self.instance_scaler()
         scaler.fit(training_dataset.loc[:, 'radius_Rearth_output'])
-        dataset.loc[:, 'radius_Rearth_output_pred'] = scaler.transform(predictions[:, 0])
-        scaler = StandardizeMinMaxScaler()
+        dataset.loc[:, 'radius_Rearth_output_pred'] = scaler.inverse_transform(predictions[:, 0])
+        scaler = self.instance_scaler()
         scaler.fit(training_dataset.loc[:, 'entropy_SI_output'])
-        dataset.loc[:, 'entropy_SI_output_pred'] = scaler.transform(predictions[:, 1])
-        scaler = StandardizeMinMaxScaler()
+        dataset.loc[:, 'entropy_SI_output_pred'] = scaler.inverse_transform(predictions[:, 1])
+        scaler = self.instance_scaler()
         scaler.fit(training_dataset.loc[:, 'f_s_SI_output'])
-        dataset.loc[:, 'f_s_SI_output_pred'] = scaler.transform(predictions[:, 2])
+        dataset.loc[:, 'f_s_SI_output_pred'] = scaler.inverse_transform(predictions[:, 2])
         return dataset
 
     def instance_generator(self, dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon=1e-7, shuffle=True):
@@ -186,6 +379,7 @@ class Haunter(BaseModel):
     def predict_non_physical(self, dir, batch_size=128):
         dataset = pd.read_csv(f"{dir}/table.dat", sep=' ')
         dataset_training = dataset.loc[dataset['physical?'] == True]
+        dataset_training = dataset_training.loc[dataset_training['job_path'] != 'run_folders/model_0019663']
         dataset_testing = dataset.loc[dataset['physical?'] == False]
         dataset_testing = self.add_standardized_columns(dataset_testing, dataset_training)
         predict_batch_generator = self.instance_generator(dataset_testing, None, batch_size, self.input_size, None)
@@ -200,13 +394,39 @@ class Haunter(BaseModel):
         dataset_testing['radius_Rearth_output_pred_diff_ratio'] = np.abs(dataset_testing['radius_Rearth_output_pred'] - dataset_testing['radius_Rearth_output']) / dataset_testing['radius_Rearth_output']
         dataset_testing['entropy_SI_output_pred_diff_ratio'] = np.abs(dataset_testing['entropy_SI_output_pred'] - dataset_testing['entropy_SI_output']) / dataset_testing['entropy_SI_output']
         dataset_testing['f_s_SI_output_pred_diff_ratio'] = np.abs(dataset_testing['f_s_SI_output_pred'] - dataset_testing['f_s_SI_output']) / dataset_testing['f_s_SI_output']
-        results_df = dataset_testing[['radius_Rearth_output_pred', 'radius_Rearth_output', 'radius_Rearth_output_pred_diff', 'radius_Rearth_output_pred_diff_ratio', 'f_s_SI_output_pred', 'f_s_SI_output', 'f_s_SI_output_pred_diff', 'f_s_SI_output_pred_diff_ratio', 'entropy_SI_output_pred', 'entropy_SI_output', 'entropy_SI_output_pred_diff', 'entropy_SI_output_pred_diff_ratio']]
+        results_df = dataset_testing[['radius_Rearth_output', 'radius_Rearth_output_norm',
+                                      'radius_Rearth_output_pred', 'radius_Rearth_output_norm_pred',
+                                      'radius_Rearth_output_pred_diff', 'radius_Rearth_output_pred_diff_ratio',
+                                      'f_s_SI_output', 'f_s_SI_output_norm',
+                                      'f_s_SI_output_pred', 'f_s_SI_output_norm_pred',
+                                      'f_s_SI_output_pred_diff', 'f_s_SI_output_pred_diff_ratio',
+                                      'entropy_SI_output', 'entropy_SI_output_norm',
+                                      'entropy_SI_output_pred', 'entropy_SI_output_norm_pred',
+                                      'entropy_SI_output_pred_diff', 'entropy_SI_output_pred_diff_ratio']]
+        logging.info("Results non physical: \n%s", results_df.to_string())
+        logging.info("Non physical radius diff ratio mean: " + str(
+            dataset_testing.loc[:, 'radius_Rearth_output_pred_diff_ratio'].mean()) + '+-' +
+                     str(dataset_testing.loc[:, 'radius_Rearth_output_pred_diff_ratio'].std()))
+        logging.info("Non physical f_s_SI diff ratio mean: " + str(
+            dataset_testing.loc[:, 'f_s_SI_output_pred_diff_ratio'].mean()) + '+-' +
+                     str(dataset_testing.loc[:, 'f_s_SI_output_pred_diff_ratio'].std()))
+        logging.info("Non physical entropy_SI diff ratio mean: " + str(
+            dataset_testing.loc[:, 'entropy_SI_output_pred_diff_ratio'].mean()) + '+-' +
+                     str(dataset_testing.loc[:, 'entropy_SI_output_pred_diff_ratio'].std()))
+        logging.info("Non physical radius diff ratio median: " + str(dataset_testing.loc[:, 'radius_Rearth_output_pred_diff_ratio'].median()) + '+-' +
+                     str(dataset_testing.loc[:, 'radius_Rearth_output_pred_diff_ratio'].std()))
+        logging.info("Non physical f_s_SI diff ratio median: " + str(dataset_testing.loc[:, 'f_s_SI_output_pred_diff_ratio'].median()) + '+-' +
+                     str(dataset_testing.loc[:, 'f_s_SI_output_pred_diff_ratio'].std()))
+        logging.info("Non physical entropy_SI diff ratio median: " + str(dataset_testing.loc[:, 'entropy_SI_output_pred_diff_ratio'].median()) + '+-' +
+                     str(dataset_testing.loc[:, 'entropy_SI_output_pred_diff_ratio'].std()))
+        return dataset_testing
 
     def predict_validation(self, model_dir, dir, batch_size=128):
         dataset = pd.read_csv(f"{dir}/table.dat", sep=' ')
         dataset_training = dataset.loc[dataset['physical?'] == True]
+        dataset_training = dataset_training.loc[dataset_training['job_path'] != 'run_folders/model_0019663']
         dataset_validation = pd.read_csv(f"{model_dir}/validation_dataset.csv")
-        dataset_training, means_and_stds = self.add_standardized_columns(dataset_validation, dataset_training)
+        dataset_training = self.add_standardized_columns(dataset_validation, dataset_training)
         predict_batch_generator = self.instance_generator(dataset_validation, None, batch_size, self.input_size, None)
         predictions = self.model.predict(predict_batch_generator, batch_size=batch_size, workers=1)
         dataset_validation['radius_Rearth_output_norm_pred'] = predictions[:, 0]
@@ -219,8 +439,59 @@ class Haunter(BaseModel):
         dataset_validation['radius_Rearth_output_pred_diff_ratio'] = np.abs(dataset_validation['radius_Rearth_output_pred'] - dataset_validation['radius_Rearth_output']) / dataset_validation['radius_Rearth_output']
         dataset_validation['entropy_SI_output_pred_diff_ratio'] = np.abs(dataset_validation['entropy_SI_output_pred'] - dataset_validation['entropy_SI_output']) / dataset_validation['entropy_SI_output']
         dataset_validation['f_s_SI_output_pred_diff_ratio'] = np.abs(dataset_validation['f_s_SI_output_pred'] - dataset_validation['f_s_SI_output']) / dataset_validation['f_s_SI_output']
-        results_df = dataset_validation[['radius_Rearth_output_pred', 'radius_Rearth_output',
-                                         'radius_Rearth_output_pred_diff', 'radius_Rearth_output_pred_diff_ratio',
-                                         'f_s_SI_output_pred', 'f_s_SI_output', 'f_s_SI_output_pred_diff',
-                                         'f_s_SI_output_pred_diff_ratio', 'entropy_SI_output_pred', 'entropy_SI_output',
-                                         'entropy_SI_output_pred_diff', 'entropy_SI_output_pred_diff_ratio']]
+        results_df = dataset_validation[['radius_Rearth_output', 'radius_Rearth_output_norm',
+                                      'radius_Rearth_output_pred', 'radius_Rearth_output_norm_pred',
+                                      'radius_Rearth_output_pred_diff', 'radius_Rearth_output_pred_diff_ratio',
+                                      'f_s_SI_output', 'f_s_SI_output_norm',
+                                      'f_s_SI_output_pred', 'f_s_SI_output_norm_pred',
+                                      'f_s_SI_output_pred_diff', 'f_s_SI_output_pred_diff_ratio',
+                                      'entropy_SI_output', 'entropy_SI_output_norm',
+                                      'entropy_SI_output_pred', 'entropy_SI_output_norm_pred',
+                                      'entropy_SI_output_pred_diff', 'entropy_SI_output_pred_diff_ratio']]
+        logging.info("Results validation: \n%s", results_df.to_string())
+        logging.info("Non physical radius diff ratio mean: " + str(
+            dataset_validation.loc[:, 'radius_Rearth_output_pred_diff_ratio'].mean()) + '+-' +
+                     str(dataset_validation.loc[:, 'radius_Rearth_output_pred_diff_ratio'].std()))
+        logging.info("Non physical f_s_SI diff ratio mean: " + str(
+            dataset_validation.loc[:, 'f_s_SI_output_pred_diff_ratio'].mean()) + '+-' +
+                     str(dataset_validation.loc[:, 'f_s_SI_output_pred_diff_ratio'].std()))
+        logging.info("Non physical entropy_SI diff ratio mean: " + str(
+            dataset_validation.loc[:, 'entropy_SI_output_pred_diff_ratio'].mean()) + '+-' +
+                     str(dataset_validation.loc[:, 'entropy_SI_output_pred_diff_ratio'].std()))
+        logging.info("Non physical radius diff ratio median: " + str(dataset_validation.loc[:, 'radius_Rearth_output_pred_diff_ratio'].median()) + '+-' +
+                     str(dataset_validation.loc[:, 'radius_Rearth_output_pred_diff_ratio'].std()))
+        logging.info("Non physical f_s_SI diff ratio median: " + str(dataset_validation.loc[:, 'f_s_SI_output_pred_diff_ratio'].median()) + '+-' +
+                     str(dataset_validation.loc[:, 'f_s_SI_output_pred_diff_ratio'].std()))
+        logging.info("Non physical entropy_SI diff ratio median: " + str(dataset_validation.loc[:, 'entropy_SI_output_pred_diff_ratio'].median()) + '+-' +
+                     str(dataset_validation.loc[:, 'entropy_SI_output_pred_diff_ratio'].std()))
+        return dataset_validation
+
+    def plot_hists(self, df, additional_columns=[]):
+        columns = ['mass_Mearth_input', 'mass_Mearth_input_norm',
+                   'CMF_input', 'CMF_input_norm',
+                   'Zenv_input', 'Zenv_input_norm',
+                   'Zwater_core_input', 'Zwater_core_input_norm',
+                   'Tsurf_K_input', 'Tsurf_K_input_norm',
+                   'Psurf_bar_input', 'Psurf_bar_input_norm',
+                   'radius_Rearth_output', 'radius_Rearth_output_norm',
+                   'f_s_SI_output', 'f_s_SI_output_norm',
+                   'entropy_SI_output', 'entropy_SI_output_norm',
+                ]
+        fig, axs = plt.subplots(9, 2, figsize=(10, 30))
+        for i, col in enumerate(columns):
+            axs[i // 2][i % 2].hist(df[col].dropna(), bins=15, color='lightblue', edgecolor='black')
+            axs[i // 2][i % 2].set_title(f"Distribution of {col}")
+            axs[i // 2][i % 2].set_xlabel(col)
+            axs[i // 2][i % 2].set_ylabel('Frequency')
+        plt.tight_layout()
+        plt.show()
+        if len(additional_columns) > 0:
+            fig, axs = plt.subplots(len(additional_columns) // 2, 2, figsize=(10, 30))
+            for i, col in enumerate(additional_columns):
+                axs[i // 2][i % 2].hist(df[col].dropna(), bins=15, color='lightblue', edgecolor='black')
+                axs[i // 2][i % 2].set_title(f"Distribution of {col}")
+                axs[i // 2][i % 2].set_xlabel(col)
+                axs[i // 2][i % 2].set_ylabel('Frequency')
+            plt.tight_layout()
+            plt.show()
+
