@@ -1,7 +1,7 @@
 keras==2.15.0
 tensorflow==2.15.0
 #tensorflow-addons==0.21.0
-ellc==1.8.9
+ellk==1.8.11
 #dearwatson==0.7.15
 lcbuilder==0.25.0
 #timesynth @ git+https://github.com/TimeSynth/TimeSynth.git
