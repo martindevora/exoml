@@ -28,7 +28,8 @@ class HaunterModelGenerator(tf.keras.utils.Sequence):
         batch_data_array = batch_rows.loc[:, ['mass_Mearth_input_norm', 'CMF_input_norm', 'Zenv_input_norm',
                                               'Zwater_core_input_norm', 'Tsurf_K_input_norm', 'Psurf_bar_input_norm']]
         batch_data_values = batch_rows.loc[:, ['radius_Rearth_output_norm', 'entropy_SI_output_norm',
-                                               'f_s_SI_output_norm']]
+                                               'f_s_SI_output_norm', 'mass_Mearth_input_norm', 'CMF_input_norm', 'Zenv_input_norm',
+                                              'Zwater_core_input_norm', 'Tsurf_K_input_norm', 'Psurf_bar_input_norm']]
         #assert np.all((batch_data_array > 0) & (batch_data_array < 1))
         #assert np.all((batch_data_values > 0) & (batch_data_values < 1))
         return batch_data_array.to_numpy(), batch_data_values.to_numpy()
