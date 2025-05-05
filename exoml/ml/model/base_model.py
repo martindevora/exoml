@@ -387,8 +387,10 @@ class BaseModel(WithLogging):
         if continue_from_model is not None:
             logging.info(f"Continuing model fit from checkpoint {continue_from_model}")
             self.load_model(continue_from_model)
+        metrics = [accuracy] if accuracy is not None else []
+        metrics = metrics + self.instance_metrics() + hyperparams.metrics
         self.compile(optimizer, hyperparams.custom_loss if hyperparams.custom_loss is not None else loss,
-                     metrics=[accuracy] + self.instance_metrics() + hyperparams.metrics,
+                     metrics=metrics,
                      run_eagerly=hyperparams.run_eagerly)
         model_weights_logger = ModelWeightsLogger()
         # if hyperparams.learning_rate_schedule is None:
@@ -545,7 +547,8 @@ class BaseModel(WithLogging):
                      ") and CV Folds with indexes %s", fold_indexes)
         # We don't use SparseCategoricalCrossentropy because our targets are one-hot encoded
         loss, accuracy = self.instance_loss_accuracy()
-        metrics = [accuracy] + self.instance_metrics() + hyperparams.metrics
+        metrics = [accuracy] if accuracy is not None else []
+        metrics = metrics + self.instance_metrics() + hyperparams.metrics
         for index, fold_index in enumerate(fold_indexes):
             model_name = root_model_name.strip("/") + f'_{index}/'
             model_path = output_dir + '/' + model_name
@@ -669,6 +672,7 @@ class BaseModel(WithLogging):
         root_model_name = self._get_model_dir()
         # We don't use SparseCategoricalCrossentropy because our targets are one-hot encoded
         loss, accuracy = self.instance_loss_accuracy()
+        metrics = [accuracy] if accuracy is not None else []
         metrics = [accuracy] + self.instance_metrics() + hyperparams.metrics
         if regenerate_fine_tuning_set:
             dataset, fold_indexes = self.prepare_training_data_cv(training_dir, folds)
