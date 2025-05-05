@@ -123,20 +123,20 @@ class SANTO(WithLogging):
 
             flux_branch = keras.layers.Conv1D(filters=16, kernel_size=90, padding="same",
                                               activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
-            flux_branch = keras.layers.MaxPooling1D(pool_size=10, strides=1)(flux_branch)
+            flux_branch = keras.layers.MaxPooling1D(pool_size=10, strides=2)(flux_branch)
             # flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
             flux_branch = keras.layers.SpatialDropout1D(rate=hyperparams.spatial_dropout_rate)(flux_branch)
             conv1_branch: keras.layers.Layer = keras.layers.Flatten()(flux_branch)
-            conv1_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha),
+            conv1_branch = keras.layers.Dense(8, activation=LeakyReLU(leaky_relu_alpha),
                                               kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(conv1_branch)
             conv1_branch = keras.layers.Dropout(hyperparams.dropout_rate)(conv1_branch)
             flux_branch = keras.layers.Conv1D(filters=32, kernel_size=30, padding="same",
                                               activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
-            flux_branch = keras.layers.MaxPooling1D(pool_size=4, strides=1)(flux_branch)
+            flux_branch = keras.layers.MaxPooling1D(pool_size=4, strides=2)(flux_branch)
             # flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
             flux_branch = keras.layers.SpatialDropout1D(rate=hyperparams.spatial_dropout_rate)(flux_branch)
             conv2_branch: keras.layers.Layer = keras.layers.Flatten()(flux_branch)
-            conv2_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha), kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(conv2_branch)
+            conv2_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha), kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(conv2_branch)
             conv2_branch = keras.layers.Dropout(hyperparams.dropout_rate)(conv2_branch)
             flux_branch = keras.layers.Conv1D(filters=64, kernel_size=15, padding="same",
                                               activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
@@ -144,7 +144,7 @@ class SANTO(WithLogging):
             # flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
             flux_branch = keras.layers.SpatialDropout1D(rate=hyperparams.spatial_dropout_rate)(flux_branch)
             conv3_branch: keras.layers.Layer = keras.layers.Flatten()(flux_branch)
-            conv3_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha), kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(conv3_branch)
+            conv3_branch = keras.layers.Dense(32, activation=LeakyReLU(leaky_relu_alpha), kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(conv3_branch)
             conv3_branch = keras.layers.Dropout(hyperparams.dropout_rate)(conv3_branch)
             flux_branch = keras.layers.Conv1D(filters=128, kernel_size=8, padding="same",
                                               activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
@@ -154,13 +154,13 @@ class SANTO(WithLogging):
             conv4_branch = keras.layers.Dropout(hyperparams.dropout_rate)(conv4_branch)
             flux_branch = keras.layers.Concatenate(axis=1)([
                 conv1_branch, conv2_branch, conv3_branch, conv4_branch])
-            flux_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha),
+            flux_branch = keras.layers.Dense(512, activation=LeakyReLU(leaky_relu_alpha),
                               kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(flux_branch)
+            # flux_branch = keras.layers.Dropout(hyperparams.dropout_rate)(flux_branch)
+            # flux_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha),
+            #                   kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(flux_branch)
             flux_branch = keras.layers.Dropout(hyperparams.dropout_rate)(flux_branch)
-            flux_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha),
-                              kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(flux_branch)
-            flux_branch = keras.layers.Dropout(hyperparams.dropout_rate)(flux_branch)
-            outputs: keras.layers.Layer = keras.layers.Dense(1, activation="sigmoid")(flux_branch)
+            outputs: keras.layers.Layer = keras.layers.Dense(input_dim, activation="sigmoid")(flux_branch)
         print("Preparing data sets")
         self.model: keras.Model = keras.Model(inputs=input_layer, outputs=outputs)
         self.model.run_eagerly = hyperparams.run_eagerly
@@ -170,7 +170,7 @@ class SANTO(WithLogging):
                                        hyperparams.validation_percent, hyperparams.training_set_limit,
                                        hyperparams.balance_class_id, hyperparams.balance_class_sampling)
 
-    def train(self, lcs_dir, output_dir, hyperparams: HyperParams, input_dim=500):
+    def train(self, lcs_dir, output_dir, hyperparams: HyperParams, input_dim=500, step_indexes=1):
         print("Begin training")
         tf.keras.backend.clear_session()
         self.inform(output_dir)
@@ -182,7 +182,8 @@ class SANTO(WithLogging):
         validation_df = pd.read_csv(model_path + '/validation_dataset.csv')
         validation_filenames = validation_df.loc[:, 'name'].tolist()
         training_batch_generator = self.instance_generator(train_filenames, lcs_dir, hyperparams.batch_size,
-                                                           input_dim, None, hyperparams.zero_epsilon)
+                                                           input_dim, None, hyperparams.zero_epsilon,
+                                                           shuffle=False, step_indexes=step_indexes)
         steps_per_epoch = training_batch_generator.steps_per_epoch()
         optimizer: keras.optimizers.Optimizer = self.build_optimizer(hyperparams, steps_per_epoch)
         loss, accuracy = self.instance_loss_accuracy(hyperparams)
@@ -196,7 +197,7 @@ class SANTO(WithLogging):
                          ")")
             validation_batch_generator = self.instance_generator(validation_filenames, lcs_dir, hyperparams.batch_size,
                                                                  input_dim, None, hyperparams.zero_epsilon,
-                                                                 shuffle=False)
+                                                                 shuffle=False, step_indexes=step_indexes)
             for callback in hyperparams.callbacks:
                 if issubclass(callback.__class__, ModelDirDataAwareCallback):
                     callback.set_model_dir(model_path)
@@ -212,15 +213,17 @@ class SANTO(WithLogging):
                     baseline=None,
                     restore_best_weights=False,
                 )]
-            model_validation_steps = None
+            model_validation_steps = validation_batch_generator.steps_per_epoch()
             class_weights = hyperparams.class_loss_weights if hyperparams.class_loss_weights is not None \
                 else training_batch_generator.class_weights()
             logging.info("Initializing training with (epochs," + str(hyperparams.epochs) +
                          ") (steps_per_epoch," + str(steps_per_epoch) +
                          ")")
             self.save(output_dir)
-            fit_history = self.fit_model(hyperparams, training_batch_generator, steps_per_epoch, class_weights,
-                                         validation_batch_generator, model_validation_steps)
+            fit_history = self.fit_model(hyperparams, training_batch_generator,
+                                         steps_per_epoch, class_weights,
+                                         validation_batch_generator,
+                                         model_validation_steps, hyperparams.epochs)
             self.save(output_dir)
 
     def predict(self, times: list, fluxes: list, model_dir: str, batch_size: int = 10000, input_size: int = 500, zero_epsilon: float = 1e-7,
@@ -358,8 +361,10 @@ class SANTO(WithLogging):
                 AUC(name="roc_auc"),
                 AUC(curve="PR", name="pr_auc")]
 
-    def instance_generator(self, dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon, shuffle=True):
-        return SantoGenerator(dir, dataset, input_size=input_sizes, step_size=1, batch_size=batch_size, shuffle=shuffle, zero_epsilon=zero_epsilon)
+    def instance_generator(self, dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon, shuffle=True,
+                           step_indexes=1):
+        return SantoGenerator(dir, dataset, input_size=input_sizes, step_size=1, batch_size=batch_size,
+                              shuffle=shuffle, zero_epsilon=zero_epsilon, indexes_steps=step_indexes)
 
     def load_training_set(self, **kwargs):
         training_dir = kwargs.get('training_dir')
@@ -427,10 +432,10 @@ class SANTO(WithLogging):
         return dest_dir
 
     def fit_model(self, hyperparams, training_batch_generator, steps_per_epoch, class_weights,
-                  validation_batch_generator, model_validation_steps):
+                  validation_batch_generator, model_validation_steps, epochs):
         fit_history = self.model.fit(x=training_batch_generator,
                                      steps_per_epoch=steps_per_epoch,
-                                     epochs=hyperparams.epochs, verbose=1, class_weight=class_weights,
+                                     epochs=hyperparams.epochs, verbose=1,
                                      validation_data=validation_batch_generator,
                                      validation_steps=model_validation_steps,
                                      callbacks=hyperparams.callbacks,
