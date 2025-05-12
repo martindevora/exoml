@@ -2,7 +2,6 @@ import logging
 
 from keras.losses import CategoricalCrossentropy
 from keras.metrics import CategoricalAccuracy, Precision, Recall, AUC, RecallAtPrecision
-from tensorflow_addons.metrics import F1Score
 import pandas as pd
 from exoml.ml.model.base_model import BaseModel
 import matplotlib.pyplot as plt
@@ -28,8 +27,7 @@ class CategoricalModel(BaseModel):
                                  RecallAtPrecision(0.975, class_id=index, name=class_name_string + "_r@p975"),
                                  RecallAtPrecision(0.95, class_id=index, name=class_name_string + "_r@p95")]
         classes_count = len(self.class_names)
-        return metrics + [F1Score(num_classes=classes_count, average='macro'),
-                          AUC(multi_label=True, num_labels=classes_count, name="roc_auc"),
+        return metrics + [AUC(multi_label=True, num_labels=classes_count, name="roc_auc"),
                           AUC(multi_label=True, curve="PR", num_labels=classes_count, name="pr_auc")]
 
     def plot_metrics(self, model_dir, steps_per_epoch, with_validation=False):

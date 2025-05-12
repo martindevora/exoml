@@ -27,7 +27,6 @@ from numpy import ndarray
 from sklearn.utils import shuffle
 
 from exoml.ml.callback.early_stopping import ExoMlEarlyStopping
-from tensorflow_addons.optimizers import MultiOptimizer, SWA
 from exoml.ml.callback.learning_rate import WarmUpAndLinDecreaseCallback
 from exoml.ml.callback.training_data_aware import ModelDirDataAwareCallback, ValidationDataAwareCallback
 from exoml.ml.log.get_weights_logger import ModelWeightsLogger
@@ -452,6 +451,8 @@ class SANTO(WithLogging):
         return initial_lr
 
     def build_optimizer(self, hyperparams, steps_per_epoch):
+        # from exoml.ml.callback.learning_rate import MultiOptimizer
+        from tensorflow_addons.optimizers import MultiOptimizer
         initial_lr = self.compute_initial_lr(hyperparams)
         optimizer = self.build_swa_optimizer(hyperparams, initial_lr, steps_per_epoch)
         if hyperparams.lr_progression != 1:
@@ -473,6 +474,8 @@ class SANTO(WithLogging):
         return optimizer
 
     def build_swa_optimizer(self, hyperparams: HyperParams, lr, steps_per_epoch):
+        # from exoml.ml.callback.learning_rate import SWA
+        from tensorflow_addons.optimizers import SWA
         if hyperparams.stochastic_weight_average_wait > 0:
             optimizer = tf.keras.optimizers.legacy.Adam(lr,
                                                         beta_1=0.9, beta_2=0.98, epsilon=1e-9,

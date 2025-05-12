@@ -1,7 +1,7 @@
 import abc
 import importlib
 import warnings
-
+import sys
 from keras import backend
 from keras_core.src.utils import tf_utils
 # from keras.src import backend
@@ -9,7 +9,6 @@ from keras_core.src.utils import tf_utils
 
 from keras.callbacks import Callback
 import tensorflow as tf
-from tensorflow_addons.optimizers import MultiOptimizer
 from typeguard import typechecked
 from typing import Union, List
 
@@ -506,6 +505,10 @@ class WarmUpAndLinDecreaseCallback(Callback):
         super().__init__()
 
     def on_epoch_end(self, epoch, logs=None):
+        if 'tensorflow_addons.optimizers' in sys.modules:
+            MultiOptimizer = sys.modules['tensorflow_addons.optimizers'].MultiOptimizer
+        else:
+            from tensorflow_addons.optimizers import MultiOptimizer
         if self.model.optimizer.__class__.__name__ == MultiOptimizer.__name__:
             for index, optimizer_spec in enumerate(self.model.optimizer.optimizer_specs):
                 optimizer = optimizer_spec['optimizer']
