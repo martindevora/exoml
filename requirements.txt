@@ -1,5 +1,5 @@
 keras==2.12.0
-keras_nlp==0.8.1
+#keras_nlp==0.8.1
 ellc==1.8.11
 #dearwatson==0.7.15
 lcbuilder==0.25.0
