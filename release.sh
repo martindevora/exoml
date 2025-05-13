@@ -27,7 +27,7 @@ if ! [[ -z ${tests_results} ]]; then
   rm -R *egg-info
   conda remove -n exoml-reqs --all -y
   set -e
-  conda create -n exoml-reqs python=3.13 -y
+  conda create -n exoml-reqs python=3.11 -y
   conda activate exoml-reqs
   python3 -m pip install pip -U
   python3 -m pip install numpy==2.2.4

@@ -1,4 +1,5 @@
 keras==2.12.0
+tensorflow==2.12.0
 #keras_nlp==0.8.1
 ellc==1.8.11
 #dearwatson==0.7.15
