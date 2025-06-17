@@ -37,7 +37,6 @@ SantoTestDataGenerator(output_dir="/data/scratch/ml/santo/training_data/",
                        max_number_of_sinusoid=2,
                        max_number_of_red_noise=2,
                        gaps_size_boundaries=(0.25, 3),
-                       curves_cadences=[120, 300, 600, 1800],
-                       time_encoding_periods=[5],
+                       curves_cadences=[60, 120, 300, 600, 1800],
                        only_plot=True)
 

@@ -10,6 +10,7 @@ from exoml.ete6.ete6_generator import Ete6ModelGenerator
 from sklearn.utils import shuffle
 import numpy as np
 import pandas as pd
+import tensorflow as tf
 
 
 class WatsonPlanetModelGenerator(Ete6ModelGenerator):
@@ -614,3 +615,31 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                 folded_flux_odd_har_array,
                 folded_centroids_array, folded_og_array], \
             batch_data_values
+
+    def __iter__(self):
+        for i in range(len(self)):
+            yield self[i]
+
+    def get_dataset(self):
+        input_sizes = self.input_sizes
+        mpp = self.measurements_per_point
+
+        x_spec = (
+            tf.TensorSpec(shape=(None, 9, 1), dtype=tf.float32),  # scalar_values[:, [0,1,3,4,5,8,9,10,11]]
+            tf.TensorSpec(shape=(None, 1, 1), dtype=tf.float32),  # scalar_values[:, [7]]
+            tf.TensorSpec(shape=(None, 2, 1), dtype=tf.float32),  # star_array[:, [2, 6]]
+            tf.TensorSpec(shape=(None, input_sizes[2], mpp), dtype=tf.float32),  # global_flux_array
+            tf.TensorSpec(shape=(None, input_sizes[3], mpp), dtype=tf.float32),  # folded_flux_even_array
+            tf.TensorSpec(shape=(None, input_sizes[3], mpp), dtype=tf.float32),  # folded_flux_odd_array
+            tf.TensorSpec(shape=(None, input_sizes[3], mpp), dtype=tf.float32),  # folded_flux_even_har_array
+            tf.TensorSpec(shape=(None, input_sizes[3], mpp), dtype=tf.float32),  # folded_flux_odd_har_array
+            tf.TensorSpec(shape=(None, input_sizes[3], 2), dtype=tf.float32),  # folded_centroids_array
+            tf.TensorSpec(shape=(None, input_sizes[3], 1), dtype=tf.float32),  # folded_og_array
+        )
+
+        y_spec = tf.TensorSpec(shape=(None, 1,), dtype=tf.float32)  # Adjust if label shape is different
+
+        return tf.data.Dataset.from_generator(
+            lambda: iter(self),
+            output_signature=(x_spec, y_spec)
+        ).take(len(self))

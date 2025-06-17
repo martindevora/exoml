@@ -2,8 +2,8 @@ import dataclasses
 
 import tensorflow as tf
 
-from keras_core.src.optimizers.schedules.learning_rate_schedule import LearningRateSchedule
-#from keras.optimizers.schedules import LearningRateSchedule
+#from keras_core.src.optimizers.schedules.learning_rate_schedule import LearningRateSchedule
+from keras.optimizers.schedules import LearningRateSchedule
 
 
 @dataclasses.dataclass(init=False)

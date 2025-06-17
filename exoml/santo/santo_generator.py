@@ -75,62 +75,30 @@ class SantoGenerator(Sequence):
         flux = np.loadtxt(f"{self.lcs_dir}/{filename}", delimiter=",")
         # train_fluxes = np.full((self.batch_size, self.input_size, 33), 0)
         train_fluxes = np.full((self.batch_size, self.input_size, 1), 0.0)
-        train_tags = np.full((self.batch_size, self.input_size, 1), float(0))
+        train_tags = np.full((self.batch_size, 1), float(0))
         for iteration_index in np.arange(file_index, file_index + self.batch_size):
-            if iteration_index < 0:
-                # flux_data = flux[np.r_[1, 4:36], 0:iteration_index + self.input_size]
-                flux_data = flux[1, 0 : iteration_index + self.input_size]
-                tags_data = flux[3, 0 : iteration_index + self.input_size]
-                # flux_data = np.pad(flux_data, (0, self.input_size - flux_data.shape[1]), mode='constant', constant_values=0)
-                flux_data = np.pad(
-                    flux_data,
-                    (self.input_size - flux_data.shape[0], 0),
-                    mode="constant",
-                    constant_values=0,
-                )
-                tags_data = np.pad(
-                    tags_data,
-                    (self.input_size - tags_data.shape[0], 0),
-                    mode="constant",
-                    constant_values=0,
-                )
-            elif iteration_index >= flux.shape[1] - self.input_size:
-                # flux_data = flux[np.r_[1, 4:36], iteration_index:flux.shape[1]]
-                flux_data = flux[1, iteration_index : flux.shape[1]]
-                tags_data = flux[3, iteration_index : flux.shape[1]]
-                # flux_data = np.pad(flux_data, [(0, 0), (0, self.input_size - flux_data.shape[1])],
-                #                   mode='constant', constant_values=0)
-                flux_data = np.pad(
-                    flux_data,
-                    (0, self.input_size - flux_data.shape[0]),
-                    mode="constant",
-                    constant_values=0,
-                )
-                tags_data = np.pad(
-                    tags_data,
-                    (0, self.input_size - tags_data.shape[0]),
-                    mode="constant",
-                    constant_values=0,
-                )
-            else:
-                # flux_data = flux[np.r_[1, 4:36], iteration_index:iteration_index + self.input_size]
-                flux_data = flux[1, iteration_index : iteration_index + self.input_size]
-                tags_data = flux[3, iteration_index : iteration_index + self.input_size]
-            # import matplotlib.pyplot as plt
-            #
-            # fig, axs = plt.subplots(2, 1, figsize=(16, 16), constrained_layout=True)
-            # axs[0].scatter(np.arange(0, len(np.transpose(flux_data[0].flatten()))),
-            #                np.transpose(flux_data[0].flatten()))
-            # axs[1].plot(np.arange(0, len(np.transpose(flux_data[0].flatten()))),
-            #             np.transpose(flux[3, iteration_index:iteration_index + self.input_size]).flatten())
-            # plt.show()
-            # flux_data[0] = flux_data[0] / 2
-            flux_data = flux_data / 2
-            item_index = iteration_index - file_index
             try:
-                # train_fluxes[item_index] = np.transpose(flux_data)
+                if iteration_index < 0:
+                    flux_data = flux[1, 0 : iteration_index + self.input_size]
+                    flux_data = np.pad(flux_data, [(self.input_size - flux_data.shape[0], 0)], mode='constant', constant_values=0)
+                elif iteration_index >= flux.shape[1] - self.input_size:
+                    flux_data = flux[1, iteration_index:flux.shape[1]]
+                    flux_data = np.pad(flux_data, [(0, self.input_size - flux_data.shape[0])], mode='constant', constant_values=0)
+                else:
+                    flux_data = flux[1, iteration_index:iteration_index + self.input_size]
+                tags_data = flux[3, iteration_index + self.input_size // 2]
+                # import matplotlib.pyplot as plt
+                #
+                # fig, axs = plt.subplots(2, 1, figsize=(16, 16), constrained_layout=True)
+                # axs[0].scatter(np.arange(0, len(np.transpose(flux_data[0].flatten()))),
+                #                np.transpose(flux_data[0].flatten()))
+                # axs[1].plot(np.arange(0, len(np.transpose(flux_data[0].flatten()))),
+                #             np.transpose(flux[3, iteration_index:iteration_index + self.input_size]).flatten())
+                # plt.show()
+                # flux_data[0] = flux_data[0] / 2
+                flux_data = flux_data / 2
+                item_index = iteration_index - file_index
                 train_fluxes[item_index] = flux_data.reshape((self.input_size, 1))
-                tags_data = tags_data.reshape((self.input_size, 1))
             except Exception as e:
                 logging.exception(
                     f"Error with file {filename}. file_index {file_index}, "

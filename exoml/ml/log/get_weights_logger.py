@@ -1,7 +1,7 @@
 import logging
 
 import numpy as np
-from keras_core import Layer
+from tensorflow.keras import Layer
 
 
 class ModelWeightsLogger:

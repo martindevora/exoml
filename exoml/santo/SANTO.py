@@ -45,6 +45,10 @@ def weighted_binary_crossentropy_param(weight=1):
     return weighted_binary_crossentropy
 
 
+def clean_to_float(x):
+    return float(str(x).strip("\"'").strip("\"").strip("'"))
+
+
 class SANTO(WithLogging):
     """
     Self-Attention Neural Network for Transiting Objects
@@ -118,48 +122,72 @@ class SANTO(WithLogging):
             leaky_relu_alpha = 0.01
             flux_branch: keras.layers.Layer = input_layer
             # flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
-            #flux_branch = keras.layers.Dense(64, activation=LeakyReLU())(keras.layers.Flatten()(flux_branch))
-
+            # flux_branch = keras.layers.Dense(64, activation=LeakyReLU())(keras.layers.Flatten()(flux_branch))
+            conv_small = keras.layers.Conv1D(filters=16, kernel_size=3, padding="same",
+                                             activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
+            conv_medium = keras.layers.Conv1D(filters=16, kernel_size=15, padding="same",
+                                              activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
+            conv_large = keras.layers.Conv1D(filters=16, kernel_size=90, padding="same",
+                                             activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
+            flux_branch = keras.layers.Concatenate(axis=-1)([conv_small, conv_medium, conv_large])
+            flux_branch = keras.layers.SpatialDropout1D(hyperparams.dropout_rate)(flux_branch)
             flux_branch = keras.layers.Conv1D(filters=16, kernel_size=90, padding="same",
                                               activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
             flux_branch = keras.layers.MaxPooling1D(pool_size=10, strides=2)(flux_branch)
             # flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
             flux_branch = keras.layers.SpatialDropout1D(rate=hyperparams.spatial_dropout_rate)(flux_branch)
-            conv1_branch: keras.layers.Layer = keras.layers.Flatten()(flux_branch)
+            conv1_branch = flux_branch
+            conv1_branch: keras.layers.Layer = keras.layers.Flatten()(conv1_branch)
             conv1_branch = keras.layers.Dense(8, activation=LeakyReLU(leaky_relu_alpha),
-                                              kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(conv1_branch)
+                                              kernel_regularizer=tf.keras.regularizers.L1L2(
+                                                  l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(
+                conv1_branch)
             conv1_branch = keras.layers.Dropout(hyperparams.dropout_rate)(conv1_branch)
             flux_branch = keras.layers.Conv1D(filters=32, kernel_size=30, padding="same",
                                               activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
             flux_branch = keras.layers.MaxPooling1D(pool_size=4, strides=2)(flux_branch)
             # flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
             flux_branch = keras.layers.SpatialDropout1D(rate=hyperparams.spatial_dropout_rate)(flux_branch)
-            conv2_branch: keras.layers.Layer = keras.layers.Flatten()(flux_branch)
-            conv2_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha), kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(conv2_branch)
+            conv2_branch = flux_branch
+            conv2_branch: keras.layers.Layer = keras.layers.Flatten()(conv2_branch)
+            conv2_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha),
+                                              kernel_regularizer=tf.keras.regularizers.L1L2(
+                                                  l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(
+                conv2_branch)
             conv2_branch = keras.layers.Dropout(hyperparams.dropout_rate)(conv2_branch)
             flux_branch = keras.layers.Conv1D(filters=64, kernel_size=15, padding="same",
                                               activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
             flux_branch = keras.layers.MaxPooling1D(pool_size=3, strides=2)(flux_branch)
             # flux_branch = keras.layers.normalization.batch_normalization.BatchNormalization()(flux_branch)
             flux_branch = keras.layers.SpatialDropout1D(rate=hyperparams.spatial_dropout_rate)(flux_branch)
-            conv3_branch: keras.layers.Layer = keras.layers.Flatten()(flux_branch)
-            conv3_branch = keras.layers.Dense(32, activation=LeakyReLU(leaky_relu_alpha), kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(conv3_branch)
+            conv3_branch = flux_branch
+            conv3_branch: keras.layers.Layer = keras.layers.Flatten()(conv3_branch)
+            conv3_branch = keras.layers.Dense(32, activation=LeakyReLU(leaky_relu_alpha),
+                                              kernel_regularizer=tf.keras.regularizers.L1L2(
+                                                  l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(
+                conv3_branch)
             conv3_branch = keras.layers.Dropout(hyperparams.dropout_rate)(conv3_branch)
             flux_branch = keras.layers.Conv1D(filters=128, kernel_size=8, padding="same",
                                               activation=LeakyReLU(leaky_relu_alpha))(flux_branch)
             flux_branch = keras.layers.MaxPooling1D(pool_size=2, strides=2)(flux_branch)
-            conv4_branch: keras.layers.Layer = keras.layers.Flatten()(flux_branch)
-            conv4_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha), kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(conv4_branch)
+            conv4_branch = flux_branch
+            conv4_branch: keras.layers.Layer = keras.layers.Flatten()(conv4_branch)
+            conv4_branch = keras.layers.Dense(64, activation=LeakyReLU(leaky_relu_alpha),
+                                              kernel_regularizer=tf.keras.regularizers.L1L2(
+                                                  l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(
+                conv4_branch)
             conv4_branch = keras.layers.Dropout(hyperparams.dropout_rate)(conv4_branch)
             flux_branch = keras.layers.Concatenate(axis=1)([
                 conv1_branch, conv2_branch, conv3_branch, conv4_branch])
             flux_branch = keras.layers.Dense(512, activation=LeakyReLU(leaky_relu_alpha),
-                              kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(flux_branch)
+                                             kernel_regularizer=tf.keras.regularizers.L1L2(
+                                                 l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(
+                flux_branch)
             # flux_branch = keras.layers.Dropout(hyperparams.dropout_rate)(flux_branch)
             # flux_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha),
             #                   kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(flux_branch)
             flux_branch = keras.layers.Dropout(hyperparams.dropout_rate)(flux_branch)
-            outputs: keras.layers.Layer = keras.layers.Dense(input_dim, activation="sigmoid")(flux_branch)
+            outputs: keras.layers.Layer = keras.layers.Dense(1, activation="sigmoid")(flux_branch)
         print("Preparing data sets")
         self.model: keras.Model = keras.Model(inputs=input_layer, outputs=outputs)
         self.model.run_eagerly = hyperparams.run_eagerly
@@ -225,58 +253,43 @@ class SANTO(WithLogging):
                                          model_validation_steps, hyperparams.epochs)
             self.save(output_dir)
 
-    def predict(self, times: list, fluxes: list, model_dir: str, batch_size: int = 10000, input_size: int = 500, zero_epsilon: float = 1e-7,
-                plot=False, plot_positives=False, tagged_data: list = None, target_name: str = ""):
+    def predict(self, lcs_dir: str, target_files: list, model_dir: str, batch_size: int = 1024, input_size: int = 2500,
+                zero_epsilon: float = 1e-7, plot=False, plot_positives=False, tagged_data: bool = False,
+                target_name: str = ""):
         self.load_model(model_dir)
-        generator = SantoPredictGenerator(times, fluxes, input_size=input_size, step_size=1, batch_size=batch_size, zero_epsilon=zero_epsilon)
-        generator_df = generator.generator_info_df.sort_values(by=['curve_index', 'batch_index'])
+        half_window = input_size // 2
+        generator = SantoPredictGenerator(lcs_dir, target_files, input_size=input_size, step_size=1,
+                                          batch_size=batch_size, zero_epsilon=zero_epsilon)
         predictions = self.model.predict(generator)
-        predictions = predictions.flatten()
-        predictions_curve_indexes = np.full((len(predictions)), -1)
+        left = np.linspace(0.1, 1.0, input_size // 2, endpoint=False)
+        right = np.linspace(1.0, 0.1, input_size // 2)
+        triangle_weights = np.concatenate([left, right])
         current_index = 0
-        for index, row in generator_df.iterrows():
-            if row['end_jump_index'] >= row['initial_jump_index'] + row['file_index'] + batch_size:
-                predictions_curve_indexes[current_index:current_index + batch_size] = row['curve_index']
-            else:
-                diff = row['end_jump_index'] - row['initial_jump_index']
-                predictions_curve_indexes[current_index:current_index + int(diff % batch_size)] = row['curve_index']
-            current_index = current_index + batch_size
-        results = []
-        times_windows = []
-        fluxes_windows = []
-        predictions_windows = []
-        for index in np.arange(0, len(times)):
-            curve_indexes = np.argwhere(predictions_curve_indexes == index).flatten()
-            results = results + [predictions[curve_indexes]]
-            results[index] = np.concatenate([results[index][-input_size // 2:], results[index][:-input_size // 2]])
-            local_maxima_indexes = self.tokenize_found_transits(times[index], fluxes[index], results[index], plot=plot_positives, tagged_data=tagged_data)
+        files_predictions = {}
+        for target_file in target_files:
+            file_content = pd.read_csv(lcs_dir + '/' + target_file).values
+            flux_key = 1
+            if file_content.shape[0] > 40:
+                file_content = np.transpose(file_content)
+                flux_key = 2
+            file_content = np.vectorize(clean_to_float)(file_content)
+            file_predictions = predictions[current_index:current_index + file_content.shape[1]]
+            files_predictions[target_file] = file_predictions.reshape(file_predictions.shape[0])
             if plot:
-                dif = times[index][1:] - times[index][:-1]
-                jumps = np.where(dif > 1)[0]
-                jumps = np.append(jumps, len(times[index]))
-                previous_jump_index = 0
-                for jumpIndex in jumps:
-                    times_truncated = times[index][previous_jump_index:jumpIndex]
-                    fluxes_truncated = fluxes[index][previous_jump_index:jumpIndex]
-                    results_truncated = results[index][previous_jump_index:jumpIndex]
-                    fig, axs = plt.subplots(2 if tagged_data is None else 3, 1, figsize=(16, 8),
-                                            constrained_layout=True)
-                    if tagged_data is not None:
-                        tags_truncated = tagged_data[index][previous_jump_index:jumpIndex]
-                        axs[2].plot(times_truncated, tags_truncated, color='orange')
-                    axs[0].scatter(times_truncated, fluxes_truncated)
-                    axs[1].plot(times_truncated, results_truncated, color='blue')
-                    fig.suptitle(target_name)
-                    previous_jump_index = jumpIndex + 1
-                    plt.show()
-                    plt.close(fig)
-                    plt.clf()
-                frequency, power = LombScargle(times[index], results[index]).autopower()
-                plt.plot(1 / frequency, power)
-                plt.xlim((0, 20))
-                plt.xscale('symlog')
+                N = files_predictions[target_file].shape[0]
+                fig, axs = plt.subplots(2 if not tagged_data else 3, 1, figsize=(16, 8),
+                                        constrained_layout=True)
+                keys_greater_than_zero = np.argwhere(file_content[flux_key][0:N] > zero_epsilon).flatten()
+                min_flux = np.nanmin(file_content[flux_key][keys_greater_than_zero])
+                axs[0].set_ylim(bottom=min_flux)
+                axs[0].scatter(np.arange(0, N), file_content[flux_key][0:N])
+                axs[1].plot(np.arange(0, N), files_predictions[target_file])
+                if tagged_data:
+                    axs[2].plot(np.arange(0, N), file_content[2][0:N])
+                plt.title(target_file)
                 plt.show()
-        return results
+            current_index = current_index + len(file_content)
+        return files_predictions
 
     def tokenize_found_transits(self, time, flux, predictions, window_size=500, plot=False, tagged_data=None):
         positive_predictions = predictions
@@ -373,6 +386,8 @@ class SANTO(WithLogging):
 
     def prepare_training_data(self, training_dir, output_dir, batch_size, train_percent=0.8, validation_percent=0.1,
                               training_set_limit=None, balance_class_id=None, balance_class_sampling=None):
+        if not os.path.exists(output_dir):
+            os.mkdir(output_dir)
         training_dataset = self.load_training_set(training_dir=training_dir)
         training_dataset = shuffle(training_dataset)
         test_dataset = None

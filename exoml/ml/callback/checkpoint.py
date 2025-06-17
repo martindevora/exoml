@@ -1,5 +1,6 @@
 import logging
 import os.path
+import os
 import shutil
 
 from keras.callbacks import ModelCheckpoint
@@ -51,10 +52,10 @@ def sync_to_numpy_or_python_type(tensors):
 class ModelCheckpointCallback(ModelCheckpoint):
     def __init__(self, filepath, original_path, monitor: str = "val_loss", verbose: int = 0,
                  save_best_only: bool = False,
-                 save_weights_only: bool = False, mode: str = "auto", save_freq="epoch", options=None,
-                 initial_value_threshold=None, filter_metrics: list[str] = [], **kwargs):
-        super().__init__(filepath, monitor, verbose, save_best_only, save_weights_only, mode, save_freq, options,
-                         initial_value_threshold, **kwargs)
+                 save_weights_only: bool = False, mode: str = "auto", save_freq="epoch",
+                 initial_value_threshold=None, filter_metrics: list[str] = []):
+        super().__init__(filepath, monitor, verbose, save_best_only, save_weights_only, mode, save_freq,
+                         initial_value_threshold)
         self.original_path = original_path
         self.filter_metrics = filter_metrics
 
@@ -65,15 +66,15 @@ class ModelCheckpointCallback(ModelCheckpoint):
 
     def copy_files(self):
         if os.path.exists(self.original_path + '/training_log.csv'):
-            shutil.copyfile(self.original_path + '/training_log.csv', self.filepath + '/training_log.csv')
+            shutil.copyfile(self.original_path + '/training_log.csv', os.path.dirname(self.filepath) + '/training_log.csv')
         if os.path.exists(self.original_path + '/train_dataset.csv'):
-            shutil.copyfile(self.original_path + '/train_dataset.csv', self.filepath + '/train_dataset.csv')
+            shutil.copyfile(self.original_path + '/train_dataset.csv', os.path.dirname(self.filepath) + '/train_dataset.csv')
         if os.path.exists(self.original_path + '/validation_dataset.csv'):
-            shutil.copyfile(self.original_path + '/validation_dataset.csv', self.filepath + '/validation_dataset.csv')
+            shutil.copyfile(self.original_path + '/validation_dataset.csv', os.path.dirname(self.filepath) + '/validation_dataset.csv')
         if os.path.exists(self.original_path + '/network.png'):
-            shutil.copyfile(self.original_path + '/network.png', self.filepath + '/network.png')
+            shutil.copyfile(self.original_path + '/network.png', os.path.dirname(self.filepath) + '/network.png')
         if os.path.exists(self.original_path + '/metrics.png'):
-            shutil.copyfile(self.original_path + '/metrics.png', self.filepath + '/metrics.png')
+            shutil.copyfile(self.original_path + '/metrics.png', os.path.dirname(self.filepath) + '/metrics.png')
 
     def _save_model(self, epoch, batch, logs):
         """Saves the model.
@@ -119,13 +120,13 @@ class ModelCheckpointCallback(ModelCheckpoint):
                                 self.model.save_weights(
                                     filepath,
                                     overwrite=True,
-                                    options=self._options,
+                                    options=None,
                                 )
                             else:
                                 self.model.save(
                                     filepath,
                                     overwrite=True,
-                                    options=self._options,
+                                    options=None,
                                 )
                             self.copy_files()
                         else:
@@ -142,11 +143,11 @@ class ModelCheckpointCallback(ModelCheckpoint):
                         )
                     if self.save_weights_only:
                         self.model.save_weights(
-                            filepath, overwrite=True, options=self._options
+                            filepath, overwrite=True, options=None
                         )
                     else:
                         self.model.save(
-                            filepath, overwrite=True, options=self._options
+                            filepath, overwrite=True, options=None
                         )
                     self.copy_files()
                 self._maybe_remove_file()

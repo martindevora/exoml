@@ -1,8 +1,8 @@
-import sys
 import tensorflow as tf
-from keras_core.src.layers import LeakyReLU
-#from keras.layers import MultiHeadAttention, LeakyReLU
+#from keras_core.src.layers import LeakyReLU
+from keras.layers import MultiHeadAttention, LeakyReLU
 #from keras.src.layers import Dense
+from keras_hub.layers import TransformerEncoder
 
 from exoml.ml.layers.dropout import AdaptiveStdDropout
 
@@ -149,10 +149,6 @@ class Transformer(tf.keras.layers.Layer):
         self.regularizer_value = 0.1
 
     def build(self, input_shape):
-        if 'keras_nlp.src.layers' in sys.modules:
-            TransformerEncoder = sys.modules['keras_nlp.src.layers'].TransformerEncoder
-        else:
-            from keras_nlp.src.layers import TransformerEncoder
         for n in range(self.num_blocks):
             self.transformer_encoders = self.transformer_encoders + \
                                          [TransformerEncoder(
@@ -172,7 +168,7 @@ class Transformer(tf.keras.layers.Layer):
             #     name=f"Transformer/encoderblock_{n}"
             # )]
 
-    def call(self, inputs, training=True):
+    def call(self, inputs):
         result = inputs
         for n in range(self.num_blocks):
             result = self.transformer_encoders[n](result)

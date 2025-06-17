@@ -30,42 +30,6 @@ from exoml.ml.model.imbalanced_binary_model import ImbalancedBinaryModel
 
 
 class IATSON_planet(ImbalancedBinaryModel):
-    fplanet_ftransit = 0.0308
-    fclosebinary_feclipse = 0.0048
-    fmultiple = 0.48
-    fclosetriple_feclipse = fmultiple * fclosebinary_feclipse
-    fbinary = 0.27
-    fpnonastro = 5e-5
-
-    # Prior of eclipsing binary on the target, TRICERATOPS
-    def P_FP_EB(self, Ptarget):
-        return Ptarget * self.fclosebinary_feclipse
-
-    # Prior of hierarchichal eclipsing binary (triple system where target star has an eclipsing binary companion), TRICERATOPS
-    def P_FP_HEB(self, Ptarget):
-        return Ptarget * self.fclosetriple_feclipse
-
-     # Prior of eclipsing binary on the target, TRICERATOPS
-    def P_FP_HTP(self, Ptarget):
-        return Ptarget * self.fbinary * self.fplanet_ftransit
-
-     # Prior of eclipsing binary on the target, TRICERATOPS
-    def P_FPresolved(self, Psecondsource):
-        return Psecondsource * (self.fclosebinary_feclipse + self.fclosetriple_feclipse + self.fplanet_ftransit)
-
-     # Prior of eclipsing binary on the target, TRICERATOPS
-    def P_FP_BEB(self, Pbackground):
-        return Pbackground * self.fclosebinary_feclipse
-
-     # Prior of eclipsing binary on the target, TRICERATOPS
-    def P_FP_BTP(self, Pbackground):
-        return Pbackground * self.fplanet_ftransit
-
-    def P_0(self, Ptarget, Pbackground, Psecondsource):
-        return (self.P_FP_EB(Ptarget) + self.P_FP_HEB(Ptarget) + self.P_FP_HTP(Ptarget) +
-                self.P_FPresolved(Psecondsource) + self.P_FP_BEB(Pbackground) + self.P_FP_BTP(Pbackground) +
-                self.fpnonastro)
-
     def __init__(self, class_ids, class_names, type_to_label, hyperparams, channels=1, name='IATSON_planet',
                  mode=['q1q17', 'ete6', 'with_tce_candidates', 'no_val', 'with_radius']) -> None:
         super().__init__(name,
@@ -684,45 +648,38 @@ class IATSON_planet(ImbalancedBinaryModel):
         return IatsonPlanetModelGenerator(dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon,
                                           shuffle_batch=shuffle)
 
-    def predict(self, input, calibrator_path=None):
+    def predict(self, input, calibrator_path=None, batch_size=100):
         calibrator = self.load_calibrator(calibrator_path)
-        prediction = self.model.predict(input)
+        dataset = input.get_dataset().batch(batch_size)
+        prediction = self.model.predict(dataset, steps=len(dataset))
         prediction_cal = prediction
         if calibrator:
             prediction_cal = calibrator.predict(prediction)
         return prediction, prediction_cal
 
-    def predict_cv(self, input, models_dir, calibrator_path=None):
+    def predict_cv(self, input, models_dir, calibrator_path=None, batch_size=100):
         models = os.listdir(models_dir)
-        predictions_df = None
-        fold = 0
+        predictions = []
+        predictions_cal = []
+        calibrator = self.load_calibrator(calibrator_path)
         for model in sorted(models):
             if '_chk_' in model:
-                predictions = []
-                predictions_cal = []
-                model_dir = f'{models_dir}/{model}'
-                self.load_model(model_dir)
-                prediction, _ = self.predict(input)
+                model_dir = f'{models_dir}/{model}/'
+                self.load_model(model_dir + '/' + os.path.basename(model_dir) + '.h5')
+                prediction, _ = self.predict(input, batch_size=batch_size)
                 input.plot_inputs = False
                 prediction_cal = prediction
-                calibrator = self.load_calibrator(f'{model_dir}/{calibrator_path}')
                 if calibrator:
                     prediction_cal = calibrator.predict(prediction)
-                predictions_cal = np.array(prediction_cal).flatten().tolist()
-                predictions = np.array(prediction).flatten().tolist()
-                input.injected_objects_df['fold'] = fold
-                input.injected_objects_df['prediction_value'] = predictions
-                input.injected_objects_df['prediction_value_cal'] = predictions_cal
-                if predictions_df is None:
-                    predictions_df = input.injected_objects_df.copy()
-                else:
-                    predictions_df = pd.concat([predictions_df, input.injected_objects_df])
-                fold = fold + 1
-        return predictions_df
+                predictions_cal = predictions_cal + np.array(prediction_cal).flatten().tolist()
+                predictions = predictions + np.array(prediction).flatten().tolist()
+        return predictions, predictions_cal
 
     def predict_batch(self, input_generator: Ete6ModelGenerator, expected_outputs=None, dataset=None, training_dir=None, plot_mismatches=False,
                       batch_size=20, cores=os.cpu_count() - 1, threshold=[0.5], calibrator_path=None, explain=False):
-        predictions = self.model.predict(input_generator, use_multiprocessing=True, batch_size=batch_size, workers=cores)
+        generator_dataset = input_generator.get_dataset()
+        generator_dataset.batch(batch_size)
+        predictions = self.model.predict(generator_dataset, batch_size=batch_size, steps=len(input_generator))
         calibrator = None
         if calibrator_path is not None:
             calibrator = self.load_calibrator(calibrator_path)
@@ -735,9 +692,15 @@ class IATSON_planet(ImbalancedBinaryModel):
             planet_stats = self.test_metrics(expected_outputs, max_prediction_indexes, max_prediction_values, predictions,
                                              dataset if not explain else input_generator.injected_objects_df,
                                              training_dir=training_dir, plot_mismatches=plot_mismatches, explain=explain)
-            return max_prediction_indexes, max_prediction_values, [planet_stats]
+            if not explain:
+                return max_prediction_indexes, max_prediction_values, [planet_stats]
+            else:
+                return max_prediction_indexes, max_prediction_values, [planet_stats] #TODO return explain df
         else:
-            return max_prediction_indexes, max_prediction_values
+            if not explain:
+                return max_prediction_indexes, max_prediction_values
+            else:
+                return max_prediction_indexes, max_prediction_values  #TODO return explain df
 
     def predict_threshold(self, predictions, threshold=[0.5]):
         max_prediction_indexes = np.array([np.argmax(prediction) for prediction in predictions])
@@ -832,8 +795,9 @@ class IATSON_planet(ImbalancedBinaryModel):
             fold_indexes = [int(fold_index) for fold_index in np.linspace(additional_dataset_len // folds, additional_dataset_len, folds)]
         additional_test_fold_df = None
         for index, fold in enumerate(np.arange(0, folds)):
-            model_dir = f"{model_dir_prefix}_{fold}/"
-            self.load_model(model_dir)
+            model_dir = f"{model_dir_prefix}_{fold}"
+            self.load_model(model_dir + '/' + os.path.basename(model_dir) + '.h5')
+            model_dir = model_dir + '/'
             if fold_indexes is not None:
                 previous_fold_index = fold_indexes[index - 1] if index > 0 else 0
                 additional_test_fold_df = additional_test_df.iloc[previous_fold_index:fold_indexes[index]]
@@ -914,8 +878,9 @@ class IATSON_planet(ImbalancedBinaryModel):
         available_folds = np.arange(0, folds)
         available_folds = set(available_folds).symmetric_difference(set(skip_folds))
         for fold in available_folds:
-            model_dir = f"{model_dir_prefix}_{fold}/"
-            self.load_model(model_dir)
+            model_dir = f"{model_dir_prefix}_{fold}"
+            self.load_model(model_dir + '/' + os.path.basename(model_dir) + '.h5')
+            model_dir = f"{model_dir}/"
             calibrator = f"{model_dir}{calibrator_path}" if calibrator_path is not None else None
             prediction_stats_for_folds_thresholds[fold] = \
                 self.predict_df(df, training_dir, batch_size, cores, zero_epsilon=zero_epsilon,
@@ -1461,8 +1426,8 @@ class IATSON_planet(ImbalancedBinaryModel):
                                              predictions_df)
 
     def predict_watson(self, target_id, period, duration, epoch, depth_ppt, watson_dir, star_filename, lc_filename,
-                       transits_mask=None, plot_inputs=False, cv_dir=None, calibrator_path=None, use_csvs=False, explain=True,
-                       batch_size=100):
+                       transits_mask=None, plot_inputs=False, cv_dir=None, calibrator_path=None, use_csvs=False, explain=False,
+                       batch_size=1):
         df = pd.DataFrame(columns=['object_id', 'period', 'duration(h)', 'depth_primary', 'radius(earth)', 'type'])
         star_df = pd.read_csv(star_filename)
         df = pd.concat([df, pd.DataFrame.from_dict(
@@ -1478,21 +1443,9 @@ class IATSON_planet(ImbalancedBinaryModel):
                                                              self.input_size, zero_epsilon=1e-7,
                                                              transits_mask=transits_mask, plot_inputs=plot_inputs, use_csvs=use_csvs, explain=explain)
         if cv_dir:
-            # if triceratops_df is not None:
-            #     validation_predictions = []
-            #     tp_combined_prediction = 0
-            #     total_combined_prediction = 0
-            #     for prediction in predictions:
-            #         for index, row in triceratops_df.iterrows():
-            #             if row['scenario'] == 'TP' or row['scenario'] == 'PTP' or row['scenario'] == 'DTP':
-            #                 tp_combined_prediction = tp_combined_prediction + row['prob']
-            #             total_combined_prediction = total_combined_prediction + row['prob'] * prediction
-            #         tp_combined_prediction = tp_combined_prediction * prediction
-            #         validation_predictions = validation_predictions + [
-            #             tp_combined_prediction / total_combined_prediction]
-            return self.predict_cv(testing_batch_generator, cv_dir, calibrator_path=calibrator_path), testing_batch_generator.injected_objects_df
+            return self.predict_cv(testing_batch_generator, cv_dir, calibrator_path=calibrator_path)
         else:
-            return self.predict(testing_batch_generator, calibrator_path=calibrator_path), testing_batch_generator.injected_objects_df
+            return self.predict(testing_batch_generator, calibrator_path=calibrator_path)
 
     def calibration_metrics(self, predictions_train_df, predictions_val_df=None, validation_set_percent=0.2, title="",
                             method='none', plot=False):
@@ -1664,7 +1617,7 @@ class IATSON_planet(ImbalancedBinaryModel):
         val_predictions_df_iso = None
         for fold in np.arange(0, folds):
             model_dir = model_prefix + f'_{fold}'
-            self.load_model(model_dir)
+            self.load_model(model_dir + '/' + os.path.basename(model_dir) + '.keras')
             calibration_df = pd.read_csv(f'{model_dir}/validation_dataset.csv')
             prediction_stats_for_thresholds = self.predict_df(calibration_df, training_dir, batch_size, cores,
                                                               thresholds=thresholds, from_arrays=True)

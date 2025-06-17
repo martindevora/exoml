@@ -12,11 +12,13 @@ from abc import abstractmethod
 
 from keras.optimizers import Adam
 #from keras_core.src.optimizers import Adam
-from keras_core.src.optimizers.schedules.learning_rate_schedule import LearningRateSchedule
-from keras_core.src.utils import plot_model
+#from keras_core.src.optimizers.schedules.learning_rate_schedule import LearningRateSchedule
+#from tensorflow.keras.utils import plot_model
+from keras.layers import LeakyReLU
+from tensorflow.keras.utils import plot_model
 # from keras.optimizers import Adam
 # from keras.utils import plot_model
-# from keras.optimizers.schedules import LearningRateSchedule
+from keras.optimizers.schedules import LearningRateSchedule
 
 from sklearn.utils import shuffle
 
@@ -29,9 +31,15 @@ from exoml.ml.callback.training_data_aware import ValidationDataAwareCallback, M
 from exoml.ml.learning_rate.schedulers import ExponentialRescaleDecay
 from exoml.ml.log.get_weights_logger import ModelWeightsLogger
 from exoml.ml.log.with_logging import WithLogging
+from exoml.ml.layers.random_reverse import RandomReverseLayer
+from exoml.ml.layers.dropout import SafeSpatialDropout1D
+from exoml.ml.layers.branch_dropout import BranchDropoutLayer
 
 from exoml.ml.metrics.auc import precision_at_k, mean_positive_value, mean_true_positive_value, mean_false_positive_value, \
     mean_true_negative_value, ThresholdAtPrecision
+
+from exoml.ml.callback.learning_rate import MultiOptimizer, SWA
+#from tensorflow_addons.optimizers import MultiOptimizer, SWA
 
 
 @dataclasses.dataclass
@@ -196,7 +204,7 @@ class BaseModel(WithLogging):
                 sampling = sampling - 1
                 training_set = [training_set, rows_for_type.sample(frac=sampling, replace=True)]
                 # training_set = [training_set, rows_for_type * np.floor(sampling).astype(int)]
-                # training_set = pd.concat(training_set) 
+                # training_set = pd.concat(training_set)
                 # class_expected_size_remainder = np.round(np.mod(sampling, 1) * class_count).astype(int)
                 # training_set = [training_set, training_set[training_set['type'].isin(labels)].iloc[0:class_expected_size_remainder]]
                 training_set = pd.concat(training_set)
@@ -467,8 +475,6 @@ class BaseModel(WithLogging):
         return fit_history
 
     def build_optimizer(self, hyperparams, steps_per_epoch):
-        # from exoml.ml.callback.learning_rate import MultiOptimizer
-        from tensorflow_addons.optimizers import MultiOptimizer
         initial_lr = self.compute_initial_lr(hyperparams)
         optimizer = self.build_swa_optimizer(hyperparams, initial_lr, steps_per_epoch)
         if hyperparams.lr_progression != 1:
@@ -498,8 +504,6 @@ class BaseModel(WithLogging):
         return initial_lr
 
     def build_swa_optimizer(self, hyperparams: HyperParams, lr, steps_per_epoch):
-        # from exoml.ml.callback.learning_rate import SWA
-        from tensorflow_addons.optimizers import SWA
         if hyperparams.stochastic_weight_average_wait > 0:
             optimizer = tf.keras.optimizers.legacy.Adam(lr,
                                                         beta_1=0.9, beta_2=0.98, epsilon=1e-9,
@@ -616,7 +620,7 @@ class BaseModel(WithLogging):
                                 logging.info(f"Switched modelCheckpointCallback to {model_path} "
                                              f",{model_chk_path} and {new_callback.best}")
                                 new_callback.original_path = model_path
-                                new_callback.filepath = model_chk_path
+                                new_callback.filepath = model_chk_path + '/' + os.path.basename(model_chk_path) + '.keras'
                             callbacks = callbacks + [new_callback]
                         additional_callbacks = [BatchAwareCsvLogger(model_name + '/training_log.csv', steps_per_epoch)]
                         if plot_metrics:
@@ -840,6 +844,10 @@ class BaseModel(WithLogging):
         #     yaml.dump(hyperparameters, f)
 
     def load_model(self, dir, custom_objects={}, compile=False):
+        custom_objects['BranchDropoutLayer'] = BranchDropoutLayer
+        custom_objects['SpatialDropout1D'] = SafeSpatialDropout1D
+        custom_objects['LeakyReLU'] = LeakyReLU
+        custom_objects['RandomReverseLayer'] = RandomReverseLayer
         custom_objects['ExponentialRescaleDecay'] = ExponentialRescaleDecay
         custom_objects['WarmUpAndLinDecreaseCallback'] = WarmUpAndLinDecreaseCallback
         custom_objects['precision_at_k'] = precision_at_k

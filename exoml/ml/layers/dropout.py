@@ -3,7 +3,7 @@ import numbers
 import tensorflow as tf
 import keras
 from keras import backend
-from keras.layers import Dropout
+from keras.layers import Dropout, SpatialDropout1D
 
 
 def smart_cond(pred, true_fn=None, false_fn=None, name=None):
@@ -32,6 +32,13 @@ def smart_cond(pred, true_fn=None, false_fn=None, name=None):
     return tf.__internal__.smart_cond.smart_cond(
         pred, true_fn=true_fn, false_fn=false_fn, name=name
     )
+
+class SafeSpatialDropout1D(SpatialDropout1D):
+    def __init__(self, *args, **kwargs):
+        kwargs.pop("trainable", None)
+        kwargs.pop("dtype", None)
+        kwargs.pop('noise_shape', None)
+        super().__init__(*args, **kwargs)
 
 
 class AdaptiveStdDropout(Dropout):
