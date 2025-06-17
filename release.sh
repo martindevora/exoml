@@ -15,7 +15,7 @@ git_tag=$1
 echo "GIT TAG IS " ${git_tag}
 echo "Run all tests"
 set -e
-tox -r -e py313 > tests.log
+tox -r -e py311 > tests.log
 tests_results=$(cat tests.log | grep "congratulations")
 if ! [[ -z ${tests_results} ]]; then
   set +e
@@ -30,7 +30,7 @@ if ! [[ -z ${tests_results} ]]; then
   conda create -n exoml-reqs python=3.11 -y
   conda activate exoml-reqs
   python3 -m pip install pip -U
-  python3 -m pip install numpy==2.2.4
+  python3 -m pip install numpy==2.1.1
   sed -i '16s/.*/version = "'${git_tag}'"/' pyproject.toml
   python3 -m pip install -q build
   python3 -m pip install .
