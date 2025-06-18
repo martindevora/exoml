@@ -606,14 +606,14 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                     folded_og_array[i] = np.zeros(folded_og_array[i].shape)
             i = i + 1
         filter_channels = np.array([0, 1, 6, 7, 8, 9, 10, 11])
-        return [scalar_values[:, [0, 1, 3, 4, 5, 8, 9, 10, 11]], scalar_values[:, [7]],
+        return (scalar_values[:, [0, 1, 3, 4, 5, 8, 9, 10, 11]], scalar_values[:, [7]],
                 star_array, #Only Teff, Rad and Mass
                 global_flux_array,
                 folded_flux_even_array,
                 folded_flux_odd_array,
                 folded_flux_even_har_array,
                 folded_flux_odd_har_array,
-                folded_centroids_array, folded_og_array], \
+                folded_centroids_array, folded_og_array), \
             batch_data_values
 
     def __iter__(self):
