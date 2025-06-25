@@ -28,7 +28,9 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
         self.EXPLAIN_OFFSET_VALUE = [self.zero_epsilon, 0.5, 1 - self.zero_epsilon]
         self.EXPLAIN_BFAP_VALUE = [self.zero_epsilon, 0.5, 1 - self.zero_epsilon]
         self.EXPLAIN_ODDEVEN_VALUE = [self.zero_epsilon, 0.5, 1 - self.zero_epsilon]
-        self.EXPLAIN_TEMP_VALUE = [self.zero_epsilon, 0.5, 1 - self.zero_epsilon]
+        self.EXPLAIN_TEMP_ALBEDO_VALUE = [f"{self.zero_epsilon},{1 - self.zero_epsilon}",
+                                          "0.5,0.5",
+                                          f"{1 - self.zero_epsilon},{self.zero_epsilon}"]
         self.EXPLAIN_ALBEDO_VALUE = [self.zero_epsilon, 0.5, 1 - self.zero_epsilon]
         self.EXPLAIN_STARTEFF_VALUE = [self.zero_epsilon, 0.5, 1 - self.zero_epsilon]
         self.EXPLAIN_STARRAD_VALUE = [self.zero_epsilon, 0.5, 1 - self.zero_epsilon]
@@ -48,7 +50,7 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                 columns=['object_id', 'period', 'duration(h)', 'depth_primary', 'radius(earth)', 'type',
                          'EXPLAIN_PERIOD_VALUE', 'EXPLAIN_DURATION_VALUE', 'EXPLAIN_RADIUS_VALUE', 'EXPLAIN_GTCN_VALUE',
                          'EXPLAIN_GTR_VALUE', 'EXPLAIN_OFFSET_VALUE', 'EXPLAIN_BFAP_VALUE',
-                         'EXPLAIN_ODDEVEN_VALUE', 'EXPLAIN_TEMP_VALUE', 'EXPLAIN_ALBEDO_VALUE',
+                         'EXPLAIN_ODDEVEN_VALUE', 'EXPLAIN_TEMP_ALBEDO_VALUE',
                          'EXPLAIN_STARTEFF_VALUE', 'EXPLAIN_STARRAD_VALUE',
                          'EXPLAIN_GLOBAL_VIEW', 'EXPLAIN_MAIN_VIEW', 'EXPLAIN_SECONDARY_VIEW',
                          'EXPLAIN_ODD_VIEW', 'EXPLAIN_EVEN_VIEW', 'EXPLAIN_CENTROIDS_RA_VIEW',
@@ -57,36 +59,88 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                 row_copy_df = row.copy().to_frame().T
                 final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 row_copy_df = row.copy().to_frame().T
-                row_copy_df['EXPLAIN_GLOBAL_VIEW'] = True
-                row_copy_df['object_id'] = row_copy_df['object_id'] + ' global view branch'
+                row_copy_df['EXPLAIN_GLOBAL_VIEW'] = 'hide'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' global hide branch'
                 final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 row_copy_df = row.copy().to_frame().T
-                row_copy_df['EXPLAIN_MAIN_VIEW'] = True
-                row_copy_df['object_id'] = row_copy_df['object_id'] + ' main view branch'
+                row_copy_df['EXPLAIN_MAIN_VIEW'] = 'hide'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' main hide branch'
                 final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 row_copy_df = row.copy().to_frame().T
-                row_copy_df['EXPLAIN_SECONDARY_VIEW'] = True
-                row_copy_df['object_id'] = row_copy_df['object_id'] + ' secondary view branch'
+                row_copy_df['EXPLAIN_SECONDARY_VIEW'] = 'hide'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' secondary hide branch'
                 final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 row_copy_df = row.copy().to_frame().T
-                row_copy_df['EXPLAIN_ODD_VIEW'] = True
-                row_copy_df['object_id'] = row_copy_df['object_id'] + ' odd view branch'
+                row_copy_df['EXPLAIN_SECONDARY_VIEW'] = 'strong'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' secondary strong branch'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_SECONDARY_VIEW'] = 'plain'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' secondary plain branch'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_ODD_VIEW'] = 'hide'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' odd hide branch'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_ODD_VIEW'] = 'strong'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' odd strong branch'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_ODD_VIEW'] = 'plain'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' odd plain branch'
                 final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 row_copy_df = row.copy().to_frame().T
                 row_copy_df['EXPLAIN_EVEN_VIEW'] = True
-                row_copy_df['object_id'] = row_copy_df['object_id'] + ' even view branch'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' even hide branch'
                 final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 row_copy_df = row.copy().to_frame().T
-                row_copy_df['EXPLAIN_CENTROIDS_RA_VIEW'] = True
-                row_copy_df['object_id'] = row_copy_df['object_id'] + ' centroids ra branch'
+                row_copy_df['EXPLAIN_EVEN_VIEW'] = 'strong'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' even strong branch'
                 final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 row_copy_df = row.copy().to_frame().T
-                row_copy_df['EXPLAIN_CENTROIDS_DEC_VIEW'] = True
-                row_copy_df['object_id'] = row_copy_df['object_id'] + ' centroids dec branch'
+                row_copy_df['EXPLAIN_EVEN_VIEW'] = 'plain'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' even plain branch'
                 final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 row_copy_df = row.copy().to_frame().T
-                row_copy_df['EXPLAIN_OG_VIEW'] = True
-                row_copy_df['object_id'] = row_copy_df['object_id'] + ' og branch'
+                row_copy_df['EXPLAIN_CENTROIDS_RA_VIEW'] = 'hide'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' centroids ra hide branch'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_CENTROIDS_RA_VIEW'] = 'strong'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' centroids ra strong branch'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_CENTROIDS_RA_VIEW'] = 'plain'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' centroids ra plain branch'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_CENTROIDS_DEC_VIEW'] = 'hide'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' centroids dec hide branch'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_CENTROIDS_DEC_VIEW'] = 'strong'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' centroids dec strong branch'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_CENTROIDS_DEC_VIEW'] = 'plain'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' centroids dec plain branch'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_OG_VIEW'] = 'hide'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' og hide branch'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_OG_VIEW'] = 'halo'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' og halo branch'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_OG_VIEW'] = 'core'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' og core branch'
+                final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
+                row_copy_df = row.copy().to_frame().T
+                row_copy_df['EXPLAIN_OG_VIEW'] = 'plain'
+                row_copy_df['object_id'] = row_copy_df['object_id'] + ' og plain branch'
                 final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 for value in self.EXPLAIN_PERIOD_VALUE:
                     row_copy_df = row.copy().to_frame().T
@@ -126,17 +180,12 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                 for value in self.EXPLAIN_ODDEVEN_VALUE:
                     row_copy_df = row.copy().to_frame().T
                     row_copy_df['EXPLAIN_ODDEVEN_VALUE'] = value
-                    row_copy_df['object_id'] = row_copy_df['object_id'] + f' odd/even factor value={value}'
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f' odd-even factor value={value}'
                     final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
-                for value in self.EXPLAIN_TEMP_VALUE:
+                for value in self.EXPLAIN_TEMP_ALBEDO_VALUE:
                     row_copy_df = row.copy().to_frame().T
-                    row_copy_df['EXPLAIN_TEMP_VALUE'] = value
-                    row_copy_df['object_id'] = row_copy_df['object_id'] + f' temperature statistic value={value}'
-                    final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
-                for value in self.EXPLAIN_ALBEDO_VALUE:
-                    row_copy_df = row.copy().to_frame().T
-                    row_copy_df['EXPLAIN_ALBEDO_VALUE'] = value
-                    row_copy_df['object_id'] = row_copy_df['object_id'] + f' albedo statistic value={value}'
+                    row_copy_df['EXPLAIN_TEMP_ALBEDO_VALUE'] = value
+                    row_copy_df['object_id'] = row_copy_df['object_id'] + f' temp-albedo stat values={value}'
                     final_df = pd.concat([final_df, row_copy_df], ignore_index=True)
                 for value in self.EXPLAIN_STARTEFF_VALUE:
                     row_copy_df = row.copy().to_frame().T
@@ -372,8 +421,8 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                     lc_df_focus = lc_df.copy()
                     lc_df_focus['time'] = self.fold(time, period * 2, epoch)
                     lc_df_focus = lc_df_focus.sort_values(by=['time'])
-                    lc_df_focus = lc_df_focus[(lc_df_focus['time'] > 0.5 - duration_to_period * 3) &
-                                              (lc_df_focus['time'] < 0.5 + duration_to_period * 3)]
+                    lc_df_focus = lc_df_focus[(lc_df_focus['time'] > 0.5 - duration_to_period * 1.5) &
+                                              (lc_df_focus['time'] < 0.5 + duration_to_period * 1.5)]
                     oot_lc_df_focus = lc_df_focus[((lc_df_focus['time'] <= 0.5 - duration_to_period / 4) |
                                                    (lc_df_focus['time'] >= 0.5 + duration_to_period / 4))]
                     it_lc_df_focus = lc_df_focus[((lc_df_focus['time'] > 0.5 - duration_to_period / 4) &
@@ -386,8 +435,8 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                     lc_df_focus = lc_df.copy()
                     lc_df_focus['time'] = self.fold(time, period * 2, epoch + period)
                     lc_df_focus = lc_df_focus.sort_values(by=['time'])
-                    lc_df_focus = lc_df_focus[(lc_df_focus['time'] > 0.5 - duration_to_period * 3) &
-                                              (lc_df_focus['time'] < 0.5 + duration_to_period * 3)]
+                    lc_df_focus = lc_df_focus[(lc_df_focus['time'] > 0.5 - duration_to_period * 1.5) &
+                                              (lc_df_focus['time'] < 0.5 + duration_to_period * 1.5)]
                     oot_lc_df_focus = lc_df_focus[((lc_df_focus['time'] <= 0.5 - duration_to_period / 4) |
                                                    (lc_df_focus['time'] >= 0.5 + duration_to_period / 4))]
                     it_lc_df_focus = lc_df_focus[((lc_df_focus['time'] > 0.5 - duration_to_period / 4) &
@@ -473,18 +522,18 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                     depth = depth if depth < 1 else 1 - self.zero_epsilon
                     duration = duration / 15
                     duration = duration if duration < 1 else 1 - self.zero_epsilon
-                    scalar_values[i] = np.transpose([[period / 1200 if period < 1200 else 1,
-                                                      duration,
-                                                      depth,
-                                                      planet_radius,
-                                                      good_transits_count_norm,
-                                                      good_transits_ratio,
-                                                      target_dist if not np.isnan(target_dist) else self.zero_epsilon,
-                                                      offset_err,
-                                                      bootstrap_fap,
-                                                      oe_factor,
-                                                      temperature_stat,
-                                                      albedo_stat]])
+                    scalar_values[i] = np.array([[period / 1200 if period < 1200 else 1],
+                                                      [duration],
+                                                      [depth],
+                                                      [planet_radius],
+                                                      [good_transits_count_norm],
+                                                      [good_transits_ratio],
+                                                      [target_dist if not np.isnan(target_dist) else self.zero_epsilon],
+                                                      [offset_err],
+                                                      [bootstrap_fap],
+                                                      [oe_factor],
+                                                      [temperature_stat],
+                                                      [albedo_stat]])
                     self.arrays_cache[target_row['object_id']]['global_flux_array'] = global_flux_array[i]
                     self.arrays_cache[target_row['object_id']]['folded_flux_even_array'] = folded_flux_even_array[i]
                     self.arrays_cache[target_row['object_id']]['folded_flux_odd_array'] = folded_flux_odd_array[i]
@@ -527,20 +576,18 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
             self.assert_in_range(object_id, folded_centroids_array[i], None)
             self.assert_in_range(object_id, folded_og_array[i], None)
             if df_index == 0:
-                self._plot_input(global_flux_array[i], None, target_row['object_id'], "global",
+                self._plot_input(global_flux_array[i], None, target_row['object_id'], "original_global",
                                  save_dir=inputs_save_dir)
-                self._plot_input(folded_flux_even_array[i], None, target_row['object_id'], "even",
+                self._plot_input(folded_flux_even_array[i], None, target_row['object_id'], "original_secondary",
                                  save_dir=inputs_save_dir)
-                self._plot_input(folded_flux_odd_array[i], None, target_row['object_id'], "odd",
+                self._plot_input(folded_flux_odd_array[i], None, target_row['object_id'], "original_main",
                                  save_dir=inputs_save_dir)
-                self._plot_input(folded_flux_even_har_array[i], None, target_row['object_id'], "even_har",
+                self._plot_input(folded_flux_even_har_array[i], None, target_row['object_id'], "original_even",
                                  save_dir=inputs_save_dir)
-                self._plot_input(folded_flux_odd_har_array[i], None, target_row['object_id'], "odd_har",
+                self._plot_input(folded_flux_odd_har_array[i], None, target_row['object_id'], "original_odd",
                                  save_dir=inputs_save_dir)
-                # self._plot_input(folded_flux_even_subhar_array[i], folded_flux_even_subhar_array_err[i], target_row['object_id'], "even_subhar")
-                # self._plot_input(folded_flux_odd_subhar_array[i], folded_flux_odd_subhar_array_err[i], target_row['object_id'], "odd_subhar")
-                self._plot_input(folded_og_array[i], None, target_row['object_id'], "OG", save_dir=inputs_save_dir)
-                self._plot_input(folded_centroids_array[i], None, target_row['object_id'], "CENTROIDS",
+                self._plot_input(folded_og_array[i], None, target_row['object_id'], "original_og", save_dir=inputs_save_dir)
+                self._plot_input(folded_centroids_array[i], None, target_row['object_id'], "original_centroids",
                                  save_dir=inputs_save_dir)
                 np.savetxt(inputs_save_dir + 'input_scalar_values.csv', scalar_values[i], delimiter=',')
                 np.savetxt(inputs_save_dir + 'input_star.csv', star_array[i], delimiter=',')
@@ -564,6 +611,7 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                 np.savetxt(inputs_save_dir + 'input_og.csv', folded_og_array[i], delimiter=',')
                 np.savetxt(inputs_save_dir + 'input_og_err.csv', folded_og_array_err[i], delimiter=',')
             if self.explain:
+                scenario = None
                 if 'EXPLAIN_PERIOD_VALUE' in target_row and not np.isnan(target_row['EXPLAIN_PERIOD_VALUE']):
                     scalar_values[i, 0] = target_row['EXPLAIN_PERIOD_VALUE']
                 if 'EXPLAIN_DURATION_VALUE' in target_row and not np.isnan(target_row['EXPLAIN_DURATION_VALUE']):
@@ -580,30 +628,115 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                     scalar_values[i, 8] = target_row['EXPLAIN_ODDEVEN_VALUE']
                 if 'EXPLAIN_BFAP_VALUE' in target_row and not np.isnan(target_row['EXPLAIN_BFAP_VALUE']):
                     scalar_values[i, 9] = target_row['EXPLAIN_BFAP_VALUE']
-                if 'EXPLAIN_TEMP_VALUE' in target_row and not np.isnan(target_row['EXPLAIN_TEMP_VALUE']):
-                    scalar_values[i, 10] = target_row['EXPLAIN_TEMP_VALUE']
-                if 'EXPLAIN_ALBEDO_VALUE' in target_row and not np.isnan(target_row['EXPLAIN_ALBEDO_VALUE']):
-                    scalar_values[i, 11] = target_row['EXPLAIN_ALBEDO_VALUE']
+                explain_temp_albedo_value = str(target_row['EXPLAIN_TEMP_ALBEDO_VALUE'])
+                if ('EXPLAIN_TEMP_ALBEDO_VALUE' in target_row and len(explain_temp_albedo_value) > 0
+                        and explain_temp_albedo_value != 'nan'):
+                    scalar_values[i, 10] = explain_temp_albedo_value.split(',')[0]
+                    scalar_values[i, 11] = explain_temp_albedo_value.split(',')[1]
                 if 'EXPLAIN_STARTEFF_VALUE' in target_row and not np.isnan(target_row['EXPLAIN_STARTEFF_VALUE']):
                     star_array[i, 0] = target_row['EXPLAIN_STARTEFF_VALUE']
                 if 'EXPLAIN_STARRAD_VALUE' in target_row and not np.isnan(target_row['EXPLAIN_STARRAD_VALUE']):
                     star_array[i, 1] = target_row['EXPLAIN_STARRAD_VALUE']
-                if 'EXPLAIN_GLOBAL_VIEW' in target_row and not np.isnan(target_row['EXPLAIN_GLOBAL_VIEW']):
-                    global_flux_array[i] = np.zeros(global_flux_array[i].shape)
-                if 'EXPLAIN_MAIN_VIEW' in target_row and not np.isnan(target_row['EXPLAIN_MAIN_VIEW']):
-                    folded_flux_odd_array[i] = np.zeros(folded_flux_odd_array[i].shape)
-                if 'EXPLAIN_SECONDARY_VIEW' in target_row and not np.isnan(target_row['EXPLAIN_SECONDARY_VIEW']):
-                    folded_flux_even_array[i] = np.zeros(folded_flux_even_array[i].shape)
-                if 'EXPLAIN_ODD_VIEW' in target_row and not np.isnan(target_row['EXPLAIN_ODD_VIEW']):
-                    folded_flux_odd_har_array[i] = np.zeros(folded_flux_odd_har_array[i].shape)
-                if 'EXPLAIN_EVEN_VIEW' in target_row and not np.isnan(target_row['EXPLAIN_EVEN_VIEW']):
-                    folded_flux_even_har_array[i] = np.zeros(folded_flux_even_har_array[i].shape)
-                if 'EXPLAIN_CENTROIDS_RA_VIEW' in target_row and not np.isnan(target_row['EXPLAIN_CENTROIDS_RA_VIEW']):
-                    folded_centroids_array[i, :, 0] = np.zeros(folded_centroids_array[i].shape[0])
-                if 'EXPLAIN_CENTROIDS_DEC_VIEW' in target_row and not np.isnan(target_row['EXPLAIN_CENTROIDS_DEC_VIEW']):
-                    folded_centroids_array[i, :, 1] = np.zeros(folded_centroids_array[i].shape[0])
-                if 'EXPLAIN_OG_VIEW' in target_row and not np.isnan(target_row['EXPLAIN_OG_VIEW']):
-                    folded_og_array[i] = np.zeros(folded_og_array[i].shape)
+                std = np.nanstd(folded_flux_odd_array[i])
+                if 'EXPLAIN_GLOBAL_VIEW' in target_row:
+                    if target_row['EXPLAIN_GLOBAL_VIEW'] == 'hide':
+                        global_flux_array[i] = np.zeros(global_flux_array[i].shape)
+                        self._plot_input(global_flux_array[i], None, target_row['object_id'], f"global",
+                                         save_dir=inputs_save_dir)
+                if 'EXPLAIN_MAIN_VIEW' in target_row:
+                    if target_row['EXPLAIN_MAIN_VIEW'] == 'hide':
+                        folded_flux_odd_array[i] = np.zeros(folded_flux_odd_array[i].shape)
+                        self._plot_input(folded_flux_even_array[i], None, target_row['object_id'], f"main",
+                                         save_dir=inputs_save_dir)
+                    elif target_row['EXPLAIN_MAIN_VIEW'] == 'strong':
+                        folded_flux_odd_array[i] = folded_flux_odd_array[i]
+                        self._plot_input(folded_flux_even_array[i], None, target_row['object_id'], f"main",
+                                         save_dir=inputs_save_dir)
+                    elif target_row['EXPLAIN_MAIN_VIEW'] == 'plain':
+                        folded_flux_odd_array[i] = np.random.normal(loc=0.5, scale=std, size=folded_flux_odd_array[i].shape)
+                        self._plot_input(folded_flux_even_array[i], None, target_row['object_id'], f"main",
+                                         save_dir=inputs_save_dir)
+                if 'EXPLAIN_SECONDARY_VIEW' in target_row:
+                    if target_row['EXPLAIN_SECONDARY_VIEW'] == 'hide':
+                        folded_flux_even_array[i] = np.zeros(folded_flux_even_array[i].shape)
+                        self._plot_input(folded_flux_even_array[i], None, target_row['object_id'], f"even",
+                                         save_dir=inputs_save_dir)
+                    elif target_row['EXPLAIN_SECONDARY_VIEW'] == 'strong':
+                        folded_flux_even_array[i] = folded_flux_even_array[i]
+                        self._plot_input(folded_flux_even_array[i], None, target_row['object_id'], f"even",
+                                         save_dir=inputs_save_dir)
+                    elif target_row['EXPLAIN_SECONDARY_VIEW'] == 'plain':
+                        folded_flux_even_array[i] = np.random.normal(loc=0.5, scale=std, size=folded_flux_even_array[i].shape)
+                        self._plot_input(folded_flux_even_array[i], None, target_row['object_id'], f"even",
+                                         save_dir=inputs_save_dir)
+                if 'EXPLAIN_ODD_VIEW' in target_row:
+                    if target_row['EXPLAIN_ODD_VIEW'] == 'hide':
+                        folded_flux_odd_har_array[i] = np.zeros(folded_flux_odd_har_array[i].shape)
+                        self._plot_input(folded_flux_odd_har_array[i], None, target_row['object_id'], f"odd",
+                                         save_dir=inputs_save_dir)
+                    elif target_row['EXPLAIN_ODD_VIEW'] == 'strong':
+                        folded_flux_odd_har_array[i] = folded_flux_odd_har_array[i]
+                        self._plot_input(folded_flux_odd_har_array[i], None, target_row['object_id'], f"odd",
+                                         save_dir=inputs_save_dir)
+                    elif target_row['EXPLAIN_ODD_VIEW'] == 'plain':
+                        folded_flux_odd_har_array[i] = np.random.normal(loc=1.0, scale=std, size=folded_flux_odd_har_array[i].shape)
+                        self._plot_input(folded_flux_odd_har_array[i], None, target_row['object_id'], f"odd",
+                                         save_dir=inputs_save_dir)
+                if 'EXPLAIN_EVEN_VIEW' in target_row:
+                    if target_row['EXPLAIN_EVEN_VIEW'] == 'hide':
+                        folded_flux_even_har_array[i] = np.zeros(folded_flux_even_har_array[i].shape)
+                        self._plot_input(folded_flux_even_har_array[i], None, target_row['object_id'], f"even",
+                                         save_dir=inputs_save_dir)
+                    elif target_row['EXPLAIN_EVEN_VIEW'] == 'strong':
+                        folded_flux_even_har_array[i] = folded_flux_even_har_array[i]
+                        self._plot_input(folded_flux_even_array[i], None, target_row['object_id'], f"even",
+                                         save_dir=inputs_save_dir)
+                    elif target_row['EXPLAIN_EVEN_VIEW'] == 'plain':
+                        folded_flux_even_har_array[i] = np.random.normal(loc=1.0, scale=std, size=folded_flux_even_har_array[i].shape)
+                        self._plot_input(folded_flux_even_array[i], None, target_row['object_id'], f"even",
+                                         save_dir=inputs_save_dir)
+                if 'EXPLAIN_CENTROIDS_RA_VIEW' in target_row or 'EXPLAIN_CENTROIDS_DEC_VIEW' in target_row:
+                    if target_row['EXPLAIN_CENTROIDS_RA_VIEW'] == 'hide':
+                        folded_centroids_array[i, :, 0] = np.zeros(folded_centroids_array[i, :, 0].shape)
+                        self._plot_input(folded_centroids_array[i], None, target_row['object_id'], f"centroids",
+                                         save_dir=inputs_save_dir)
+                    elif target_row['EXPLAIN_CENTROIDS_RA_VIEW'] == 'strong':
+                        folded_centroids_array[i, :, 0] = folded_flux_odd_array[i].flatten()
+                        self._plot_input(folded_centroids_array[i], None, target_row['object_id'], f"centroids",
+                                         save_dir=inputs_save_dir)
+                    elif target_row['EXPLAIN_CENTROIDS_RA_VIEW'] == 'plain':
+                        folded_centroids_array[i, :, 0] = np.random.normal(loc=1.0, scale=std, size=folded_centroids_array[i, :, 0].shape)
+                        self._plot_input(folded_centroids_array[i], None, target_row['object_id'], f"centroids",
+                                         save_dir=inputs_save_dir)
+                    if target_row['EXPLAIN_CENTROIDS_DEC_VIEW'] == 'hide':
+                        folded_centroids_array[i, :, 1] = np.zeros(folded_centroids_array[i, :, 1].shape)
+                        self._plot_input(folded_centroids_array[i], None, target_row['object_id'], f"centroids",
+                                         save_dir=inputs_save_dir)
+                    elif target_row['EXPLAIN_CENTROIDS_DEC_VIEW'] == 'strong':
+                        folded_centroids_array[i, :, 1] = folded_flux_odd_array[i].flatten()
+                        self._plot_input(folded_centroids_array[i], None, target_row['object_id'], f"centroids",
+                                         save_dir=inputs_save_dir)
+                    elif target_row['EXPLAIN_CENTROIDS_DEC_VIEW'] == 'plain':
+                        folded_centroids_array[i, :, 1] = np.random.normal(loc=1.0, scale=std, size=folded_centroids_array[i, :, 1].shape)
+                        self._plot_input(folded_centroids_array[i], None, target_row['object_id'], f"centroids",
+                                         save_dir=inputs_save_dir)
+                if 'EXPLAIN_OG_VIEW' in target_row:
+                    if target_row['EXPLAIN_EVEN_VIEW'] == 'hide':
+                        folded_og_array[i] = np.zeros(folded_og_array[i].shape)
+                        self._plot_input(folded_og_array[i], None, target_row['object_id'], f"og",
+                                         save_dir=inputs_save_dir)
+                    elif target_row['EXPLAIN_EVEN_VIEW'] == 'core':
+                        folded_og_array[i] = folded_og_array[i]
+                        self._plot_input(folded_og_array[i], None, target_row['object_id'], f"og",
+                                         save_dir=inputs_save_dir)
+                    elif target_row['EXPLAIN_EVEN_VIEW'] == 'halo':
+                        folded_og_array[i] = (1 - folded_og_array[i])
+                        self._plot_input(folded_og_array[i], None, target_row['object_id'], f"og",
+                                         save_dir=inputs_save_dir)
+                    elif target_row['EXPLAIN_EVEN_VIEW'] == 'plain':
+                        folded_og_array[i] = np.random.normal(loc=1.0, scale=std, size=folded_og_array[i].shape)
+                        self._plot_input(folded_og_array[i], None, target_row['object_id'], f"og",
+                                         save_dir=inputs_save_dir)
             i = i + 1
         filter_channels = np.array([0, 1, 6, 7, 8, 9, 10, 11])
         return (scalar_values[:, [0, 1, 3, 4, 5, 8, 9, 10, 11]], scalar_values[:, [7]],

@@ -2,10 +2,14 @@ import logging
 import os.path
 import os
 import shutil
+import warnings
 
 from keras.callbacks import ModelCheckpoint
 import tensorflow as tf
 import numpy as np
+from keras.src.utils import file_utils
+from keras.src.utils import io_utils
+from keras.src import backend
 
 
 def sync_to_numpy_or_python_type(tensors):
@@ -58,113 +62,74 @@ class ModelCheckpointCallback(ModelCheckpoint):
                          initial_value_threshold)
         self.original_path = original_path
         self.filter_metrics = filter_metrics
+        self.epochs_since_last_save = 0
 
     def on_epoch_end(self, epoch, logs=None):
         self.epochs_since_last_save += 1
         if self.save_freq == "epoch":
             self._save_model(epoch=epoch, batch=None, logs=logs)
 
-    def copy_files(self):
-        if os.path.exists(self.original_path + '/training_log.csv'):
-            shutil.copyfile(self.original_path + '/training_log.csv', os.path.dirname(self.filepath) + '/training_log.csv')
-        if os.path.exists(self.original_path + '/train_dataset.csv'):
-            shutil.copyfile(self.original_path + '/train_dataset.csv', os.path.dirname(self.filepath) + '/train_dataset.csv')
-        if os.path.exists(self.original_path + '/validation_dataset.csv'):
-            shutil.copyfile(self.original_path + '/validation_dataset.csv', os.path.dirname(self.filepath) + '/validation_dataset.csv')
-        if os.path.exists(self.original_path + '/network.png'):
-            shutil.copyfile(self.original_path + '/network.png', os.path.dirname(self.filepath) + '/network.png')
-        if os.path.exists(self.original_path + '/metrics.png'):
-            shutil.copyfile(self.original_path + '/metrics.png', os.path.dirname(self.filepath) + '/metrics.png')
+    def _should_save_model(self, epoch, batch, logs, filepath):
+        """Determines whether the model should be saved.
 
-    def _save_model(self, epoch, batch, logs):
-        """Saves the model.
+        The model should be saved in the following cases:
+
+        - self.save_best_only is False
+        - self.save_best_only is True and `monitor` is a numpy array or
+          backend tensor (falls back to `save_best_only=False`)
+        - self.save_best_only is True and `self.monitor_op(current, self.best)`
+          evaluates to True.
 
         Args:
             epoch: the epoch this iteration is in.
             batch: the batch this iteration is in. `None` if the `save_freq`
-              is set to `epoch`.
-            logs: the `logs` dict passed in to `on_batch_end` or `on_epoch_end`.
+                is set to `"epoch"`.
+            logs: the `logs` dict passed in to `on_batch_end` or
+                `on_epoch_end`.
+            filepath: the path where the model would be saved
         """
         logs = logs or {}
-
-        if (
-                isinstance(self.save_freq, int)
-                or self.epochs_since_last_save >= self.period
-        ):
-            # Block only when saving interval is reached.
-            logs = sync_to_numpy_or_python_type(logs)
-            self.epochs_since_last_save = 0
-            filepath = self._get_file_path(epoch, batch, logs)
-
-            try:
-                if self.save_best_only:
-                    current = logs.get(self.monitor)
-                    metrics_for_filter = [logs.get(filter_metric) for filter_metric in self.filter_metrics]
-                    if current is None:
-                        logging.warning(
-                            "Can save best model only with %s available, "
-                            "skipping.",
-                            self.monitor,
+        if self.save_best_only:
+            current = logs.get(self.monitor)
+            if current is None:
+                warnings.warn(
+                    f"Can save best model only with {self.monitor} available.",
+                    stacklevel=2,
+                )
+                return True
+            elif (
+                isinstance(current, np.ndarray) or backend.is_tensor(current)
+            ) and len(current.shape) > 0:
+                warnings.warn(
+                    "Can save best model only when `monitor` is "
+                    f"a scalar value. Received: {current}. "
+                    "Falling back to `save_best_only=False`."
+                )
+                return True
+            else:
+                if self.monitor_op(current, self.best) and np.all(np.array(self.filter_metrics) > 0):
+                    if self.verbose > 0:
+                        io_utils.print_msg(
+                            f"\nEpoch {epoch + 1}: {self.monitor} "
+                            "improved "
+                            f"from {self.best:.5f} to {current:.5f}, "
+                            f"saving model to {filepath}"
                         )
-                    else:
-                        if self.monitor_op(current, self.best) and np.all(np.array(metrics_for_filter) > 0):
-                            if self.verbose > 0:
-                                logging.info(
-                                    f"\nEpoch {epoch + 1}: {self.monitor} "
-                                    "improved "
-                                    f"from {self.best:.5f} to {current:.5f}, "
-                                    f"saving model to {filepath}"
-                                )
-                            self.best = current
-                            if self.save_weights_only:
-                                self.model.save_weights(
-                                    filepath,
-                                    overwrite=True,
-                                    options=None,
-                                )
-                            else:
-                                self.model.save(
-                                    filepath,
-                                    overwrite=True,
-                                    options=None,
-                                )
-                            self.copy_files()
-                        else:
-                            if self.verbose > 0:
-                                logging.info(
-                                    f"\nEpoch {epoch + 1}: "
-                                    f"{self.monitor} did not improve "
-                                    f"from {self.best:.5f}"
-                                )
+                    self.best = current
+                    return True
                 else:
                     if self.verbose > 0:
-                        logging.info(
-                            f"\nEpoch {epoch + 1}: saving model to {filepath}"
+                        io_utils.print_msg(
+                            f"\nEpoch {epoch + 1}: "
+                            f"{self.monitor} did not improve "
+                            f"from {self.best:.5f}"
                         )
-                    if self.save_weights_only:
-                        self.model.save_weights(
-                            filepath, overwrite=True, options=None
-                        )
-                    else:
-                        self.model.save(
-                            filepath, overwrite=True, options=None
-                        )
-                    self.copy_files()
-                self._maybe_remove_file()
-            except IsADirectoryError:  # h5py 3.x
-                raise IOError(
-                    "Please specify a non-directory filepath for "
-                    "ModelCheckpoint. Filepath used is an existing "
-                    f"directory: {filepath}"
+                    return False
+        else:
+            if self.verbose > 0:
+                io_utils.print_msg(
+                    f"\nEpoch {epoch + 1}: saving model to {filepath}"
                 )
-            except IOError as e:  # h5py 2.x
-                # `e.errno` appears to be `None` so checking the content of
-                # `e.args[0]`.
-                if "is a directory" in str(e.args[0]).lower():
-                    raise IOError(
-                        "Please specify a non-directory filepath for "
-                        "ModelCheckpoint. Filepath used is an existing "
-                        f"directory: f{filepath}"
-                    )
-                # Re-throw the error for any other causes.
-                raise e
+            return True
+
+

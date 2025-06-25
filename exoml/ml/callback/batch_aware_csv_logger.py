@@ -59,7 +59,7 @@ class BatchAwareCsvLogger(CSVLogger):
             last_learning_rate = K.eval(K.eval(self.model.optimizer.optimizer_specs[-1]['optimizer'].lr))
             row_dict['lr_last'] = last_learning_rate
         else:
-            learning_rate = K.eval(self.model.optimizer.lr)
+            learning_rate = self.model.optimizer.learning_rate.numpy()
         row_dict['epoch'] = epoch
         row_dict['batch'] = batch
         row_dict['lr'] = learning_rate

@@ -454,11 +454,11 @@ class BaseModel(WithLogging):
             logging.info("Initializing training with (epochs," + str(hyperparams.epochs) +
                          ") (steps_per_epoch," + str(steps_per_epoch) +
                          ")")
-            self.save(output_dir)
+            self.save(output_dir, self._get_model_prefix() + '.h5')
             self.__write_hyperparameters(hyperparams, model_path)
             fit_history = self.fit_model(hyperparams, training_batch_generator, steps_per_epoch, class_weights,
                                          validation_batch_generator, model_validation_steps)
-            self.save(output_dir)
+            self.save(output_dir, self._get_model_prefix() + '.h5')
         else:
             logging.warning("dry_run was activated and 'training' will not be launched")
 
@@ -469,9 +469,7 @@ class BaseModel(WithLogging):
                                      epochs=hyperparams.epochs, verbose=1, class_weight=class_weights,
                                      validation_data=validation_batch_generator,
                                      validation_steps=model_validation_steps,
-                                     callbacks=hyperparams.callbacks,
-                                     use_multiprocessing=hyperparams.cores > 0, workers=1
-            if hyperparams.cores <= 0 else hyperparams.cores)
+                                     callbacks=hyperparams.callbacks)
         return fit_history
 
     def build_optimizer(self, hyperparams, steps_per_epoch):
@@ -869,5 +867,8 @@ class BaseModel(WithLogging):
         self.model = model
 
     def _get_model_dir(self):
-        return self.name + '_model/'
+        return self._get_model_prefix() + '/'
+
+    def _get_model_prefix(self):
+        return self.name + '_model'
 

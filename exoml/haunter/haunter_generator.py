@@ -32,7 +32,7 @@ class HaunterModelGenerator(tf.keras.utils.Sequence):
                                               'Zwater_core_input_norm', 'Tsurf_K_input_norm', 'Psurf_bar_input_norm']]
         #assert np.all((batch_data_array > 0) & (batch_data_array < 1))
         #assert np.all((batch_data_values > 0) & (batch_data_values < 1))
-        return batch_data_array.to_numpy(), batch_data_values.to_numpy()
+        return batch_data_array.to_numpy(dtype=np.float32), batch_data_values.to_numpy(dtype=np.float32)
 
     def class_weights(self):
         return None
