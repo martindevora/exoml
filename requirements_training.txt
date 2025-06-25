@@ -5,7 +5,7 @@ typeguard==4.1.5
 #tensorflow-addons==0.21.0
 ellc==1.8.11
 #dearwatson==0.7.15
-lcbuilder==0.25.1
+lcbuilder==0.25.3
 #timesynth @ git+https://github.com/TimeSynth/TimeSynth.git
 ruamel.yaml==0.17.32
 #debugpy
