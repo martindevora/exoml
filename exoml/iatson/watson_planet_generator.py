@@ -721,19 +721,19 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                         self._plot_input(folded_centroids_array[i], None, target_row['object_id'], f"centroids",
                                          save_dir=inputs_save_dir)
                 if 'EXPLAIN_OG_VIEW' in target_row:
-                    if target_row['EXPLAIN_EVEN_VIEW'] == 'hide':
+                    if target_row['EXPLAIN_OG_VIEW'] == 'hide':
                         folded_og_array[i] = np.zeros(folded_og_array[i].shape)
                         self._plot_input(folded_og_array[i], None, target_row['object_id'], f"og",
                                          save_dir=inputs_save_dir)
-                    elif target_row['EXPLAIN_EVEN_VIEW'] == 'core':
+                    elif target_row['EXPLAIN_OG_VIEW'] == 'core':
                         folded_og_array[i] = folded_og_array[i]
                         self._plot_input(folded_og_array[i], None, target_row['object_id'], f"og",
                                          save_dir=inputs_save_dir)
-                    elif target_row['EXPLAIN_EVEN_VIEW'] == 'halo':
+                    elif target_row['EXPLAIN_OG_VIEW'] == 'halo':
                         folded_og_array[i] = (1 - folded_og_array[i])
                         self._plot_input(folded_og_array[i], None, target_row['object_id'], f"og",
                                          save_dir=inputs_save_dir)
-                    elif target_row['EXPLAIN_EVEN_VIEW'] == 'plain':
+                    elif target_row['EXPLAIN_OG_VIEW'] == 'plain':
                         folded_og_array[i] = np.random.normal(loc=1.0, scale=std, size=folded_og_array[i].shape)
                         self._plot_input(folded_og_array[i], None, target_row['object_id'], f"og",
                                          save_dir=inputs_save_dir)
