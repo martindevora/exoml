@@ -1,14 +1,8 @@
-import logging
-import os.path
-import os
-import shutil
 import warnings
 
 from keras.callbacks import ModelCheckpoint
 import tensorflow as tf
 import numpy as np
-from keras.src.utils import file_utils
-from keras.src.utils import io_utils
 from keras.src import backend
 
 
@@ -58,8 +52,10 @@ class ModelCheckpointCallback(ModelCheckpoint):
                  save_best_only: bool = False,
                  save_weights_only: bool = False, mode: str = "auto", save_freq="epoch",
                  initial_value_threshold=None, filter_metrics: list[str] = []):
-        super().__init__(filepath, monitor, verbose, save_best_only, save_weights_only, mode, save_freq,
-                         initial_value_threshold)
+        super().__init__(filepath=filepath,
+                         monitor=monitor, verbose=verbose, save_best_only=save_best_only,
+                         save_weights_only=save_weights_only, mode=mode, save_freq=save_freq,
+                         initial_value_threshold=initial_value_threshold)
         self.original_path = original_path
         self.filter_metrics = filter_metrics
         self.epochs_since_last_save = 0
@@ -108,28 +104,11 @@ class ModelCheckpointCallback(ModelCheckpoint):
                 return True
             else:
                 if self.monitor_op(current, self.best) and np.all(np.array(self.filter_metrics) > 0):
-                    if self.verbose > 0:
-                        io_utils.print_msg(
-                            f"\nEpoch {epoch + 1}: {self.monitor} "
-                            "improved "
-                            f"from {self.best:.5f} to {current:.5f}, "
-                            f"saving model to {filepath}"
-                        )
                     self.best = current
                     return True
                 else:
-                    if self.verbose > 0:
-                        io_utils.print_msg(
-                            f"\nEpoch {epoch + 1}: "
-                            f"{self.monitor} did not improve "
-                            f"from {self.best:.5f}"
-                        )
                     return False
         else:
-            if self.verbose > 0:
-                io_utils.print_msg(
-                    f"\nEpoch {epoch + 1}: saving model to {filepath}"
-                )
             return True
 
 
