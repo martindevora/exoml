@@ -15,23 +15,25 @@ import tensorflow as tf
 import time
 
 from astropy.timeseries import LombScargle
-from keras.layers.activation.relu import ReLU
 from keras.losses import BinaryCrossentropy
 from keras.metrics import Precision, PrecisionAtRecall, Recall, AUC, BinaryAccuracy
 from keras.optimizers import Adam
 from keras.utils import plot_model
 from keras.layers import LeakyReLU
-from keras_nlp.src.layers import TransformerEncoder
+from lcbuilder.helper import LcbuilderHelper
 from lightkurve import TessLightCurve
 from numpy import ndarray
+from scipy.signal import medfilt
 from sklearn.utils import shuffle
 
 from exoml.ml.callback.early_stopping import ExoMlEarlyStopping
-from exoml.ml.callback.learning_rate import WarmUpAndLinDecreaseCallback
+from exoml.ml.callback.learning_rate import WarmUpAndLinDecreaseCallback, MultiOptimizer
 from exoml.ml.callback.training_data_aware import ModelDirDataAwareCallback, ValidationDataAwareCallback
+from exoml.ml.layers.transformer import TransformerEncoder
 from exoml.ml.log.get_weights_logger import ModelWeightsLogger
 from exoml.ml.log.with_logging import WithLogging
 from exoml.ml.model.base_model import HyperParams
+from exoml.santo.santo_folded_predict_generator import SantoFoldedPredictGenerator
 from exoml.santo.santo_generator import SantoGenerator
 from exoml.santo.santo_predict_generator import SantoPredictGenerator
 
@@ -85,6 +87,7 @@ class SANTO(WithLogging):
     def initialize(self, lcs_dir, output_dir, hyperparams: HyperParams, input_dim=500,
               cores=os.cpu_count() // 2, load_checkpoint=False):
         input_layer = keras.Input(shape=(input_dim, 1), name="input")
+        cadences_layer = keras.Input(shape=(1), name="cadences_input")
         if self.transformer_layers > 0:
             # outputs = TransformerClassifier(transformer_input_size=input_dim, patch_size=input_dim,
             #                                 num_heads=self.transformer_heads, mlp_dim=input_dim,
@@ -177,8 +180,7 @@ class SANTO(WithLogging):
                                                   l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(
                 conv4_branch)
             conv4_branch = keras.layers.Dropout(hyperparams.dropout_rate)(conv4_branch)
-            flux_branch = keras.layers.Concatenate(axis=1)([
-                conv1_branch, conv2_branch, conv3_branch, conv4_branch])
+            flux_branch = keras.layers.Concatenate(axis=1)([conv1_branch, conv2_branch, conv3_branch, conv4_branch, cadences_layer])
             flux_branch = keras.layers.Dense(512, activation=LeakyReLU(leaky_relu_alpha),
                                              kernel_regularizer=tf.keras.regularizers.L1L2(
                                                  l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(
@@ -187,9 +189,9 @@ class SANTO(WithLogging):
             # flux_branch = keras.layers.Dense(16, activation=LeakyReLU(leaky_relu_alpha),
             #                   kernel_regularizer=tf.keras.regularizers.L1L2(l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(flux_branch)
             flux_branch = keras.layers.Dropout(hyperparams.dropout_rate)(flux_branch)
-            outputs: keras.layers.Layer = keras.layers.Dense(1, activation="sigmoid")(flux_branch)
+            outputs: keras.layers.Layer = keras.layers.Dense(input_dim, activation="sigmoid")(flux_branch)
         print("Preparing data sets")
-        self.model: keras.Model = keras.Model(inputs=input_layer, outputs=outputs)
+        self.model: keras.Model = keras.Model(inputs=[input_layer, cadences_layer], outputs=outputs)
         self.model.run_eagerly = hyperparams.run_eagerly
         model_path = output_dir + self._get_model_dir()
         train_filenames, validation_filenames, test_filenames = \
@@ -210,7 +212,7 @@ class SANTO(WithLogging):
         validation_filenames = validation_df.loc[:, 'name'].tolist()
         training_batch_generator = self.instance_generator(train_filenames, lcs_dir, hyperparams.batch_size,
                                                            input_dim, None, hyperparams.zero_epsilon,
-                                                           shuffle=False, step_indexes=step_indexes)
+                                                           shuffle=False, step_indexes=step_indexes, from_arrays=False)
         steps_per_epoch = training_batch_generator.steps_per_epoch()
         optimizer: keras.optimizers.Optimizer = self.build_optimizer(hyperparams, steps_per_epoch)
         loss, accuracy = self.instance_loss_accuracy(hyperparams)
@@ -224,7 +226,7 @@ class SANTO(WithLogging):
                          ")")
             validation_batch_generator = self.instance_generator(validation_filenames, lcs_dir, hyperparams.batch_size,
                                                                  input_dim, None, hyperparams.zero_epsilon,
-                                                                 shuffle=False, step_indexes=step_indexes)
+                                                                 shuffle=False, step_indexes=step_indexes, from_arrays=False)
             for callback in hyperparams.callbacks:
                 if issubclass(callback.__class__, ModelDirDataAwareCallback):
                     callback.set_model_dir(model_path)
@@ -255,41 +257,172 @@ class SANTO(WithLogging):
 
     def predict(self, lcs_dir: str, target_files: list, model_dir: str, batch_size: int = 1024, input_size: int = 2500,
                 zero_epsilon: float = 1e-7, plot=False, plot_positives=False, tagged_data: bool = False,
-                target_name: str = ""):
+                target_name: str = "", threshold=0.5, smooth=False):
         self.load_model(model_dir)
         half_window = input_size // 2
         generator = SantoPredictGenerator(lcs_dir, target_files, input_size=input_size, step_size=1,
-                                          batch_size=batch_size, zero_epsilon=zero_epsilon)
+                                          batch_size=batch_size, zero_epsilon=zero_epsilon, smooth=smooth)
         predictions = self.model.predict(generator)
         left = np.linspace(0.1, 1.0, input_size // 2, endpoint=False)
         right = np.linspace(1.0, 0.1, input_size // 2)
         triangle_weights = np.concatenate([left, right])
         current_index = 0
         files_predictions = {}
+        files_predictions_spectra = {}
+        stats_df = pd.DataFrame(columns=['target_file', 'type', 'depth', 'std', 'snr', 't0', 'duration_points', 'max_score'])
         for target_file in target_files:
-            file_content = pd.read_csv(lcs_dir + '/' + target_file).values
+            file_content = pd.read_csv(lcs_dir + '/' + target_file, sep=',', header=None).values
             flux_key = 1
+            time_key = 0
+            tags_key = 2
             if file_content.shape[0] > 40:
+                file_content = file_content[1:]
                 file_content = np.transpose(file_content)
+                time_key = 1
                 flux_key = 2
+                tags_key = 3
             file_content = np.vectorize(clean_to_float)(file_content)
             file_predictions = predictions[current_index:current_index + file_content.shape[1]]
-            files_predictions[target_file] = file_predictions.reshape(file_predictions.shape[0])
+            N = file_predictions.shape[0]
+            final_preds = np.zeros(N)
+            weight_sums = np.zeros(N)
+            for i in range(N):
+                j_start = max(0, i - half_window)
+                j_end = min(N, i + half_window)
+                # corresponding columns in the prediction matrix
+                js = np.arange(j_start, j_end)
+                ks = half_window - (js - i)
+                # Remove invalid ks (outside [0, 2499])
+                valid_mask = (ks >= 0) & (ks < input_size)
+                js = js[valid_mask]
+                ks = ks[valid_mask]
+                pred_values = predictions[js, ks]
+                weights = triangle_weights[half_window - (js - i)]
+                final_preds[i] = np.sum(pred_values * weights)
+                weight_sums[i] = np.sum(weights)
+            final_preds /= weight_sums
+            files_predictions[target_file] = final_preds
+            if tagged_data:
+                is_dip = (file_content[tags_key][0:N] < 1) & (file_content[tags_key][0:N] > zero_epsilon)
+                diff = np.diff(is_dip.astype(int))
+                transit_starts = np.where(diff == 1)[0] + 1
+                transit_ends = np.where(diff == -1)[0] + 1
+                if is_dip[0]:
+                    transit_starts = np.insert(transit_starts, 0, 0)
+                if is_dip[-1]:
+                    transit_ends = np.append(transit_ends, len(is_dip))
+                is_positive = files_predictions[target_file] >= threshold
+                diff = np.diff(is_positive.astype(int))
+                positive_starts = np.where(diff == 1)[0] + 1
+                positive_ends = np.where(diff == -1)[0] + 1
+                if is_positive[0]:
+                    positive_starts = np.insert(positive_starts, 0, 0)
+                if is_positive[-1]:
+                    positive_ends = np.append(positive_ends, len(is_dip))
+                std = np.nanstd(file_content[flux_key][0:N])
+                for start, end in zip(transit_starts, transit_ends):
+                    region_preds = files_predictions[target_file][start:end]
+                    t0 = np.nanmedian(file_content[time_key][start:end][len(region_preds) // 2])
+                    depth = np.nanmedian(file_content[flux_key][start:end][len(region_preds) // 2])
+                    snr = (1 - depth) / std * np.sqrt(len(region_preds))
+                    if np.any(region_preds > threshold):
+                        target_stats = {'target_file': [target_file], 'type': ['tp'], 'depth': [depth], 'std': [std],
+                                        'snr': [snr], 't0': [t0], 'duration_points': [end - start], 'max_score': [np.max(region_preds)]}
+                    else:
+                        target_stats = {'target_file': [target_file], 'type': ['fn'], 'depth': [depth], 'std': [std],
+                                        'snr': [snr], 't0': [t0], 'duration_points': [end - start], 'max_score': [np.max(region_preds)]}
+                    stats_df = pd.concat([stats_df, pd.DataFrame.from_dict(target_stats)], ignore_index=True)
+                for start, end in zip(positive_starts, positive_ends):
+                    region_model = file_content[tags_key][start:end]
+                    region_preds = files_predictions[target_file][start:end]
+                    t0 = np.nanmedian(file_content[time_key][start:end][len(region_model) // 2])
+                    depth = np.nanmedian(file_content[flux_key][start:end][len(region_model) // 2])
+                    snr = (1 - depth) / std * np.sqrt(len(region_model))
+                    if not np.any((region_model < 1) & (region_model > zero_epsilon)):
+                        target_stats = {'target_file': [target_file], 'type': ['fp'], 'depth': [depth], 'std': [std],
+                                        'snr': [snr], 't0': [t0], 'duration_points': [end - start], 'max_score': [np.max(region_preds)]}
+                        stats_df = pd.concat([stats_df, pd.DataFrame.from_dict(target_stats)], ignore_index=True)
+                target_stats_df = stats_df.loc[stats_df['target_file'] == target_file]
+                target_tps = target_stats_df.loc[target_stats_df['type'] == 'tp', 'type'].count()
+                target_fps = target_stats_df.loc[target_stats_df['type'] == 'fp', 'type'].count()
+                target_fns = target_stats_df.loc[target_stats_df['type'] == 'fn', 'type'].count()
+                logging.info(f"Target {target_file} stats: precision={target_tps / (target_tps + target_fps)}, "
+                             f"recall={target_tps / (target_tps + target_fns)}, tps={target_tps}, "
+                             f"fps={target_fps}, fns={target_fns}")
+            # LOMB SCARGLE POWER COMPUTATION
+            # ls = LombScargle(file_content[time_key][0:N], files_predictions[target_file])
+            # frequencies = np.linspace(1 / ((file_content[time_key][N - 1] - file_content[time_key][0]) * 2 / 3), 1 / 0.1, N)
+            # files_predictions_spectra[target_file] = ls.power(frequencies)
+            # power_x = 1 / frequencies
+            # AUTOCORRELATION COMPUTATION
+            time_filled, flux_filled, cadence = self.fill_data_gaps(file_content[time_key][0:N], files_predictions[target_file], )
+            power_x, files_predictions_spectra[target_file] = self.compute_autocorrelation(flux_filled, cadence_s=cadence * 24 * 3600)
+            args = np.argwhere(power_x > 0.25).flatten()
+            power_x = power_x[args]
+            files_predictions_spectra[target_file] = files_predictions_spectra[target_file][args]
+            files_predictions_spectra[target_file] = self.compute_sde(files_predictions_spectra[target_file], 51)
             if plot:
-                N = files_predictions[target_file].shape[0]
-                fig, axs = plt.subplots(2 if not tagged_data else 3, 1, figsize=(16, 8),
+                fig, axs = plt.subplots(3 if not tagged_data else 4, 1, figsize=(16, 8),
                                         constrained_layout=True)
                 keys_greater_than_zero = np.argwhere(file_content[flux_key][0:N] > zero_epsilon).flatten()
                 min_flux = np.nanmin(file_content[flux_key][keys_greater_than_zero])
-                axs[0].set_ylim(bottom=min_flux)
-                axs[0].scatter(np.arange(0, N), file_content[flux_key][0:N])
-                axs[1].plot(np.arange(0, N), files_predictions[target_file])
+                axs[0].set_ylim(bottom=min_flux, top=np.nanmax(file_content[flux_key][keys_greater_than_zero]))
+                axs[0].scatter(file_content[time_key][0:N], file_content[flux_key][0:N], s=1)
+                axs[0].set_title(lcs_dir + '/' + target_file)
+                axs[1].plot(file_content[time_key][0:N], files_predictions[target_file])
+                axs[2].plot(power_x, files_predictions_spectra[target_file])
+                axs[2].set_xscale('log')
                 if tagged_data:
-                    axs[2].plot(np.arange(0, N), file_content[2][0:N])
+                    axs[3].plot(file_content[time_key][0:N], file_content[tags_key][0:N])
                 plt.title(target_file)
-                plt.show()
+                plt.savefig(lcs_dir + '/' + target_file + '.png', bbox_inches='tight', dpi=300)
+                plt.clf()
+                plt.close()
             current_index = current_index + len(file_content)
-        return files_predictions
+        return files_predictions, files_predictions_spectra, stats_df
+
+    def predict_folded(self, time: list, flux: list, model_dir: str, batch_size: int = 1024, input_size: int = 2500,
+                zero_epsilon: float = 1e-7, plot_positives=False, tagged_data: bool = False,
+                target_name: str = "", threshold=0.5, smooth=False, object_id='', plot_dir=None):
+        self.load_model(model_dir)
+        half_window = input_size // 2
+        generator = SantoFoldedPredictGenerator(time, flux, input_size=input_size, step_size=1,
+                                          batch_size=batch_size, zero_epsilon=zero_epsilon, smooth=smooth)
+        predictions = self.model.predict(generator)
+        left = np.linspace(0.1, 1.0, input_size // 2, endpoint=False)
+        right = np.linspace(1.0, 0.1, input_size // 2)
+        triangle_weights = np.concatenate([left, right])
+        current_index = 0
+        files_predictions = {}
+        files_predictions_spectra = {}
+        stats_df = pd.DataFrame(columns=['target_file', 'type', 'depth', 'std', 'snr'])
+        max_predictions = np.zeros(input_size)
+        for index, prediction in enumerate(predictions):
+            max_predictions[index] = np.nanmax(prediction)
+        spectrum = self.compute_sde(max_predictions, 51)
+        if plot_dir is not None:
+            fig, axs = plt.subplots(2 if not tagged_data else 3, 1, figsize=(16, 8),
+                                    constrained_layout=True)
+            periods = generator.periods
+            max_sde_index = np.argmax(spectrum)
+            best_period = periods[max_sde_index]
+            phases = foldedleastsquares.core.foldfast(time, best_period)
+            sort_index = np.argsort(phases, kind="mergesort")  # 8% faster than Quicksort
+            folded_flux = flux[sort_index]
+            folded_time = time[sort_index]
+            bin_centers, bin_means, bin_width, bin_stds = LcbuilderHelper.bin(time, flux, bins=input_size)
+            axs[0].plot(periods, spectrum)
+            best_prediction_bin_index = np.argmax(predictions[max_sde_index])
+            axs[1].scatter(folded_time, folded_flux, s=1)
+            axs[1].vbar(bin_centers[best_prediction_bin_index], np.nanmin(bin_means), np.nanmax(bin_means))
+            axs[1].set_title(f'{object_id} Power Spectrum')
+            # if tagged_data:
+            #     axs[3].plot(file_content[time_key][0:N], file_content[tags_key][0:N])
+            plt.title(f'{object_id} Power Spectrum')
+            plt.savefig(plot_dir + '/spectrum.png', bbox_inches='tight', dpi=300)
+            plt.clf()
+            plt.close()
+        return files_predictions, files_predictions_spectra, stats_df
 
     def tokenize_found_transits(self, time, flux, predictions, window_size=500, plot=False, tagged_data=None):
         positive_predictions = predictions
@@ -374,15 +507,18 @@ class SANTO(WithLogging):
                 AUC(curve="PR", name="pr_auc")]
 
     def instance_generator(self, dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon, shuffle=True,
-                           step_indexes=1):
+                           step_indexes=1, from_arrays=True):
         return SantoGenerator(dir, dataset, input_size=input_sizes, step_size=1, batch_size=batch_size,
-                              shuffle=shuffle, zero_epsilon=zero_epsilon, indexes_steps=step_indexes)
+                              shuffle=shuffle, zero_epsilon=zero_epsilon, indexes_steps=step_indexes, from_arrays=from_arrays)
 
     def load_training_set(self, **kwargs):
         training_dir = kwargs.get('training_dir')
-        target_files = glob.glob(f'/{training_dir}/**/*.csv', recursive=True)
-        target_files = [os.path.basename(path) for path in target_files]
-        return target_files
+        all_target_files = glob.glob(f'/{training_dir}/**/*.csv', recursive=True)
+        #target_files = []
+        #for target_file in all_target_files:
+        #    if not (target_file.endswith("cadences.csv") or target_file.endswith("flux.csv") or target_file.endswith("tags.csv")):
+        #        target_files = target_files + [os.path.basename(target_file)]
+        return all_target_files
 
     def prepare_training_data(self, training_dir, output_dir, batch_size, train_percent=0.8, validation_percent=0.1,
                               training_set_limit=None, balance_class_id=None, balance_class_sampling=None):
@@ -466,8 +602,7 @@ class SANTO(WithLogging):
         return initial_lr
 
     def build_optimizer(self, hyperparams, steps_per_epoch):
-        # from exoml.ml.callback.learning_rate import MultiOptimizer
-        from tensorflow_addons.optimizers import MultiOptimizer
+        from exoml.ml.callback.learning_rate import MultiOptimizer
         initial_lr = self.compute_initial_lr(hyperparams)
         optimizer = self.build_swa_optimizer(hyperparams, initial_lr, steps_per_epoch)
         if hyperparams.lr_progression != 1:
@@ -489,8 +624,8 @@ class SANTO(WithLogging):
         return optimizer
 
     def build_swa_optimizer(self, hyperparams: HyperParams, lr, steps_per_epoch):
-        # from exoml.ml.callback.learning_rate import SWA
-        from tensorflow_addons.optimizers import SWA
+        from exoml.ml.callback.learning_rate import SWA
+        # from tensorflow_addons.optimizers import SWA
         if hyperparams.stochastic_weight_average_wait > 0:
             optimizer = tf.keras.optimizers.legacy.Adam(lr,
                                                         beta_1=0.9, beta_2=0.98, epsilon=1e-9,
@@ -672,6 +807,48 @@ class SANTO(WithLogging):
         plt.close(fig)
         plt.clf()
         logging.info("Plotted metrics")
+
+    def compute_sde(self, power_raw, window_size=51):
+        median_power = medfilt(power_raw, kernel_size=window_size)
+        power = power_raw - median_power
+        # Re-normalize to range between median = 0 and peak = SDE
+        # shift down to the mean being zero
+        power = power - numpy.mean(power)
+        SDE = numpy.max(power / numpy.std(power))
+        # scale factor to touch max=SDE
+        scale = SDE / numpy.max(power)
+        power = power * scale
+        return power
+
+    def fill_data_gaps(self, times, data, fill_value=1e-7, rtol=1e-5):
+        times = np.array(times)
+        data = np.array(data)
+        cadence = LcbuilderHelper.compute_cadence(times) / (24 * 60 * 60)
+        new_times = [times[0]]
+        new_data = [data[0]]
+        for i in range(1, len(times)):
+            dt = times[i] - times[i - 1]
+            if dt > cadence * (1 + rtol):
+                # Number of missing points
+                n_missing = int(np.round(dt / cadence)) - 1
+                # Insert missing times and fill_value
+                for j in range(1, n_missing + 1):
+                    new_times.append(times[i - 1] + j * cadence)
+                    new_data.append(fill_value)
+            new_times.append(times[i])
+            new_data.append(data[i])
+        return np.array(new_times), np.array(new_data), cadence
+
+    def compute_autocorrelation(self, data, max_days=15, cadence_s=120):
+        nlags = int(max_days / (cadence_s / 60 / 60 / 24))
+        x = numpy.asarray(data)
+        x = x - numpy.mean(x)
+        result = numpy.correlate(x, x, mode='full')
+        mid = len(result) // 2
+        result = result[mid:mid + nlags + 1]
+        correlation = result / result[0]
+        lags = numpy.linspace(0, max_days, len(correlation))
+        return lags, correlation
 
 # SANTO().train("/data/scratch/ml/santo/training_data/", "/data/scratch/exoml/SANTO",
 #               hyperparams=HyperParams(batch_size=100, epochs=10, run_eagerly=True))

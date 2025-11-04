@@ -1,22 +1,14 @@
 import logging
 import tensorflow as tf
 import numpy as np
-import seaborn as sns
 import matplotlib.pyplot as plt
 import keras
 import pandas as pd
 from keras import Model
 from keras.layers import LeakyReLU
-from keras.losses import MeanSquaredError, MeanAbsoluteError
-from keras.metrics import RootMeanSquaredError
-from keras_core.src.metrics import R2Score
-from lcbuilder.helper import LcbuilderHelper
+from keras.src.losses import binary_crossentropy, mean_squared_error
 
 from exoml.haunter.haunter_generator import HaunterModelGenerator
-from exoml.ml.log.with_logging import WithLogging
-from exoml.ml.loss.unsupervised import intransit_weighted_mean_squared_error
-from exoml.ml.metrics.fixed_mean import FixedMean
-import astropy.units as u
 
 from exoml.ml.model.base_model import BaseModel, HyperParams
 
@@ -43,34 +35,20 @@ class Haunter(BaseModel):
         dataset_large = pd.read_csv(f"{dir}/kunal_table.csv", sep=',')
         dataset = pd.concat([dataset, dataset_large])
         dataset = dataset.loc[dataset['physical?'] == True]
-        dataset = dataset.loc[dataset['job_path'] != 'run_folders/model_0019663']
+        dataset['log10_mass_integral_output'] = np.log10(np.abs(dataset['f_s_SI_output']) / (M_EARTH * dataset['mass_Mearth_input']))
         return dataset
 
     def build(self):
         input = keras.Input(shape=(self.input_size,))
         nn = keras.layers.GaussianNoise(self.hyperparams.white_noise_std)(input)
-        nn = keras.layers.Dense(128, activation=LeakyReLU(0.01))(nn)
-        nn = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(nn)
-        nn = keras.layers.Dense(256, activation=LeakyReLU(0.01))(nn)
-        nn = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(nn)
-        nn = keras.layers.Dense(512, activation=LeakyReLU(0.01))(nn)
-        nn = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(nn)
         nn = keras.layers.Dense(1024, activation=LeakyReLU(0.01))(nn)
         nn = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(nn)
-        nn = keras.layers.Dense(2048, activation=LeakyReLU(0.01))(nn)
-        nn = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(nn)
-        nn = keras.layers.Dense(2048, activation=LeakyReLU(0.01))(nn)
-        nn = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(nn)
+        nn = keras.layers.BatchNormalization()(nn)
         nn = keras.layers.Dense(1024, activation=LeakyReLU(0.01))(nn)
         nn = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(nn)
-        nn = keras.layers.Dense(512, activation=LeakyReLU(0.01))(nn)
-        nn = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(nn)
-        nn = keras.layers.Dense(256, activation=LeakyReLU(0.01))(nn)
-        nn = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(nn)
-        nn = keras.layers.Dense(128, activation=LeakyReLU(0.01))(nn)
-        nn = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(nn)
+        nn = keras.layers.BatchNormalization()(nn)
         nn = keras.layers.Dense(3, activation="linear")(nn)
-        nn = keras.layers.Concatenate()([nn, input])
+        #nn = keras.layers.Concatenate()([nn, input])
         self.set_model(Model(inputs=input, outputs=nn))
         return self
 
@@ -108,24 +86,28 @@ class Haunter(BaseModel):
         self.output_means = tf.constant([
             dataset['radius_Rearth_output'].mean(),
             dataset['entropy_SI_output'].mean(),
-            dataset['f_s_SI_output'].mean()], dtype=tf.float32)
+            #dataset['f_s_SI_output'].mean(),
+            dataset['log10_mass_integral_output'].mean()], dtype=tf.float32)
         self.output_stds = tf.constant([
             dataset['radius_Rearth_output'].std(),
             dataset['entropy_SI_output'].std(),
-            dataset['f_s_SI_output'].std()], dtype=tf.float32)
+            #dataset['f_s_SI_output'].std(),
+            dataset['log10_mass_integral_output'].std()], dtype=tf.float32)
         self.output_mins = tf.constant([
             dataset['radius_Rearth_output'].min(),
             dataset['entropy_SI_output'].min(),
-            dataset['f_s_SI_output'].min()], dtype=tf.float32)
+            #dataset['f_s_SI_output'].min(),
+            dataset['log10_mass_integral_output'].min()], dtype=tf.float32)
         self.output_maxs = tf.constant([
             dataset['radius_Rearth_output'].max(),
             dataset['entropy_SI_output'].max(),
-            dataset['f_s_SI_output'].max()], dtype=tf.float32)
+            #dataset['f_s_SI_output'].max(),
+            dataset['log10_mass_integral_output'].max()], dtype=tf.float32)
         dataset = self.add_standardized_columns(dataset, dataset)
         return dataset
 
     def instance_scaler(self):
-        return MinMaxScaler()
+        return StandardizeScaler()
 
     def add_standardized_columns(self, dataset, training_dataset):
         scaler = self.instance_scaler()
@@ -156,6 +138,9 @@ class Haunter(BaseModel):
         scaler = self.instance_scaler()
         scaler.fit(training_dataset.loc[:, 'f_s_SI_output'])
         dataset.loc[:, 'f_s_SI_output_norm'] = scaler.transform(dataset.loc[:, 'f_s_SI_output'].to_numpy())
+        scaler = self.instance_scaler()
+        scaler.fit(training_dataset.loc[:, 'log10_mass_integral_output'])
+        dataset.loc[:, 'log10_mass_integral_output_norm'] = scaler.transform(dataset.loc[:, 'log10_mass_integral_output'].to_numpy())
         logging.info("Mass " + str(training_dataset.loc[:, 'mass_Mearth_input'].mean()) + ' +- ' + str(
             training_dataset.loc[:, 'mass_Mearth_input'].std()) +
                      ' ' + str(training_dataset.loc[:, 'mass_Mearth_input'].min()) + ' ' + str(
@@ -192,6 +177,10 @@ class Haunter(BaseModel):
             training_dataset.loc[:, 'f_s_SI_output'].std()) +
                      ' ' + str(training_dataset.loc[:, 'f_s_SI_output'].min()) + ' ' + str(
             training_dataset.loc[:, 'f_s_SI_output'].max()))
+        logging.info("Log10 mass integral " + str(training_dataset.loc[:, 'log10_mass_integral_output'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'log10_mass_integral_output'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'log10_mass_integral_output'].min()) + ' ' + str(
+            training_dataset.loc[:, 'log10_mass_integral_output'].max()))
         return dataset
 
     def add_destandardized_columns(self, dataset, training_dataset, predictions):
@@ -229,20 +218,28 @@ class Haunter(BaseModel):
             training_dataset.loc[:, 'entropy_SI_output'].std()) +
                      ' ' + str(training_dataset.loc[:, 'entropy_SI_output'].min()) + ' ' + str(
             training_dataset.loc[:, 'entropy_SI_output'].max()))
+        # logging.info(
+        #     "F_S " + str(training_dataset.loc[:, 'f_s_SI_output'].mean()) + ' +- ' + str(
+        #         training_dataset.loc[:, 'f_s_SI_output'].std()) +
+        #     ' ' + str(training_dataset.loc[:, 'f_s_SI_output'].min()) + ' ' + str(
+        #         training_dataset.loc[:, 'f_s_SI_output'].max()))
         logging.info(
-            "F_S " + str(training_dataset.loc[:, 'f_s_SI_output'].mean()) + ' +- ' + str(
-                training_dataset.loc[:, 'f_s_SI_output'].std()) +
-            ' ' + str(training_dataset.loc[:, 'f_s_SI_output'].min()) + ' ' + str(
-                training_dataset.loc[:, 'f_s_SI_output'].max()))
+            "Log10 mass integral " + str(training_dataset.loc[:, 'log10_mass_integral_output'].mean()) + ' +- ' + str(
+                training_dataset.loc[:, 'log10_mass_integral_output'].std()) +
+            ' ' + str(training_dataset.loc[:, 'log10_mass_integral_output'].min()) + ' ' + str(
+                training_dataset.loc[:, 'log10_mass_integral_output'].max()))
         scaler = self.instance_scaler()
         scaler.fit(training_dataset.loc[:, 'radius_Rearth_output'])
         dataset.loc[:, 'radius_Rearth_output_pred'] = scaler.inverse_transform(predictions[:, 0])
         scaler = self.instance_scaler()
         scaler.fit(training_dataset.loc[:, 'entropy_SI_output'])
         dataset.loc[:, 'entropy_SI_output_pred'] = scaler.inverse_transform(predictions[:, 1])
+        # scaler = self.instance_scaler()
+        # scaler.fit(training_dataset.loc[:, 'f_s_SI_output'])
+        # dataset.loc[:, 'f_s_SI_output_pred'] = scaler.inverse_transform(predictions[:, 2])
         scaler = self.instance_scaler()
-        scaler.fit(training_dataset.loc[:, 'f_s_SI_output'])
-        dataset.loc[:, 'f_s_SI_output_pred'] = scaler.inverse_transform(predictions[:, 2])
+        scaler.fit(training_dataset.loc[:, 'log10_mass_integral_output'])
+        dataset.loc[:, 'log10_mass_integral_output_pred'] = scaler.inverse_transform(predictions[:, 2])
         return dataset
 
     def instance_generator(self, dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon=1e-7, shuffle=True):
@@ -251,156 +248,111 @@ class Haunter(BaseModel):
     def instance_loss_accuracy(self):
         # loss = tf.keras.losses.MeanAbsolutePercentageError(reduction=losses_utils.ReductionV2.AUTO)
         loss = tf.keras.losses.MeanSquaredError()
+        #loss = self.combined_loss
         return loss, None
 
     def instance_metrics(self):
-        return [self.rmse_radius, self.rmse_entropy, self.rmse_fs,
-                self.mae_radius, self.mae_entropy, self.mae_fs,
-                self.r2_radius, self.r2_entropy, self.r2_fs, self.r2_total]
+        return [self.mae_radius, self.mae_entropy, self.mae_log10_mass_integral]
 
     def plot_metrics(self, model_dir, steps_per_epoch, with_validation=False):
         return []
 
     def load_model(self, dir, custom_objects={}, compile=False):
+        custom_objects['LeakyReLU'] = LeakyReLU
         custom_objects['mse_radius'] = self.mse_radius
         custom_objects['mse_entropy'] = self.mse_entropy
         custom_objects['mse_fs'] = self.mse_fs
-        custom_objects['rmse_radius'] = self.rmse_radius
-        custom_objects['rmse_entropy'] = self.rmse_entropy
-        custom_objects['rmse_fs'] = self.rmse_fs
         custom_objects['mae_radius'] = self.mae_radius
         custom_objects['mae_entropy'] = self.mae_entropy
         custom_objects['mae_fs'] = self.mae_fs
-        custom_objects['r2_radius'] = self.r2_radius
-        custom_objects['r2_entropy'] = self.r2_entropy
-        custom_objects['r2_fs'] = self.r2_fs
         logging.info("Loading model from %s", dir)
         self.set_model(tf.keras.models.load_model(dir, compile=compile, custom_objects=custom_objects))
         return self
 
-    def predict_non_physical(self, dir, batch_size=128):
-        dataset = pd.read_csv(f"{dir}/table.csv", sep=',')
-        dataset_large = pd.read_csv(f"{dir}/kunal_table.csv", sep=',')
-        dataset = pd.concat([dataset, dataset_large])
-        dataset_training = dataset.loc[dataset['physical?'] == True]
-        dataset_training = dataset_training.loc[dataset_training['job_path'] != 'run_folders/model_0019663']
-        dataset_testing = dataset.loc[dataset['physical?'] == False]
-        dataset_testing = self.add_standardized_columns(dataset_testing, dataset_training)
-        predict_batch_generator = self.instance_generator(dataset_testing, None, batch_size, self.input_size, None)
-        predictions = self.model.predict(predict_batch_generator, batch_size=batch_size, workers=1)
-        dataset_testing['radius_Rearth_output_norm_pred'] = predictions[:, 0]
-        dataset_testing['entropy_SI_output_norm_pred'] = predictions[:, 1]
-        dataset_testing['f_s_SI_output_norm_pred'] = predictions[:, 2]
-        dataset_testing = self.add_destandardized_columns(dataset_testing, dataset_training, predictions)
-        dataset_testing['radius_Rearth_output_pred_diff'] = np.abs(
-            dataset_testing['radius_Rearth_output_pred'] - dataset_testing['radius_Rearth_output'])
-        dataset_testing['entropy_SI_output_pred_diff'] = np.abs(
-            dataset_testing['entropy_SI_output_pred'] - dataset_testing['entropy_SI_output'])
-        dataset_testing['f_s_SI_output_pred_diff'] = np.abs(
-            dataset_testing['f_s_SI_output_pred'] - dataset_testing['f_s_SI_output'])
-        dataset_testing['radius_Rearth_output_pred_diff_ratio'] = np.abs(
-            dataset_testing['radius_Rearth_output_pred'] - dataset_testing['radius_Rearth_output']) / dataset_testing[
-                                                                      'radius_Rearth_output']
-        dataset_testing['entropy_SI_output_pred_diff_ratio'] = np.abs(
-            dataset_testing['entropy_SI_output_pred'] - dataset_testing['entropy_SI_output']) / dataset_testing[
-                                                                   'entropy_SI_output']
-        dataset_testing['f_s_SI_output_pred_diff_ratio'] = np.abs(
-            dataset_testing['f_s_SI_output_pred'] - dataset_testing['f_s_SI_output']) / dataset_testing['f_s_SI_output']
-        results_df = dataset_testing[['radius_Rearth_output', 'radius_Rearth_output_norm',
-                                      'radius_Rearth_output_pred', 'radius_Rearth_output_norm_pred',
-                                      'radius_Rearth_output_pred_diff', 'radius_Rearth_output_pred_diff_ratio',
-                                      'f_s_SI_output', 'f_s_SI_output_norm',
-                                      'f_s_SI_output_pred', 'f_s_SI_output_norm_pred',
-                                      'f_s_SI_output_pred_diff', 'f_s_SI_output_pred_diff_ratio',
-                                      'entropy_SI_output', 'entropy_SI_output_norm',
-                                      'entropy_SI_output_pred', 'entropy_SI_output_norm_pred',
-                                      'entropy_SI_output_pred_diff', 'entropy_SI_output_pred_diff_ratio']]
-        logging.info("Results non physical: \n%s", results_df.to_string())
-        logging.info("Non physical radius diff ratio mean: " + str(
-            dataset_testing.loc[:, 'radius_Rearth_output_pred_diff_ratio'].mean()) + '+-' +
-                     str(dataset_testing.loc[:, 'radius_Rearth_output_pred_diff_ratio'].std()))
-        logging.info("Non physical f_s_SI diff ratio mean: " + str(
-            dataset_testing.loc[:, 'f_s_SI_output_pred_diff_ratio'].mean()) + '+-' +
-                     str(dataset_testing.loc[:, 'f_s_SI_output_pred_diff_ratio'].std()))
-        logging.info("Non physical entropy_SI diff ratio mean: " + str(
-            dataset_testing.loc[:, 'entropy_SI_output_pred_diff_ratio'].mean()) + '+-' +
-                     str(dataset_testing.loc[:, 'entropy_SI_output_pred_diff_ratio'].std()))
-        logging.info("Non physical radius diff ratio median: " + str(
-            dataset_testing.loc[:, 'radius_Rearth_output_pred_diff_ratio'].median()) + '+-' +
-                     str(dataset_testing.loc[:, 'radius_Rearth_output_pred_diff_ratio'].std()))
-        logging.info("Non physical f_s_SI diff ratio median: " + str(
-            dataset_testing.loc[:, 'f_s_SI_output_pred_diff_ratio'].median()) + '+-' +
-                     str(dataset_testing.loc[:, 'f_s_SI_output_pred_diff_ratio'].std()))
-        logging.info("Non physical entropy_SI diff ratio median: " + str(
-            dataset_testing.loc[:, 'entropy_SI_output_pred_diff_ratio'].median()) + '+-' +
-                     str(dataset_testing.loc[:, 'entropy_SI_output_pred_diff_ratio'].std()))
-        return dataset_testing
-
     def predict_validation(self, model_dir, dir, batch_size=128):
-        dataset = pd.read_csv(f"{dir}/table.dat", sep=' ')
-        dataset_training = dataset.loc[dataset['physical?'] == True]
-        dataset_training = dataset_training.loc[dataset_training['job_path'] != 'run_folders/model_0019663']
+        dataset_training = pd.read_csv(f"{model_dir}/train_dataset.csv")
+        dataset_training['log10_mass_integral_output'] = np.log10(np.abs(dataset_training['f_s_SI_output']) / (M_EARTH * dataset_training['mass_Mearth_input']))
         dataset_validation = pd.read_csv(f"{model_dir}/validation_dataset.csv")
-        dataset_training = self.add_standardized_columns(dataset_validation, dataset_training)
+        dataset_validation['log10_mass_integral_output'] = np.log10(np.abs(dataset_validation['f_s_SI_output']) / (M_EARTH * dataset_validation['mass_Mearth_input']))
+        dataset_standardization = pd.concat([dataset_training, dataset_validation])
+        dataset_training = self.add_standardized_columns(dataset_validation, dataset_standardization)
         predict_batch_generator = self.instance_generator(dataset_validation, None, batch_size, self.input_size, None,
                                                           shuffle=False)
         predictions = self.model.predict(predict_batch_generator, batch_size=batch_size)
         dataset_validation['radius_Rearth_output_norm_pred'] = predictions[:, 0]
         dataset_validation['entropy_SI_output_norm_pred'] = predictions[:, 1]
-        dataset_validation['f_s_SI_output_norm_pred'] = predictions[:, 2]
+        #dataset_validation['f_s_SI_output_norm_pred'] = predictions[:, 2]
+        dataset_validation['log10_mass_integral_output_norm_pred'] = predictions[:, 2]
         dataset_validation = self.add_destandardized_columns(dataset_validation, dataset_training, predictions)
         dataset_validation['radius_Rearth_output_pred_diff'] = np.abs(
             dataset_validation['radius_Rearth_output_pred'] - dataset_validation['radius_Rearth_output'])
         dataset_validation['entropy_SI_output_pred_diff'] = np.abs(
             dataset_validation['entropy_SI_output_pred'] - dataset_validation['entropy_SI_output'])
-        dataset_validation['f_s_SI_output_pred_diff'] = np.abs(
-            dataset_validation['f_s_SI_output_pred'] - dataset_validation['f_s_SI_output'])
+        #dataset_validation['f_s_SI_output_pred_diff'] = np.abs(
+        #    dataset_validation['f_s_SI_output_pred'] - dataset_validation['f_s_SI_output'])
+        dataset_validation['log10_mass_integral_output_pred_diff'] = np.abs(
+            dataset_validation['log10_mass_integral_output_pred'] - dataset_validation['log10_mass_integral_output'])
         dataset_validation['radius_Rearth_output_pred_diff_ratio'] = np.abs(
             dataset_validation['radius_Rearth_output_pred'] - dataset_validation['radius_Rearth_output']) / \
                                                                      dataset_validation['radius_Rearth_output']
         dataset_validation['entropy_SI_output_pred_diff_ratio'] = np.abs(
             dataset_validation['entropy_SI_output_pred'] - dataset_validation['entropy_SI_output']) / \
                                                                   dataset_validation['entropy_SI_output']
-        dataset_validation['f_s_SI_output_pred_diff_ratio'] = np.abs(
-            dataset_validation['f_s_SI_output_pred'] - dataset_validation['f_s_SI_output']) / np.abs(
-            dataset_validation['f_s_SI_output'])
+        #dataset_validation['f_s_SI_output_pred_diff_ratio'] = np.abs(
+        #    dataset_validation['f_s_SI_output_pred'] - dataset_validation['f_s_SI_output']) / np.abs(
+        #    dataset_validation['f_s_SI_output'])
+        dataset_validation['log10_mass_integral_output_pred_diff_ratio'] = np.abs(
+            dataset_validation['log10_mass_integral_output_pred'] - dataset_validation['log10_mass_integral_output']) / np.abs(
+            dataset_validation['log10_mass_integral_output'])
         results_df = dataset_validation[['radius_Rearth_output', 'radius_Rearth_output_norm',
                                          'radius_Rearth_output_pred', 'radius_Rearth_output_norm_pred',
                                          'radius_Rearth_output_pred_diff', 'radius_Rearth_output_pred_diff_ratio',
-                                         'f_s_SI_output', 'f_s_SI_output_norm',
-                                         'f_s_SI_output_pred', 'f_s_SI_output_norm_pred',
-                                         'f_s_SI_output_pred_diff', 'f_s_SI_output_pred_diff_ratio',
                                          'entropy_SI_output', 'entropy_SI_output_norm',
                                          'entropy_SI_output_pred', 'entropy_SI_output_norm_pred',
-                                         'entropy_SI_output_pred_diff', 'entropy_SI_output_pred_diff_ratio']]
+                                         'entropy_SI_output_pred_diff', 'entropy_SI_output_pred_diff_ratio',
+                                         #'f_s_SI_output', 'f_s_SI_output_norm',
+                                         #'f_s_SI_output_pred', 'f_s_SI_output_norm_pred',
+                                         #'f_s_SI_output_pred_diff', 'f_s_SI_output_pred_diff_ratio',
+                                         'log10_mass_integral_output', 'log10_mass_integral_output_norm',
+                                         'log10_mass_integral_output_pred', 'log10_mass_integral_output_norm_pred',
+                                         'log10_mass_integral_output_pred_diff', 'log10_mass_integral_output_pred_diff_ratio',]]
         logging.info("Results validation: \n%s", results_df.to_string())
         logging.info("Validation radius diff mean: " + str(
             dataset_validation.loc[:, 'radius_Rearth_output_pred_diff'].mean()) + '+-' +
                      str(dataset_validation.loc[:, 'radius_Rearth_output_pred_diff'].std()))
-        logging.info("Validation f_s_SI diff mean: " + str(
-            dataset_validation.loc[:, 'f_s_SI_output_pred_diff'].mean()) + '+-' +
-                     str(dataset_validation.loc[:, 'f_s_SI_output_pred_diff'].std()))
         logging.info("Validation entropy_SI diff mean: " + str(
             dataset_validation.loc[:, 'entropy_SI_output_pred_diff'].mean()) + '+-' +
                      str(dataset_validation.loc[:, 'entropy_SI_output_pred_diff'].std()))
+        #logging.info("Validation f_s_SI diff mean: " + str(
+        #    dataset_validation.loc[:, 'f_s_SI_output_pred_diff'].mean()) + '+-' +
+        #             str(dataset_validation.loc[:, 'f_s_SI_output_pred_diff'].std()))
+        logging.info("Validation log10_mass_integral diff mean: " + str(
+            dataset_validation.loc[:, 'log10_mass_integral_output_pred_diff'].mean()) + '+-' +
+                     str(dataset_validation.loc[:, 'log10_mass_integral_output_pred_diff'].std()))
         logging.info("Validation radius diff ratio median: " + str(
             dataset_validation.loc[:, 'radius_Rearth_output_pred_diff_ratio'].median()) + '+-' +
                      str(dataset_validation.loc[:, 'radius_Rearth_output_pred_diff_ratio'].std()))
-        logging.info("Validation f_s_SI diff ratio median: " + str(
-            dataset_validation.loc[:, 'f_s_SI_output_pred_diff_ratio'].median()) + '+-' +
-                     str(dataset_validation.loc[:, 'f_s_SI_output_pred_diff_ratio'].std()))
         logging.info("Validation entropy_SI diff ratio median: " + str(
             dataset_validation.loc[:, 'entropy_SI_output_pred_diff_ratio'].median()) + '+-' +
                      str(dataset_validation.loc[:, 'entropy_SI_output_pred_diff_ratio'].std()))
+        #logging.info("Validation f_s_SI diff ratio median: " + str(
+        #    dataset_validation.loc[:, 'f_s_SI_output_pred_diff_ratio'].median()) + '+-' +
+        #             str(dataset_validation.loc[:, 'f_s_SI_output_pred_diff_ratio'].std()))
+        logging.info("Validation log10_mass_integral diff ratio median: " + str(
+            dataset_validation.loc[:, 'log10_mass_integral_output_pred_diff_ratio'].median()) + '+-' +
+                     str(dataset_validation.loc[:, 'log10_mass_integral_output_pred_diff_ratio'].std()))
         logging.info("Validation radius diff ratio mean: " + str(
             dataset_validation.loc[:, 'radius_Rearth_output_pred_diff_ratio'].mean()) + '+-' +
                      str(dataset_validation.loc[:, 'radius_Rearth_output_pred_diff_ratio'].std()))
-        logging.info("Validation f_s_SI diff ratio mean: " + str(
-            dataset_validation.loc[:, 'f_s_SI_output_pred_diff_ratio'].mean()) + '+-' +
-                     str(dataset_validation.loc[:, 'f_s_SI_output_pred_diff_ratio'].std()))
         logging.info("Validation entropy_SI diff ratio mean: " + str(
             dataset_validation.loc[:, 'entropy_SI_output_pred_diff_ratio'].mean()) + '+-' +
                      str(dataset_validation.loc[:, 'entropy_SI_output_pred_diff_ratio'].std()))
+        #logging.info("Validation f_s_SI diff ratio mean: " + str(
+        #    dataset_validation.loc[:, 'f_s_SI_output_pred_diff_ratio'].mean()) + '+-' +
+        #             str(dataset_validation.loc[:, 'f_s_SI_output_pred_diff_ratio'].std()))
+        logging.info("Validation log10_mass_integral diff ratio mean: " + str(
+            dataset_validation.loc[:, 'log10_mass_integral_output_pred_diff_ratio'].mean()) + '+-' +
+                     str(dataset_validation.loc[:, 'log10_mass_integral_output_pred_diff_ratio'].std()))
         return dataset_validation
 
     def plot_hists(self, df, additional_columns=[]):
@@ -411,10 +363,11 @@ class Haunter(BaseModel):
                    'Tsurf_K_input', 'Tsurf_K_input_norm',
                    'Psurf_bar_input', 'Psurf_bar_input_norm',
                    'radius_Rearth_output', 'radius_Rearth_output_norm',
-                   'f_s_SI_output', 'f_s_SI_output_norm',
                    'entropy_SI_output', 'entropy_SI_output_norm',
+                   'f_s_SI_output', 'f_s_SI_output_norm',
+                   'log10_mass_integral_output', 'log10_mass_integral_output_norm'
                    ]
-        fig, axs = plt.subplots(9, 2, figsize=(10, 30))
+        fig, axs = plt.subplots(10, 2, figsize=(10, 30))
         for i, col in enumerate(columns):
             axs[i // 2][i % 2].hist(df[col].dropna(), bins=15, color='lightblue', edgecolor='black')
             axs[i // 2][i % 2].set_title(f"Distribution of {col}")
@@ -434,112 +387,53 @@ class Haunter(BaseModel):
 
 
     def mse_radius(self, y_true, y_pred):
-        y_pred_outputs = y_pred[:, :3]
-        y_true_outputs = y_true[:, :3]
+        y_pred_outputs = y_pred
+        y_true_outputs = y_true
         y_pred_outputs = y_pred_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
         y_true_outputs = y_true_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
         return tf.reduce_mean(tf.square(y_true_outputs[:, 0] - y_pred_outputs[:, 0]))
 
     def mse_entropy(self, y_true, y_pred):
-        y_pred_outputs = y_pred[:, :3]
-        y_true_outputs = y_true[:, :3]
+        y_pred_outputs = y_pred
+        y_true_outputs = y_true
         y_pred_outputs = y_pred_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
         y_true_outputs = y_true_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
         return tf.reduce_mean(tf.square(y_true_outputs[:, 1] - y_pred_outputs[:, 1]))
 
     def mse_fs(self, y_true, y_pred):
-        y_pred_outputs = y_pred[:, :3]
-        y_true_outputs = y_true[:, :3]
+        y_pred_outputs = y_pred
+        y_true_outputs = y_true
         y_pred_outputs = y_pred_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
         y_true_outputs = y_true_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
         return tf.reduce_mean(tf.square(y_true_outputs[:, 2] - y_pred_outputs[:, 2]))
 
-    def rmse_radius(self, y_true, y_pred):
-        y_pred_outputs = y_pred[:, :3]
-        y_true_outputs = y_true[:, :3]
-        y_pred_outputs = y_pred_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        y_true_outputs = y_true_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        return tf.sqrt(tf.reduce_mean(tf.square(y_true_outputs[:, 0] - y_pred_outputs[:, 0])))
-
-    def rmse_entropy(self, y_true, y_pred):
-        y_pred_outputs = y_pred[:, :3]
-        y_true_outputs = y_true[:, :3]
-        y_pred_outputs = y_pred_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        y_true_outputs = y_true_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        return tf.sqrt(tf.reduce_mean(tf.square(y_true_outputs[:, 1] - y_pred_outputs[:, 1])))
-
-    def rmse_fs(self, y_true, y_pred):
-        y_pred_outputs = y_pred[:, :3]
-        y_true_outputs = y_true[:, :3]
-        y_pred_outputs = y_pred_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        y_true_outputs = y_true_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        return tf.sqrt(tf.reduce_mean(tf.square(y_true_outputs[:, 2] - y_pred_outputs[:, 2])))
-
     def mae_radius(self, y_true, y_pred):
-        y_pred_outputs = y_pred[:, :3]
-        y_true_outputs = y_true[:, :3]
-        y_pred_outputs = y_pred_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        y_true_outputs = y_true_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
+        y_pred_outputs = y_pred
+        y_true_outputs = y_true
+        y_pred_outputs = y_pred_outputs * (self.output_stds + 1e-8) + self.output_means
+        y_true_outputs = y_true_outputs * (self.output_stds + 1e-8) + self.output_means
         return tf.reduce_mean(tf.abs(y_true_outputs[:, 0] - y_pred_outputs[:, 0]))
 
     def mae_entropy(self, y_true, y_pred):
-        y_pred_outputs = y_pred[:, :3]
-        y_true_outputs = y_true[:, :3]
-        y_pred_outputs = y_pred_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        y_true_outputs = y_true_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
+        y_pred_outputs = y_pred
+        y_true_outputs = y_true
+        y_pred_outputs = y_pred_outputs * (self.output_stds + 1e-8) + self.output_means
+        y_true_outputs = y_true_outputs * (self.output_stds + 1e-8) + self.output_means
         return tf.reduce_mean(tf.abs(y_true_outputs[:, 1] - y_pred_outputs[:, 1]))
 
     def mae_fs(self, y_true, y_pred):
-        y_pred_outputs = y_pred[:, :3]
-        y_true_outputs = y_true[:, :3]
-        y_pred_outputs = y_pred_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        y_true_outputs = y_true_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
+        y_pred_outputs = y_pred
+        y_true_outputs = y_true
+        y_pred_outputs = y_pred_outputs * (self.output_stds + 1e-8) + self.output_means
+        y_true_outputs = y_true_outputs * (self.output_stds + 1e-8) + self.output_means
         return tf.reduce_mean(tf.abs(y_true_outputs[:, 2] - y_pred_outputs[:, 2]))
 
-    def r2_radius(self, y_true, y_pred):
-        y_pred_outputs = y_pred[:, :3]
-        y_true_outputs = y_true[:, :3]
-        y_pred_outputs = y_pred_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        y_true_outputs = y_true_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        ss_res = tf.reduce_sum(tf.square(y_true_outputs[:, 0] - y_pred_outputs[:, 0]))
-        ss_tot = tf.reduce_sum(tf.square(y_true_outputs[:, 0] - tf.reduce_mean(y_true_outputs[:, 0])))
-        return 1 - ss_res / (ss_tot + 1e-7)  # Add epsilon to avoid division by zero
-
-    def r2_entropy(self, y_true, y_pred):
-        y_pred_outputs = y_pred[:, :3]
-        y_true_outputs = y_true[:, :3]
-        y_pred_outputs = y_pred_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        y_true_outputs = y_true_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        ss_res = tf.reduce_sum(tf.square(y_true_outputs[:, 1] - y_pred_outputs[:, 1]))
-        ss_tot = tf.reduce_sum(tf.square(y_true_outputs[:, 1] - tf.reduce_mean(y_true_outputs[:, 1])))
-        return 1 - ss_res / (ss_tot + 1e-7)
-
-    def r2_fs(self, y_true, y_pred):
-        y_pred_outputs = y_pred[:, :3]
-        y_true_outputs = y_true[:, :3]
-        y_pred_outputs = y_pred_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        y_true_outputs = y_true_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        ss_res = tf.reduce_sum(tf.square(y_true_outputs[:, 2] - y_pred_outputs[:, 2]))
-        ss_tot = tf.reduce_sum(tf.square(y_true_outputs[:, 2] - tf.reduce_mean(y_true_outputs[:, 2])))
-        return 1 - ss_res / (ss_tot + 1e-7)
-
-    def r2_total(self, y_true, y_pred):
-        y_pred_outputs = y_pred[:, :3]
-        y_true_outputs = y_true[:, :3]
-        ss_res = tf.reduce_sum(tf.square(y_true_outputs[:, 2] - y_pred_outputs[:, 2]))
-        ss_tot = tf.reduce_sum(tf.square(y_true_outputs[:, 2] - tf.reduce_mean(y_true_outputs[:, 2])))
-        r2_f = 1 - ss_res / (ss_tot + 1e-7)
-        y_pred_outputs = y_pred[:, :3]
-        y_true_outputs = y_true[:, :3]
-        ss_res = tf.reduce_sum(tf.square(y_true_outputs[:, 1] - y_pred_outputs[:, 1]))
-        ss_tot = tf.reduce_sum(tf.square(y_true_outputs[:, 1] - tf.reduce_mean(y_true_outputs[:,1])))
-        r2_e = 1 - ss_res / (ss_tot + 1e-7)
-        y_pred_outputs = y_pred[:, :3]
-        y_true_outputs = y_true[:, :3]
-        ss_res = tf.reduce_sum(tf.square(y_true_outputs[:, 0] - y_pred_outputs[:, 0]))
-        ss_tot = tf.reduce_sum(tf.square(y_true_outputs[:, 0] - tf.reduce_mean(y_true_outputs[:,0])))
-        r2_r = 1 - ss_res / (ss_tot + 1e-7)
-        return (r2_f + r2_e + r2_r) / 3
+    def mae_log10_mass_integral(self, y_true, y_pred):
+        y_pred_outputs = y_pred
+        y_true_outputs = y_true
+        y_pred_outputs = y_pred_outputs * (self.output_stds + 1e-8) + self.output_means
+        y_true_outputs = y_true_outputs * (self.output_stds + 1e-8) + self.output_means
+        return tf.reduce_mean(tf.abs(y_true_outputs[:, 2] - y_pred_outputs[:, 2]))
 
     def combined_loss(self, y_true, y_pred):
         y_pred_outputs = y_pred[:, :3]
@@ -599,12 +493,26 @@ class Haunter(BaseModel):
         loss_dmdr = tf.reduce_mean(tf.abs((mass / radius_pred - dm_dr_estimate_pred) - (mass / radius_true - dm_dr_estimate_true)))
         # Densities consistency (estimated by percents of composition vs mass/radius densities)
         loss_rho_match = tf.reduce_mean(tf.abs((rho_mean_pred - rho_comp) - (rho_mean_true - rho_comp)))
+
+
+        # Additional f_s losses
+        f_s_true_abs = tf.abs(f_s_true)
+        f_s_pred_abs = tf.abs(f_s_pred)
+        f_s_true_log = np.log10(f_s_true_abs)  # this is option 1
+        f_s_pred_log = np.log10(f_s_pred_abs)  # this is option 1
+        f_s_true_mass_factor = f_s_true_abs / (mass)
+        f_s_pred_mass_factor = f_s_pred_abs / (mass)
+        log10_mass_integral_true = np.log10(f_s_true_mass_factor)  # this is option 2
+        log10_mass_integral_pred = np.log10(f_s_pred_mass_factor)  # this is option 2
+        log10_mass_integral_loss = tf.reduce_mean(tf.square(log10_mass_integral_true - log10_mass_integral_pred))
+
+
         # MSE
         radius_mse_outputs = tf.reduce_mean(tf.square(radius_true - radius_pred))
         entropy_mse_outputs = tf.reduce_mean(tf.square(entropy_true - entropy_pred))
         f_s_mae_outputs = tf.reduce_mean(tf.abs(f_s_true - f_s_pred))
-        print(f'{radius_mse_outputs} {entropy_mse_outputs} {f_s_mae_outputs}')
-        total_loss = radius_mse_outputs + entropy_mse_outputs + f_s_mae_outputs
+        mse = tf.reduce_mean(mean_squared_error(y_true, y_pred))
+        total_loss = mse + log10_mass_integral_loss
         # total_loss = (
         #     total_loss +
         #     0.2 * loss_dpdr +

@@ -21,18 +21,30 @@ class HaunterModelGenerator(tf.keras.utils.Sequence):
             self.dataset = self.dataset.sample(frac=1).reset_index(drop=True)
 
     def __len__(self):
-        return (np.ceil(len(self.dataset) / float(self.batch_size))).astype(int)
+        leng = (np.ceil(len(self.dataset) / float(self.batch_size))).astype(int)
+        return leng
 
     def __getitem__(self, idx):
         batch_rows = self.dataset[idx * self.batch_size: (idx + 1) * self.batch_size]
         batch_data_array = batch_rows.loc[:, ['mass_Mearth_input_norm', 'CMF_input_norm', 'Zenv_input_norm',
                                               'Zwater_core_input_norm', 'Tsurf_K_input_norm', 'Psurf_bar_input_norm']]
         batch_data_values = batch_rows.loc[:, ['radius_Rearth_output_norm', 'entropy_SI_output_norm',
-                                               'f_s_SI_output_norm', 'mass_Mearth_input_norm', 'CMF_input_norm', 'Zenv_input_norm',
-                                              'Zwater_core_input_norm', 'Tsurf_K_input_norm', 'Psurf_bar_input_norm']]
+                                               'log10_mass_integral_output_norm']]
         #assert np.all((batch_data_array > 0) & (batch_data_array < 1))
         #assert np.all((batch_data_values > 0) & (batch_data_values < 1))
         return batch_data_array.to_numpy(dtype=np.float32), batch_data_values.to_numpy(dtype=np.float32)
 
     def class_weights(self):
         return None
+
+    def get_dataset(self):
+        x_spec = (
+            tf.TensorSpec(shape=(None, 6, 1), dtype=tf.float32)
+        )
+
+        y_spec = tf.TensorSpec(shape=(None, 3,), dtype=tf.float32)  # Adjust if label shape is different
+
+        return tf.data.Dataset.from_generator(
+            lambda: iter(self),
+            output_signature=(x_spec, y_spec)
+        ).take(len(self)).repeat()

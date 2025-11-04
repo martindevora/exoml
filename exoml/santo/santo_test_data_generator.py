@@ -145,7 +145,7 @@ class TransitsInjector(FeaturesInjector):
                 t0 = np.random.uniform(self.time_series[0][0], self.time_series[0][-1])
             std = np.nanstd(self.time_series[1])
             depth = 0
-            while depth < std / 3 or depth >= 0.4:
+            while depth < std / 5 or depth >= 0.4:
                 depth = random.gauss(self.transit_depth_boundaries[0], self.transit_depth_boundaries[1]) * std
             planet_radius = np.sqrt(depth * (star_radius ** 2))
             logging.info(f'Injecting planet with P={period}, D={depth}')
@@ -366,16 +366,17 @@ class SantoTestDataGenerator:
                  flares_period_avg_std: Tuple[float, float] = (10, 5),
                  flares_amplitude_avg_std: Tuple[float, float] = (0.05, 0.05),
                  flares_length_avg_std: Tuple[float, float] = (0.05, 0.05),
-                 curves_count=10000, curves_cadences: list=[60, 120, 300, 600, 1800],
+                 curves_count=10000, curves_cadences: list=[20, 1800],
                  only_plot=False):
         for curve_index in range(0, curves_count):
             curve_cadences = 1
+            tokens_no = 1
             while curve_cadences < minimum_curve_size:
-                curve_timespan: float = random.uniform(curves_time_boundaries[0], curves_time_boundaries[1])
-                selected_cadence = random.choice(curves_cadences) / 3600 / 24
-                curve_cadences = int(curve_timespan // selected_cadence)
+                selected_cadence = random.uniform(curves_cadences[0], curves_cadences[1]) / 3600 / 24
+                tokens_no = random.choice(np.arange(1, 20))
+                curve_cadences = tokens_no * minimum_curve_size
             flux: ndarray = np.ones((36, curve_cadences))
-            flux[0] = np.linspace(0, curve_timespan, curve_cadences)
+            flux[0] = np.arange(0, curve_cadences) * selected_cadence
             white_noise_std: float = 0.0
             while white_noise_std < 0.00001:
                 white_noise_std = random.gauss(white_noise_power_boundaries[0], white_noise_power_boundaries[1])
@@ -392,14 +393,26 @@ class SantoTestDataGenerator:
             flux[3, np.argwhere((flux[3] <= 1e-7) | (flux[3] > 1 - 1e-7)).flatten()] = float(0)
             flux[3, np.argwhere(flux[3] > 1e-7).flatten()] = float(1)
             flux[4:36] = self.timestamp_encoding(flux[0])
+            flux[0][1:] = np.where(
+                flux[0][1:] != 0,
+                np.minimum(flux[0][1:] - flux[0][:-1], 1 - 1e-7),
+                flux[0][1:]
+            )
+            flux[0][0] = 0
             if only_plot:
                 args_empty = np.argwhere(flux[1] > 0).flatten()
                 fig, axs = plt.subplots(1, 1, figsize=(10, 5))
+                flux[0] = np.linspace(0, selected_cadence * curve_cadences, curve_cadences)
                 axs.scatter(flux[0][args_empty], flux[1][args_empty], s=2)
                 axs.plot(flux[0][args_empty], flux[2][args_empty], c='orange')
                 plt.show()
             else:
-                np.savetxt(f'{output_dir}/{curve_index}_model.csv', flux, delimiter=',')
+                #flux = np.pad(flux, [(0, 0), (2500 // 2, 0)], mode='constant', constant_values=0)
+                #flux = np.pad(flux, [(0, 0), (0, 2500 // 2)], mode='constant', constant_values=0)
+                for token_index in np.arange(0, tokens_no):
+                    np.savetxt(f'{output_dir}/{curve_index}_{token_index}_model.csv',
+                               flux[0:4, token_index * minimum_curve_size: (token_index + 1) * minimum_curve_size],
+                               delimiter=',')
 
     def timestamp_encoding(self, timestamps: np.ndarray, d_model: int = 32) -> np.ndarray:
         """
@@ -419,6 +432,6 @@ class SantoTestDataGenerator:
         pos_encoding[:, 0::2] = (np.sin(angles) + 1) / 2
         pos_encoding[:, 1::2] = (np.cos(angles) + 1) / 2
         pos_encoding[pos_encoding > 1 - 1e-7] = 1 - 1e-7
-        pos_encoding[pos_encoding < 0 + 1e-7] = 1 - 1e-7
+        pos_encoding[pos_encoding < 0 + 1e-7] = 0 + 1e-7
         return np.transpose(pos_encoding)
 

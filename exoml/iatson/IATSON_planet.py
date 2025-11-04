@@ -14,6 +14,7 @@ from sklearn.isotonic import IsotonicRegression
 
 from sklearn.linear_model import LogisticRegression
 from sklearn.utils import shuffle
+from sklearn.metrics import precision_recall_curve, auc
 from astropy import units as u
 
 from exoml.ete6.ete6_generator import Ete6ModelGenerator
@@ -829,6 +830,16 @@ class IATSON_planet(ImbalancedBinaryModel):
         predictions_df_q1q17 = predictions_df_q1q17.sort_values(by=['prediction_value'], ascending=False)
         #predictions_df_ete6 = predictions_df_ete6.sort_values(by=['prediction_value'], ascending=False)
         logging.info("----------------------------------COMPLETE SET METRICS ---------------------------------------")
+        predictions_df_filtered = predictions_df.loc[:, ['expected_class', 'prediction_value']]
+        predictions_df_filtered.dropna(inplace=True)
+        precisions, recalls, thresholds = precision_recall_curve(predictions_df_filtered['expected_class'].to_numpy(),
+                                                                 predictions_df_filtered['prediction_value'].to_numpy())
+        pr_auc = auc(recalls, precisions)
+        logging.info(f"PR AUC: {pr_auc}")
+        pr_auc = pd.DataFrame(columns=['precision', 'recall'])
+        pr_auc['precision'] = precisions
+        pr_auc['recall'] = recalls
+        logging.info(pr_auc.to_string())
         rp100_thresholds, rp100_values = self.compute_metrics_p100(predictions_df, True)
         npv100_thresholds, np100_values = self.compute_metrics_npv100(predictions_df, True)
         rp_values = [0.95, 0.975, 0.99, 0.995, 0.999, 1.0]
@@ -1233,11 +1244,15 @@ class IATSON_planet(ImbalancedBinaryModel):
         tns = {}
         fns = {}
         rps99 = {}
+        rps975 = {}
         rps100 = {}
+        snpvs99 = {}
         snpvs999 = {}
         snpvs1000 = {}
         tps99 = {}
+        tps975 = {}
         tps100 = {}
+        tnpvs99 = {}
         tnpvs999 = {}
         tnpvs1000 = {}
         for threshold in thresholds:
@@ -1268,9 +1283,15 @@ class IATSON_planet(ImbalancedBinaryModel):
             metric = Specificity(thresholds=threshold)
             metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
             sensitivities[threshold] = metric.result() if isinstance(metric.result(), float) else metric.result().numpy()
+            metric = RecallAtPrecision(precision=0.975, num_thresholds=1000)
+            metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
+            rps975[threshold] = metric.result() if isinstance(metric.result(), float) else metric.result().numpy()
             metric = RecallAtPrecision(precision=0.99, num_thresholds=1000)
             metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
             rps99[threshold] = metric.result() if isinstance(metric.result(), float) else metric.result().numpy()
+            metric = ThresholdAtPrecision(precision=0.975, num_thresholds=1000)
+            metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
+            tps975[threshold] = metric.result() if isinstance(metric.result(), float) else metric.result().numpy()
             metric = ThresholdAtPrecision(precision=0.99, num_thresholds=1000)
             metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
             tps99[threshold] = metric.result() if isinstance(metric.result(), float) else metric.result().numpy()
@@ -1280,9 +1301,15 @@ class IATSON_planet(ImbalancedBinaryModel):
             metric = ThresholdAtPrecision(precision=1.0, num_thresholds=1000)
             metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
             tps100[threshold] = metric.result() if isinstance(metric.result(), float) else metric.result().numpy()
+            metric = SpecificityAtNPV(npv=0.99, num_thresholds=1000)
+            metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
+            snpvs99[threshold] = metric.result() if isinstance(metric.result(), float) else metric.result().numpy()
             metric = SpecificityAtNPV(npv=0.999, num_thresholds=1000)
             metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
             snpvs999[threshold] = metric.result() if isinstance(metric.result(), float) else metric.result().numpy()
+            metric = ThresholdAtNPV(npv=0.99, num_thresholds=1000)
+            metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
+            tnpvs99[threshold] = metric.result() if isinstance(metric.result(), float) else metric.result().numpy()
             metric = ThresholdAtNPV(npv=0.999, num_thresholds=1000)
             metric.update_state(df['expected_class'].to_numpy(), df['prediction_value'].to_numpy())
             tnpvs999[threshold] = metric.result() if isinstance(metric.result(), float) else metric.result().numpy()
@@ -1559,6 +1586,7 @@ class IATSON_planet(ImbalancedBinaryModel):
         mpvs_val = []  # mean predicted values
         fops_val = []  # fraction of positives
         noss_val = []  # number of samples
+        predictions_train_df.loc[predictions_train_df['prediction_value'] == 0, 'prediction_value'] = 0.00000001
         for index, value in enumerate(values[0:-1]):
             subset_pred_train_df = predictions_train_df.loc[(predictions_train_df['prediction_value'] > value) & (
                     predictions_train_df['prediction_value'] <= values[index + 1])]
@@ -1591,7 +1619,7 @@ class IATSON_planet(ImbalancedBinaryModel):
         fig, axs = plt.subplots(2, 1, figsize=(20, 20))
         axs[0].set_title(f"{title} Reliability Diagram from [{np.nanmin(values)} to {np.nanmax(values)}]", size=40)
         axs[0].scatter(mpvs_train, fops_train, color='red', marker='.', s=1000)
-        axs[0].scatter(mpvs_val, fops_val, color='green', marker='.', s=1000)
+        axs[0].scatter(mpvs_val, fops_val, color='blue', marker='.', s=1000)
         axs[0].plot([np.nanmin(values), np.nanmax(values)], [np.nanmin(values), np.nanmax(values)], '--')
         axs[0].set_xlabel("Mean Predicted Values", size=30)
         axs[0].set_ylabel("Fraction Of Positives", size=30)
@@ -1603,7 +1631,7 @@ class IATSON_planet(ImbalancedBinaryModel):
                             np.repeat(noss_train, 2), color='red')
         axs[1].plot(np.concatenate([np.repeat(mpvs_val, 2)[1:], [mpvs_val[-1]]]), np.repeat(noss_val, 2), color='green')
         axs[1].fill_between(np.concatenate([np.repeat(mpvs_val, 2)[1:], [mpvs_val[-1]]]), 0, np.repeat(noss_val, 2),
-                            color='green')
+                            color='blue')
         axs[1].set_xlabel("Mean Predicted Values", size=30)
         axs[1].set_ylabel("Number Of Samples", size=30)
         axs[1].set_yscale('log', base=10)
@@ -1621,7 +1649,7 @@ class IATSON_planet(ImbalancedBinaryModel):
         val_predictions_df_iso = None
         for fold in np.arange(0, folds):
             model_dir = model_prefix + f'_{fold}'
-            self.load_model(model_dir + '/' + os.path.basename(model_dir) + '.keras')
+            self.load_model(model_dir + '/' + os.path.basename(model_dir) + '.h5')
             calibration_df = pd.read_csv(f'{model_dir}/validation_dataset.csv')
             prediction_stats_for_thresholds = self.predict_df(calibration_df, training_dir, batch_size, cores,
                                                               thresholds=thresholds, from_arrays=True)
