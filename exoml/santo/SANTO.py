@@ -23,7 +23,7 @@ from keras.layers import LeakyReLU
 from lcbuilder.helper import LcbuilderHelper
 from lightkurve import TessLightCurve
 from numpy import ndarray
-from scipy.signal import medfilt
+from scipy.signal import medfilt, correlate
 from sklearn.utils import shuffle
 
 from exoml.ml.callback.early_stopping import ExoMlEarlyStopping
@@ -44,6 +44,7 @@ def weighted_binary_crossentropy_param(weight=1):
         y_pred = K.clip(y_pred, K.epsilon(), 1 - K.epsilon())
         logloss = -(y_true * K.log(y_pred) * weight + (1 - y_true) * K.log(1 - y_pred))
         return K.mean(logloss, axis=-1)
+
     return weighted_binary_crossentropy
 
 
@@ -51,10 +52,19 @@ def clean_to_float(x):
     return float(str(x).strip("\"'").strip("\"").strip("'"))
 
 
+@keras.saving.register_keras_serializable(package="Compat")
+class SpatialDropout1DCompat(keras.layers.SpatialDropout1D):
+    def __init__(self, *args, **kwargs):
+        kwargs.pop("trainable", None)
+        kwargs.pop("noise_shape", None)  # legacy arg in saved config
+        super().__init__(*args, **kwargs)
+
+
 class SANTO(WithLogging):
     """
     Self-Attention Neural Network for Transiting Objects
     """
+
     def __init__(self, transformer_layers=0, transformer_heads=1, name="SANTO") -> None:
         super().__init__()
         self.name = "SANTO"
@@ -63,8 +73,7 @@ class SANTO(WithLogging):
         self.transformer_heads = transformer_heads
 
     def load(self, dir, hyperparams: HyperParams):
-        self.model = tf.keras.models.load_model(dir) #, custom_objects={'loss': self.loss(hyperparams)})
-
+        self.model = tf.keras.models.load_model(dir)  # , custom_objects={'loss': self.loss(hyperparams)})
 
     def inform(self, dir):
         """
@@ -85,7 +94,7 @@ class SANTO(WithLogging):
         return self
 
     def initialize(self, lcs_dir, output_dir, hyperparams: HyperParams, input_dim=500,
-              cores=os.cpu_count() // 2, load_checkpoint=False):
+                   cores=os.cpu_count() // 2, load_checkpoint=False):
         input_layer = keras.Input(shape=(input_dim, 1), name="input")
         cadences_layer = keras.Input(shape=(1), name="cadences_input")
         if self.transformer_layers > 0:
@@ -180,7 +189,8 @@ class SANTO(WithLogging):
                                                   l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(
                 conv4_branch)
             conv4_branch = keras.layers.Dropout(hyperparams.dropout_rate)(conv4_branch)
-            flux_branch = keras.layers.Concatenate(axis=1)([conv1_branch, conv2_branch, conv3_branch, conv4_branch, cadences_layer])
+            flux_branch = keras.layers.Concatenate(axis=1)(
+                [conv1_branch, conv2_branch, conv3_branch, conv4_branch, cadences_layer])
             flux_branch = keras.layers.Dense(512, activation=LeakyReLU(leaky_relu_alpha),
                                              kernel_regularizer=tf.keras.regularizers.L1L2(
                                                  l1=hyperparams.l1_regularization, l2=hyperparams.l2_regularization))(
@@ -220,13 +230,15 @@ class SANTO(WithLogging):
                      metrics=[accuracy] + self.instance_metrics() + hyperparams.metrics,
                      run_eagerly=hyperparams.run_eagerly)
         if not hyperparams.dry_run:
-            logging.info("Initializing training and validation generators with (batch_size," + str(hyperparams.batch_size) +
-                         ") (self.input_size," + str(input_dim) +
-                         ") (zero_epsilon," + str(hyperparams.zero_epsilon) +
-                         ")")
+            logging.info(
+                "Initializing training and validation generators with (batch_size," + str(hyperparams.batch_size) +
+                ") (self.input_size," + str(input_dim) +
+                ") (zero_epsilon," + str(hyperparams.zero_epsilon) +
+                ")")
             validation_batch_generator = self.instance_generator(validation_filenames, lcs_dir, hyperparams.batch_size,
                                                                  input_dim, None, hyperparams.zero_epsilon,
-                                                                 shuffle=False, step_indexes=step_indexes, from_arrays=False)
+                                                                 shuffle=False, step_indexes=step_indexes,
+                                                                 from_arrays=False)
             for callback in hyperparams.callbacks:
                 if issubclass(callback.__class__, ModelDirDataAwareCallback):
                     callback.set_model_dir(model_path)
@@ -257,11 +269,12 @@ class SANTO(WithLogging):
 
     def predict(self, lcs_dir: str, target_files: list, model_dir: str, batch_size: int = 1024, input_size: int = 2500,
                 zero_epsilon: float = 1e-7, plot=False, plot_positives=False, tagged_data: bool = False,
-                target_name: str = "", threshold=0.5, smooth=False):
+                target_name: str = "", threshold=0.5, smooth=False, sherlock=False):
         self.load_model(model_dir)
         half_window = input_size // 2
         generator = SantoPredictGenerator(lcs_dir, target_files, input_size=input_size, step_size=1,
-                                          batch_size=batch_size, zero_epsilon=zero_epsilon, smooth=smooth)
+                                          batch_size=batch_size, zero_epsilon=zero_epsilon, smooth=smooth,
+                                          sherlock=sherlock)
         predictions = self.model.predict(generator)
         left = np.linspace(0.1, 1.0, input_size // 2, endpoint=False)
         right = np.linspace(1.0, 0.1, input_size // 2)
@@ -269,12 +282,16 @@ class SANTO(WithLogging):
         current_index = 0
         files_predictions = {}
         files_predictions_spectra = {}
-        stats_df = pd.DataFrame(columns=['target_file', 'type', 'depth', 'std', 'snr', 't0', 'duration_points', 'max_score'])
+        stats_df = pd.DataFrame(
+            columns=['target_file', 'type', 'depth', 'std', 'snr', 't0', 'duration_points', 'max_score'])
         for target_file in target_files:
             file_content = pd.read_csv(lcs_dir + '/' + target_file, sep=',', header=None).values
             flux_key = 1
             time_key = 0
             tags_key = 2
+            if sherlock:
+                file_content = file_content[1:]
+                file_content = np.transpose(file_content)
             if file_content.shape[0] > 40:
                 file_content = file_content[1:]
                 file_content = np.transpose(file_content)
@@ -327,10 +344,12 @@ class SANTO(WithLogging):
                     snr = (1 - depth) / std * np.sqrt(len(region_preds))
                     if np.any(region_preds > threshold):
                         target_stats = {'target_file': [target_file], 'type': ['tp'], 'depth': [depth], 'std': [std],
-                                        'snr': [snr], 't0': [t0], 'duration_points': [end - start], 'max_score': [np.max(region_preds)]}
+                                        'snr': [snr], 't0': [t0], 'duration_points': [end - start],
+                                        'max_score': [np.max(region_preds)]}
                     else:
                         target_stats = {'target_file': [target_file], 'type': ['fn'], 'depth': [depth], 'std': [std],
-                                        'snr': [snr], 't0': [t0], 'duration_points': [end - start], 'max_score': [np.max(region_preds)]}
+                                        'snr': [snr], 't0': [t0], 'duration_points': [end - start],
+                                        'max_score': [np.max(region_preds)]}
                     stats_df = pd.concat([stats_df, pd.DataFrame.from_dict(target_stats)], ignore_index=True)
                 for start, end in zip(positive_starts, positive_ends):
                     region_model = file_content[tags_key][start:end]
@@ -340,7 +359,8 @@ class SANTO(WithLogging):
                     snr = (1 - depth) / std * np.sqrt(len(region_model))
                     if not np.any((region_model < 1) & (region_model > zero_epsilon)):
                         target_stats = {'target_file': [target_file], 'type': ['fp'], 'depth': [depth], 'std': [std],
-                                        'snr': [snr], 't0': [t0], 'duration_points': [end - start], 'max_score': [np.max(region_preds)]}
+                                        'snr': [snr], 't0': [t0], 'duration_points': [end - start],
+                                        'max_score': [np.max(region_preds)]}
                         stats_df = pd.concat([stats_df, pd.DataFrame.from_dict(target_stats)], ignore_index=True)
                 target_stats_df = stats_df.loc[stats_df['target_file'] == target_file]
                 target_tps = target_stats_df.loc[target_stats_df['type'] == 'tp', 'type'].count()
@@ -355,8 +375,10 @@ class SANTO(WithLogging):
             # files_predictions_spectra[target_file] = ls.power(frequencies)
             # power_x = 1 / frequencies
             # AUTOCORRELATION COMPUTATION
-            time_filled, flux_filled, cadence = self.fill_data_gaps(file_content[time_key][0:N], files_predictions[target_file], )
-            power_x, files_predictions_spectra[target_file] = self.compute_autocorrelation(flux_filled, cadence_s=cadence * 24 * 3600)
+            time_filled, flux_filled, cadence = self.fill_data_gaps(file_content[time_key][0:N],
+                                                                    files_predictions[target_file], )
+            power_x, files_predictions_spectra[target_file] = self.compute_autocorrelation(flux_filled,
+                                                                                           cadence_s=cadence * 24 * 3600)
             args = np.argwhere(power_x > 0.25).flatten()
             power_x = power_x[args]
             files_predictions_spectra[target_file] = files_predictions_spectra[target_file][args]
@@ -378,16 +400,17 @@ class SANTO(WithLogging):
                 plt.savefig(lcs_dir + '/' + target_file + '.png', bbox_inches='tight', dpi=300)
                 plt.clf()
                 plt.close()
+            files_predictions_spectra[target_file] = (power_x, files_predictions_spectra[target_file])
             current_index = current_index + len(file_content)
         return files_predictions, files_predictions_spectra, stats_df
 
     def predict_folded(self, time: list, flux: list, model_dir: str, batch_size: int = 1024, input_size: int = 2500,
-                zero_epsilon: float = 1e-7, plot_positives=False, tagged_data: bool = False,
-                target_name: str = "", threshold=0.5, smooth=False, object_id='', plot_dir=None):
+                       zero_epsilon: float = 1e-7, plot_positives=False, tagged_data: bool = False,
+                       target_name: str = "", threshold=0.5, smooth=False, object_id='', plot_dir=None):
         self.load_model(model_dir)
         half_window = input_size // 2
         generator = SantoFoldedPredictGenerator(time, flux, input_size=input_size, step_size=1,
-                                          batch_size=batch_size, zero_epsilon=zero_epsilon, smooth=smooth)
+                                                batch_size=batch_size, zero_epsilon=zero_epsilon, smooth=smooth)
         predictions = self.model.predict(generator)
         left = np.linspace(0.1, 1.0, input_size // 2, endpoint=False)
         right = np.linspace(1.0, 0.1, input_size // 2)
@@ -436,36 +459,40 @@ class SANTO(WithLogging):
         if plot:
             for index in local_maxima_indexes:
                 if index > window_size // 2:
-                    fig, axs = plt.subplots(2 if tagged_data is None else 3, 1, figsize=(16, 8), constrained_layout=True)
-                    above_indexes = np.argwhere(predictions[index - window_size // 2:index + window_size // 2] >= 3 * np.nanstd(predictions))
-                    below_indexes = np.argwhere(predictions[index - window_size // 2:index + window_size // 2] < 3 * np.nanstd(predictions))
+                    fig, axs = plt.subplots(2 if tagged_data is None else 3, 1, figsize=(16, 8),
+                                            constrained_layout=True)
+                    above_indexes = np.argwhere(
+                        predictions[index - window_size // 2:index + window_size // 2] >= 3 * np.nanstd(predictions))
+                    below_indexes = np.argwhere(
+                        predictions[index - window_size // 2:index + window_size // 2] < 3 * np.nanstd(predictions))
                     axs[0].scatter(time[index - window_size // 2:index + window_size // 2][above_indexes],
                                    flux[index - window_size // 2:index + window_size // 2][above_indexes],
                                    color='blue')
                     axs[1].scatter(time[index - window_size // 2:index + window_size // 2][above_indexes],
-                                predictions[index - window_size // 2:index + window_size // 2][above_indexes],
-                                color='blue')
+                                   predictions[index - window_size // 2:index + window_size // 2][above_indexes],
+                                   color='blue')
                     axs[0].scatter(time[index - window_size // 2:index + window_size // 2][below_indexes],
                                    flux[index - window_size // 2:index + window_size // 2][below_indexes],
                                    color='firebrick')
                     axs[1].scatter(time[index - window_size // 2:index + window_size // 2][below_indexes],
-                                predictions[index - window_size // 2:index + window_size // 2][below_indexes],
-                                color='firebrick')
+                                   predictions[index - window_size // 2:index + window_size // 2][below_indexes],
+                                   color='firebrick')
                     if tagged_data is not None:
                         axs[2].scatter(time[index - window_size // 2:index + window_size // 2][above_indexes],
-                                    tagged_data[index - window_size // 2:index + window_size // 2][above_indexes],
-                                    color='blue')
+                                       tagged_data[index - window_size // 2:index + window_size // 2][above_indexes],
+                                       color='blue')
                     plt.show()
                     plt.close(fig)
                     plt.clf()
         return local_maxima_indexes
 
-
     def load_model(self, dir, custom_objects={}, compile=False):
         custom_objects['WarmUpAndLinDecreaseCallback'] = WarmUpAndLinDecreaseCallback
         custom_objects['ThresholdAtPrecision'] = None
+        custom_objects["LeakyReLU"] = tf.keras.layers.LeakyReLU
+        custom_objects["SpatialDropout1D"] = SpatialDropout1DCompat
         logging.info("Loading model from %s", dir)
-        self.set_model(tf.keras.models.load_model(dir, compile=compile, custom_objects=custom_objects))
+        self.set_model(tf.keras.models.load_model(dir, compile=compile, safe_mode=False, custom_objects=custom_objects))
         return self
 
     def set_model(self, model):
@@ -500,22 +527,23 @@ class SANTO(WithLogging):
 
     def instance_metrics(self):
         return [Precision(name="precision"), Recall(name="recall"),
-                #F1Score(num_classes=1, threshold=0.5, average='weighted', name='f1_score'),
+                # F1Score(num_classes=1, threshold=0.5, average='weighted', name='f1_score'),
                 PrecisionAtRecall(recall=0.99, name="p@r99", num_thresholds=1000),
-                #ThresholdAtPrecision(precision=0.99, name="t@p99", num_thresholds=1000),
+                # ThresholdAtPrecision(precision=0.99, name="t@p99", num_thresholds=1000),
                 AUC(name="roc_auc"),
                 AUC(curve="PR", name="pr_auc")]
 
     def instance_generator(self, dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon, shuffle=True,
                            step_indexes=1, from_arrays=True):
         return SantoGenerator(dir, dataset, input_size=input_sizes, step_size=1, batch_size=batch_size,
-                              shuffle=shuffle, zero_epsilon=zero_epsilon, indexes_steps=step_indexes, from_arrays=from_arrays)
+                              shuffle=shuffle, zero_epsilon=zero_epsilon, indexes_steps=step_indexes,
+                              from_arrays=from_arrays)
 
     def load_training_set(self, **kwargs):
         training_dir = kwargs.get('training_dir')
         all_target_files = glob.glob(f'/{training_dir}/**/*.csv', recursive=True)
-        #target_files = []
-        #for target_file in all_target_files:
+        # target_files = []
+        # for target_file in all_target_files:
         #    if not (target_file.endswith("cadences.csv") or target_file.endswith("flux.csv") or target_file.endswith("tags.csv")):
         #        target_files = target_files + [os.path.basename(target_file)]
         return all_target_files
@@ -553,7 +581,8 @@ class SANTO(WithLogging):
         validation_filenames = training_dataset[train_last_index:validation_last_index]
         test_filenames = []
         if validation_last_index != test_last_index:
-            test_filenames = test_dataset if test_dataset is not None else training_dataset[validation_last_index:test_last_index]
+            test_filenames = test_dataset if test_dataset is not None else training_dataset[
+                                                                           validation_last_index:test_last_index]
             test_df = pd.DataFrame(columns=[])
             test_df['name'] = test_filenames
             test_df.to_csv(test_dataset_filename)
@@ -613,7 +642,8 @@ class SANTO(WithLogging):
             for layer in self.model.layers:
                 if 'final' in layer.name:
                     progressive_lr_factor = progressive_lr_factor * hyperparams.lr_progression
-                    progressive_optimizer = self.build_swa_optimizer(hyperparams, progressive_lr_factor * initial_lr, steps_per_epoch)
+                    progressive_optimizer = self.build_swa_optimizer(hyperparams, progressive_lr_factor * initial_lr,
+                                                                     steps_per_epoch)
                     progressive_optimizer.progressive_lr_factor = progressive_lr_factor
                     optimizers_and_layers = optimizers_and_layers + [
                         (progressive_optimizer, layer)]
@@ -632,17 +662,17 @@ class SANTO(WithLogging):
                                                         clipnorm=hyperparams.gradient_clip_norm,
                                                         clipvalue=hyperparams.gradient_clip_value)
             optimizer = SWA(optimizer,
-                                           start_averaging=steps_per_epoch * hyperparams.stochastic_weight_average_wait,
-                                           average_period=steps_per_epoch)
+                            start_averaging=steps_per_epoch * hyperparams.stochastic_weight_average_wait,
+                            average_period=steps_per_epoch)
             if isinstance(lr, (int, float)):
                 optimizer.lr = lr
             else:
                 optimizer.lr = hyperparams.initial_learning_rate
         else:
             optimizer = Adam(lr,
-                                                 beta_1=0.9, beta_2=0.98, epsilon=1e-9,
-                                                 clipnorm=hyperparams.gradient_clip_norm,
-                                                 clipvalue=hyperparams.gradient_clip_value)
+                             beta_1=0.9, beta_2=0.98, epsilon=1e-9,
+                             clipnorm=hyperparams.gradient_clip_norm,
+                             clipvalue=hyperparams.gradient_clip_value)
         return optimizer
 
     def run_epoch(self, epoch, lcs_dir, model_dir, target_files, hyperparams, input_dim, transformer_model, optimizer,
@@ -688,15 +718,15 @@ class SANTO(WithLogging):
                     train_tags[iteration_index][oot_mask] = 0
                     train_tags[iteration_index][~oot_mask] = 1
                     if is_last_iteration:
-                        #oot_mask = np.abs(train_tags.flatten()) < 1e-6
-                        #plt.scatter(np.arange(0, iteration_index + 1)[oot_mask], flux[0][0:iteration_index + 1][oot_mask],
+                        # oot_mask = np.abs(train_tags.flatten()) < 1e-6
+                        # plt.scatter(np.arange(0, iteration_index + 1)[oot_mask], flux[0][0:iteration_index + 1][oot_mask],
                         #            color='blue')
-                        #plt.scatter(np.arange(0, iteration_index + 1)[~oot_mask], flux[0][0:iteration_index + 1][~oot_mask],
+                        # plt.scatter(np.arange(0, iteration_index + 1)[~oot_mask], flux[0][0:iteration_index + 1][~oot_mask],
                         #            color='red')
-                        #plt.show()
-                        #positives_positions = np.argwhere(train_tags.flatten() == True)
-                        #plt.scatter(np.arange(0, 500), train_batch[positives_positions][0], color = 'blue')
-                        #plt.show()
+                        # plt.show()
+                        # positives_positions = np.argwhere(train_tags.flatten() == True)
+                        # plt.scatter(np.arange(0, 500), train_batch[positives_positions][0], color = 'blue')
+                        # plt.show()
                         train_tags_tensor = tf.convert_to_tensor(train_tags, dtype=np.float32)
                         train_batch_tensor = tf.convert_to_tensor(train_batch, dtype=np.float32)
                         train_tags_tensor = tf.reshape(train_tags_tensor, [hyperparams.batch_size, 1])
@@ -704,7 +734,8 @@ class SANTO(WithLogging):
                             with tf.GradientTape() as tape:
                                 tape.watch(transformer_model.trainable_variables)
                                 flux_predictions = transformer_model(train_batch)
-                                loss = transformer_model.compute_loss(train_batch_tensor, train_tags_tensor, flux_predictions)
+                                loss = transformer_model.compute_loss(train_batch_tensor, train_tags_tensor,
+                                                                      flux_predictions)
                             losses.append(loss.numpy())
                             gradients = tape.gradient(loss, transformer_model.trainable_variables)
                             optimizer.apply_gradients(zip(gradients, transformer_model.trainable_variables))
@@ -735,7 +766,8 @@ class SANTO(WithLogging):
                                           precision.result(), recall.result(), pr99.result()))
                             if training_log_df is not None:
                                 if isinstance(self.model.optimizer, MultiOptimizer):
-                                    learning_rate = K.eval(K.eval(self.model.optimizer.optimizer_specs[0]['optimizer'].lr))
+                                    learning_rate = K.eval(
+                                        K.eval(self.model.optimizer.optimizer_specs[0]['optimizer'].lr))
                                 else:
                                     learning_rate = K.eval(self.model.optimizer._decayed_lr(tf.float32))
                                 training_log_df = pd.concat([training_log_df, pd.DataFrame.from_dict(
@@ -744,13 +776,13 @@ class SANTO(WithLogging):
                                      'recall': [recall.result().numpy()],
                                      'p@r99': [pr99.result().numpy()]})], ignore_index=True)
                                 training_log_df.to_csv(model_dir + '/training_log.csv', index=False)
-                                #self.plot_metrics(model_dir, self.steps_per_epoch, False)
+                                # self.plot_metrics(model_dir, self.steps_per_epoch, False)
                             accuracy.reset_state()
                             precision.reset_state()
                             recall.reset_state()
                             pr99.reset_state()
                     iteration = iteration + 1
-        if not training: 
+        if not training:
             print(f"Validation Epoch {epoch + 1} Accuracy {accuracy.result().numpy()} "
                   f"Precision {precision.result().numpy()} Recall {recall.result().numpy()} P@R99 "
                   f"{pr99.result().numpy()}")
@@ -762,7 +794,8 @@ class SANTO(WithLogging):
                 training_log_df = pd.concat([training_log_df, pd.DataFrame.from_dict(
                     {'lr': [learning_rate], 'epoch': [epoch], 'batch': [0],
                      'val_accuracy': [accuracy.result().numpy()], 'val_precision': [precision.result().numpy()],
-                     'val_recall': [recall.result().numpy()], 'val_p@r99': [pr99.result().numpy()]})], ignore_index=True)
+                     'val_recall': [recall.result().numpy()], 'val_p@r99': [pr99.result().numpy()]})],
+                                            ignore_index=True)
                 training_log_df.to_csv(model_dir + '/training_log.csv', index=False)
         return losses, accuracies, precisions, recalls, pr99s, training_log_df
 
@@ -774,11 +807,12 @@ class SANTO(WithLogging):
         fig, axs = plt.subplots(2, 2, figsize=(25, 7), constrained_layout=True)
         fig.suptitle(self.name + ' Model Metrics', fontsize=14)
         for metric in validation_metrics:
-            axs[metric[2][0]][metric[2][1]].plot(validation_log_df['batch_total'], validation_log_df['val_' + metric[0]],
-                           color=metric[1], label='val_' + metric[0], linestyle='--')
+            axs[metric[2][0]][metric[2][1]].plot(validation_log_df['batch_total'],
+                                                 validation_log_df['val_' + metric[0]],
+                                                 color=metric[1], label='val_' + metric[0], linestyle='--')
         for metric in training_metrics:
             axs[metric[2][0]][metric[2][1]].plot(validation_log_df['batch_total'], validation_log_df[metric[0]],
-                           color=metric[1], label=metric[0])
+                                                 color=metric[1], label=metric[0])
         axs[0][0].set_xlabel("Batch")
         secx = axs[0][0].secondary_xaxis('top',
                                          functions=(lambda x: x / steps_per_epoch, lambda x: x / steps_per_epoch))
@@ -840,14 +874,25 @@ class SANTO(WithLogging):
         return np.array(new_times), np.array(new_data), cadence
 
     def compute_autocorrelation(self, data, max_days=15, cadence_s=120):
+        """
+        Autocorrelación normalizada (lags >= 0) usando SciPy con FFT.
+        Devuelve lags en días y R[k] con R[0] = 1.
+        """
+        logging.info("Computing MORIARTY autocorrelation (SciPy/FFT)")
         nlags = int(max_days / (cadence_s / 60 / 60 / 24))
-        x = numpy.asarray(data)
-        x = x - numpy.mean(x)
-        result = numpy.correlate(x, x, mode='full')
-        mid = len(result) // 2
-        result = result[mid:mid + nlags + 1]
-        correlation = result / result[0]
-        lags = numpy.linspace(0, max_days, len(correlation))
+        x = np.asarray(data, dtype=np.float32)
+        x = x - np.nanmean(x)
+        if np.isnan(x).any():
+            x = np.nan_to_num(x, copy=False)
+        n = x.size
+        nlags = min(nlags, n - 1)  # no puede haber más de n-1 retardos válidos
+        r_full = correlate(x, x, mode='full', method='fft')  # len = 2n-1
+        # extrae lags >= 0: desde el índice del lag 0 (n-1)
+        r_pos = r_full[n - 1:n - 1 + nlags + 1]
+        # normaliza (coeficiente): R[0] = 1
+        correlation = r_pos / r_pos[0]
+        # ejes de lags en días (mismo estilo que tu función original)
+        lags = np.linspace(0, max_days, correlation.size)
         return lags, correlation
 
 # SANTO().train("/data/scratch/ml/santo/training_data/", "/data/scratch/exoml/SANTO",

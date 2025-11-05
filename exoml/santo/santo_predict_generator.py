@@ -23,7 +23,8 @@ class SantoPredictGenerator(Sequence):
             zero_epsilon=1e-7,
             indexes_steps=1,
             plot=False,
-            smooth=False
+            smooth=False,
+            sherlock=False,
     ):
         self.lcs_dir = lcs_dir
         self.target_files = target_files
@@ -35,6 +36,7 @@ class SantoPredictGenerator(Sequence):
         self.plot = plot
         self.steps_count, self.generator_info_df = self._count_inputs()
         self.smooth = smooth
+        self.sherlock = sherlock
 
     def _count_inputs(self):
         batch_index = 0
@@ -85,9 +87,12 @@ class SantoPredictGenerator(Sequence):
         flux = pd.read_csv(f"{self.lcs_dir}/{filename}", sep=',', header=None).values
         flux_key = 1
         time_key = 0
-        if flux.shape[0] > 40:
+        if not self.sherlock and flux.shape[0] > 40:
             flux_key = 2
             time_key = 1
+            flux = flux[1:]
+            flux = np.transpose(flux)
+        if self.sherlock:
             flux = flux[1:]
             flux = np.transpose(flux)
         flux = np.vectorize(clean_to_float)(flux)
@@ -130,7 +135,7 @@ class SantoPredictGenerator(Sequence):
                 )
                 raise e
         self.assert_in_range(filename, train_fluxes)
-        return (train_fluxes, cadences), None
+        return (train_fluxes, cadences), np.full((self.batch_size, self.input_size), 1.0)
 
     def assert_in_range(self, object_id, array, values_range=(0, 1)):
         if np.isnan(array).any():
