@@ -469,9 +469,6 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                                               (lc_df_focus['time'] < 0.5 + duration_to_period * 3)]
                     folded_flux_odd_subhar_array[i], folded_flux_odd_subhar_array_err[i] = \
                         self.bin_by_time(lc_df_focus.to_numpy(), self.input_sizes[6], target_row['object_id'])
-                    oe_factor = np.abs(depth_even - depth_odd)
-                    oe_factor = oe_factor / 5 if oe_factor < 5 else 1 - self.zero_epsilon
-                    oe_factor = oe_factor if not np.isnan(oe_factor) and oe_factor > 0 else self.zero_epsilon
                     offset_filename = file_prefix + 'source_offsets.csv'
                     offset_df = pd.read_csv(offset_filename, low_memory=True)
                     row = offset_df[offset_df['name'] == 'mean'].iloc[0]
@@ -491,9 +488,15 @@ class WatsonPlanetModelGenerator(Ete6ModelGenerator):
                     temperature_stat = metrics_df.loc[metrics_df['metric'] == 'temp_stat'].iloc[0]['score']
                     albedo_stat = metrics_df.loc[metrics_df['metric'] == 'albedo_stat'].iloc[0]['score']
                     bootstrap_fap = metrics_df.loc[metrics_df['metric'] == 'bootstrap_fap'].iloc[0]['score']
-                    oe_factor = np.abs(depth_even - depth_odd)
-                    oe_factor = oe_factor / 5 if oe_factor < 5 else 1 - self.zero_epsilon
-                    oe_factor = oe_factor if not np.isnan(oe_factor) and oe_factor > 0 else self.zero_epsilon
+                    oe_diff_rows = metrics_df[metrics_df['metric'] == 'odd_even_depth_diff']
+                    if len(oe_diff_rows) > 0 and not pd.isna(oe_diff_rows.iloc[0]['score']):
+                        oe_factor = oe_diff_rows.iloc[0]['score']
+                        oe_factor = oe_factor / 5 if oe_factor < 5 else 1 - self.zero_epsilon
+                        oe_factor = oe_factor if not np.isnan(oe_factor) and oe_factor > 0 else self.zero_epsilon
+                    else:
+                        oe_factor = np.abs(depth_even - depth_odd)
+                        oe_factor = oe_factor / 5 if oe_factor < 5 else 1 - self.zero_epsilon
+                        oe_factor = oe_factor if not np.isnan(oe_factor) and oe_factor > 0 else self.zero_epsilon
                     if np.isnan(temperature_stat):
                         temperature_stat = 0
                     elif temperature_stat < -10:
