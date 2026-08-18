@@ -26,10 +26,10 @@ class HaunterModelGenerator(tf.keras.utils.Sequence):
 
     def __getitem__(self, idx):
         batch_rows = self.dataset[idx * self.batch_size: (idx + 1) * self.batch_size]
-        batch_data_array = batch_rows.loc[:, ['mass_Mearth_input_norm', 'CMF_input_norm', 'Zenv_input_norm',
-                                              'Zwater_core_input_norm', 'Tsurf_K_input_norm', 'Psurf_bar_input_norm']]
-        batch_data_values = batch_rows.loc[:, ['radius_Rearth_output_norm', 'entropy_SI_output_norm',
-                                               'log10_mass_integral_output_norm']]
+        batch_data_array = batch_rows.loc[:, ['input_mass_Mearth_norm', 'input_CMF_norm', 'input_Zenv_norm',
+                                              'input_Zwater_core_norm', 'input_Tsurf_K_norm', 'input_Psurf_bar_norm']]
+        batch_data_values = batch_rows.loc[:, ['output_radius_Rearth_norm', 'output_entropy_log10_1000bar_SI_norm',
+                                               'output_log10_f_s_SI_norm', 'output_log10_temperature_1000bar_K_norm']]
         #assert np.all((batch_data_array > 0) & (batch_data_array < 1))
         #assert np.all((batch_data_values > 0) & (batch_data_values < 1))
         return batch_data_array.to_numpy(dtype=np.float32), batch_data_values.to_numpy(dtype=np.float32)
@@ -42,7 +42,7 @@ class HaunterModelGenerator(tf.keras.utils.Sequence):
             tf.TensorSpec(shape=(None, 6, 1), dtype=tf.float32)
         )
 
-        y_spec = tf.TensorSpec(shape=(None, 3,), dtype=tf.float32)  # Adjust if label shape is different
+        y_spec = tf.TensorSpec(shape=(None, 4,), dtype=tf.float32)  # Adjust if label shape is different
 
         return tf.data.Dataset.from_generator(
             lambda: iter(self),

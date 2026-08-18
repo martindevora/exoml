@@ -1,4 +1,6 @@
 import logging
+import os.path
+
 import tensorflow as tf
 import numpy as np
 import matplotlib.pyplot as plt
@@ -31,11 +33,11 @@ class Haunter(BaseModel):
 
     @staticmethod
     def load_data(dir):
-        dataset = pd.read_csv(f"{dir}/table.csv", sep=',')
-        dataset_large = pd.read_csv(f"{dir}/kunal_table.csv", sep=',')
-        dataset = pd.concat([dataset, dataset_large])
-        dataset = dataset.loc[dataset['physical?'] == True]
-        dataset['log10_mass_integral_output'] = np.log10(np.abs(dataset['f_s_SI_output']) / (M_EARTH * dataset['mass_Mearth_input']))
+        dataset = pd.read_csv(f"{dir}/models_for_ML_training_noduplicates.csv", sep=',')
+        dataset = dataset.loc[(dataset['flag_physical'] == True) & (dataset['flag_convergence'] == 0)]
+        dataset.dropna(inplace=True)
+        dataset.loc[:, 'output_entropy_log10_1000bar_SI'] = np.log10(dataset.loc[:, 'output_entropy_1000bar_SI'])
+        dataset.loc[:, 'output_log10_temperature_1000bar_K'] = np.log10(dataset.loc[:, 'output_temperature_1000bar_K'])
         return dataset
 
     def build(self):
@@ -47,7 +49,7 @@ class Haunter(BaseModel):
         nn = keras.layers.Dense(1024, activation=LeakyReLU(0.01))(nn)
         nn = keras.layers.Dropout(rate=self.hyperparams.dropout_rate)(nn)
         nn = keras.layers.BatchNormalization()(nn)
-        nn = keras.layers.Dense(3, activation="linear")(nn)
+        nn = keras.layers.Dense(4, activation="linear")(nn)
         #nn = keras.layers.Concatenate()([nn, input])
         self.set_model(Model(inputs=input, outputs=nn))
         return self
@@ -56,53 +58,53 @@ class Haunter(BaseModel):
         training_dir = kwargs.get('training_dir')
         dataset = Haunter.load_data(training_dir)
         self.input_means = tf.constant([
-            dataset['mass_Mearth_input'].mean(),
-            dataset['CMF_input'].mean(),
-            dataset['Zenv_input'].mean(),
-            dataset['Zwater_core_input'].mean(),
-            dataset['Tsurf_K_input'].mean(),
-            dataset['Psurf_bar_input'].mean()], dtype=tf.float32)
+            dataset['input_mass_Mearth'].mean(),
+            dataset['input_CMF'].mean(),
+            dataset['input_Zenv'].mean(),
+            dataset['input_Zwater_core'].mean(),
+            dataset['input_Tsurf_K'].mean(),
+            dataset['input_Psurf_bar'].mean()], dtype=tf.float32)
         self.input_stds = tf.constant([
-            dataset['mass_Mearth_input'].std(),
-            dataset['CMF_input'].std(),
-            dataset['Zenv_input'].std(),
-            dataset['Zwater_core_input'].std(),
-            dataset['Tsurf_K_input'].std(),
-            dataset['Psurf_bar_input'].std()], dtype=tf.float32)
+            dataset['input_mass_Mearth'].std(),
+            dataset['input_CMF'].std(),
+            dataset['input_Zenv'].std(),
+            dataset['input_Zwater_core'].std(),
+            dataset['input_Tsurf_K'].std(),
+            dataset['input_Psurf_bar'].std()], dtype=tf.float32)
         self.input_mins = tf.constant([
-            dataset['mass_Mearth_input'].min(),
-            dataset['CMF_input'].min(),
-            dataset['Zenv_input'].min(),
-            dataset['Zwater_core_input'].min(),
-            dataset['Tsurf_K_input'].min(),
-            dataset['Psurf_bar_input'].min()], dtype=tf.float32)
+            dataset['input_mass_Mearth'].min(),
+            dataset['input_CMF'].min(),
+            dataset['input_Zenv'].min(),
+            dataset['input_Zwater_core'].min(),
+            dataset['input_Tsurf_K'].min(),
+            dataset['input_Psurf_bar'].min()], dtype=tf.float32)
         self.input_maxs = tf.constant([
-            dataset['mass_Mearth_input'].max(),
-            dataset['CMF_input'].max(),
-            dataset['Zenv_input'].max(),
-            dataset['Zwater_core_input'].max(),
-            dataset['Tsurf_K_input'].max(),
-            dataset['Psurf_bar_input'].max()], dtype=tf.float32)
+            dataset['input_mass_Mearth'].max(),
+            dataset['input_CMF'].max(),
+            dataset['input_Zenv'].max(),
+            dataset['input_Zwater_core'].max(),
+            dataset['input_Tsurf_K'].max(),
+            dataset['input_Psurf_bar'].max()], dtype=tf.float32)
         self.output_means = tf.constant([
-            dataset['radius_Rearth_output'].mean(),
-            dataset['entropy_SI_output'].mean(),
-            #dataset['f_s_SI_output'].mean(),
-            dataset['log10_mass_integral_output'].mean()], dtype=tf.float32)
+            dataset['output_radius_Rearth'].mean(),
+            dataset['output_entropy_log10_1000bar_SI'].mean(),
+            dataset['output_log10_f_s_SI'].mean(),
+            dataset['output_log10_temperature_1000bar_K'].mean()], dtype=tf.float32)
         self.output_stds = tf.constant([
-            dataset['radius_Rearth_output'].std(),
-            dataset['entropy_SI_output'].std(),
-            #dataset['f_s_SI_output'].std(),
-            dataset['log10_mass_integral_output'].std()], dtype=tf.float32)
+            dataset['output_radius_Rearth'].std(),
+            dataset['output_entropy_log10_1000bar_SI'].std(),
+            dataset['output_log10_f_s_SI'].std(),
+            dataset['output_log10_temperature_1000bar_K'].std()], dtype=tf.float32)
         self.output_mins = tf.constant([
-            dataset['radius_Rearth_output'].min(),
-            dataset['entropy_SI_output'].min(),
-            #dataset['f_s_SI_output'].min(),
-            dataset['log10_mass_integral_output'].min()], dtype=tf.float32)
+            dataset['output_radius_Rearth'].min(),
+            dataset['output_entropy_log10_1000bar_SI'].min(),
+            dataset['output_log10_f_s_SI'].min(),
+            dataset['output_log10_temperature_1000bar_K'].min()], dtype=tf.float32)
         self.output_maxs = tf.constant([
-            dataset['radius_Rearth_output'].max(),
-            dataset['entropy_SI_output'].max(),
-            #dataset['f_s_SI_output'].max(),
-            dataset['log10_mass_integral_output'].max()], dtype=tf.float32)
+            dataset['output_radius_Rearth'].max(),
+            dataset['output_entropy_log10_1000bar_SI'].max(),
+            dataset['output_log10_f_s_SI'].max(),
+            dataset['output_log10_temperature_1000bar_K'].max()], dtype=tf.float32)
         dataset = self.add_standardized_columns(dataset, dataset)
         return dataset
 
@@ -111,135 +113,135 @@ class Haunter(BaseModel):
 
     def add_standardized_columns(self, dataset, training_dataset):
         scaler = self.instance_scaler()
-        scaler.fit(training_dataset.loc[:, 'mass_Mearth_input'])
-        dataset.loc[:, 'mass_Mearth_input_norm'] = scaler.transform(dataset.loc[:, 'mass_Mearth_input'].to_numpy())
+        scaler.fit(training_dataset.loc[:, 'input_mass_Mearth'])
+        dataset.loc[:, 'input_mass_Mearth_norm'] = scaler.transform(dataset.loc[:, 'input_mass_Mearth'].to_numpy())
         scaler = self.instance_scaler()
-        scaler.fit(training_dataset.loc[:, 'CMF_input'])
-        dataset.loc[:, 'CMF_input_norm'] = scaler.transform(dataset.loc[:, 'CMF_input'].to_numpy())
+        scaler.fit(training_dataset.loc[:, 'input_CMF'])
+        dataset.loc[:, 'input_CMF_norm'] = scaler.transform(dataset.loc[:, 'input_CMF'].to_numpy())
         scaler = self.instance_scaler()
-        scaler.fit(training_dataset.loc[:, 'Zenv_input'])
-        dataset.loc[:, 'Zenv_input_norm'] = scaler.transform(dataset.loc[:, 'Zenv_input'].to_numpy())
+        scaler.fit(training_dataset.loc[:, 'input_Zenv'])
+        dataset.loc[:, 'input_Zenv_norm'] = scaler.transform(dataset.loc[:, 'input_Zenv'].to_numpy())
         scaler = self.instance_scaler()
-        scaler.fit(training_dataset.loc[:, 'Zwater_core_input'])
-        dataset.loc[:, 'Zwater_core_input_norm'] = scaler.transform(dataset.loc[:, 'Zwater_core_input'].to_numpy())
+        scaler.fit(training_dataset.loc[:, 'input_Zwater_core'])
+        dataset.loc[:, 'input_Zwater_core_norm'] = scaler.transform(dataset.loc[:, 'input_Zwater_core'].to_numpy())
         scaler = self.instance_scaler()
-        scaler.fit(training_dataset.loc[:, 'Tsurf_K_input'])
-        dataset.loc[:, 'Tsurf_K_input_norm'] = scaler.transform(dataset.loc[:, 'Tsurf_K_input'].to_numpy())
+        scaler.fit(training_dataset.loc[:, 'input_Tsurf_K'])
+        dataset.loc[:, 'input_Tsurf_K_norm'] = scaler.transform(dataset.loc[:, 'input_Tsurf_K'].to_numpy())
         scaler = self.instance_scaler()
-        scaler.fit(training_dataset.loc[:, 'Psurf_bar_input'])
-        dataset.loc[:, 'Psurf_bar_input_norm'] = scaler.transform(dataset.loc[:, 'Psurf_bar_input'].to_numpy())
+        scaler.fit(training_dataset.loc[:, 'input_Psurf_bar'])
+        dataset.loc[:, 'input_Psurf_bar_norm'] = scaler.transform(dataset.loc[:, 'input_Psurf_bar'].to_numpy())
         scaler = self.instance_scaler()
-        scaler.fit(training_dataset.loc[:, 'radius_Rearth_output'])
-        dataset.loc[:, 'radius_Rearth_output_norm'] = scaler.transform(
-            dataset.loc[:, 'radius_Rearth_output'].to_numpy())
+        scaler.fit(training_dataset.loc[:, 'output_radius_Rearth'])
+        dataset.loc[:, 'output_radius_Rearth_norm'] = scaler.transform(
+            dataset.loc[:, 'output_radius_Rearth'].to_numpy())
         scaler = self.instance_scaler()
-        scaler.fit(training_dataset.loc[:, 'entropy_SI_output'])
-        dataset.loc[:, 'entropy_SI_output_norm'] = scaler.transform(dataset.loc[:, 'entropy_SI_output'].to_numpy())
+        scaler.fit(training_dataset.loc[:, 'output_entropy_log10_1000bar_SI'])
+        dataset.loc[:, 'output_entropy_log10_1000bar_SI_norm'] = scaler.transform(dataset.loc[:, 'output_entropy_log10_1000bar_SI'].to_numpy())
         scaler = self.instance_scaler()
-        scaler.fit(training_dataset.loc[:, 'f_s_SI_output'])
-        dataset.loc[:, 'f_s_SI_output_norm'] = scaler.transform(dataset.loc[:, 'f_s_SI_output'].to_numpy())
+        scaler.fit(training_dataset.loc[:, 'output_log10_f_s_SI'])
+        dataset.loc[:, 'output_log10_f_s_SI_norm'] = scaler.transform(dataset.loc[:, 'output_log10_f_s_SI'].to_numpy())
         scaler = self.instance_scaler()
-        scaler.fit(training_dataset.loc[:, 'log10_mass_integral_output'])
-        dataset.loc[:, 'log10_mass_integral_output_norm'] = scaler.transform(dataset.loc[:, 'log10_mass_integral_output'].to_numpy())
-        logging.info("Mass " + str(training_dataset.loc[:, 'mass_Mearth_input'].mean()) + ' +- ' + str(
-            training_dataset.loc[:, 'mass_Mearth_input'].std()) +
-                     ' ' + str(training_dataset.loc[:, 'mass_Mearth_input'].min()) + ' ' + str(
-            training_dataset.loc[:, 'mass_Mearth_input'].max()))
-        logging.info("CMF " + str(training_dataset.loc[:, 'CMF_input'].mean()) + ' +- ' + str(
-            training_dataset.loc[:, 'CMF_input'].std()) +
-                     ' ' + str(training_dataset.loc[:, 'CMF_input'].min()) + ' ' + str(
-            training_dataset.loc[:, 'CMF_input'].max()))
-        logging.info("Zenv " + str(training_dataset.loc[:, 'Zenv_input'].mean()) + ' +- ' + str(
-            training_dataset.loc[:, 'Zenv_input'].std()) +
-                     ' ' + str(training_dataset.loc[:, 'Zenv_input'].min()) + ' ' + str(
-            training_dataset.loc[:, 'Zenv_input'].max()))
-        logging.info("Zwater " + str(training_dataset.loc[:, 'Zwater_core_input'].mean()) + ' +- ' + str(
-            training_dataset.loc[:, 'Zwater_core_input'].std()) +
-                     ' ' + str(training_dataset.loc[:, 'Zwater_core_input'].min()) + ' ' + str(
-            training_dataset.loc[:, 'Zwater_core_input'].max()))
-        logging.info("Tsurf " + str(training_dataset.loc[:, 'Tsurf_K_input'].mean()) + ' +- ' + str(
-            training_dataset.loc[:, 'Tsurf_K_input'].std()) +
-                     ' ' + str(training_dataset.loc[:, 'Tsurf_K_input'].min()) + ' ' + str(
-            training_dataset.loc[:, 'Tsurf_K_input'].max()))
-        logging.info("Psurf " + str(training_dataset.loc[:, 'Psurf_bar_input'].mean()) + ' +- ' + str(
-            training_dataset.loc[:, 'Psurf_bar_input'].std()) +
-                     ' ' + str(training_dataset.loc[:, 'Psurf_bar_input'].min()) + ' ' + str(
-            training_dataset.loc[:, 'Psurf_bar_input'].max()))
-        logging.info("Radius " + str(training_dataset.loc[:, 'radius_Rearth_output'].mean()) + ' +- ' + str(
-            training_dataset.loc[:, 'radius_Rearth_output'].std()) +
-                     ' ' + str(training_dataset.loc[:, 'radius_Rearth_output'].min()) + ' ' + str(
-            training_dataset.loc[:, 'radius_Rearth_output'].max()))
-        logging.info("Entropy " + str(training_dataset.loc[:, 'entropy_SI_output'].mean()) + ' +- ' + str(
-            training_dataset.loc[:, 'entropy_SI_output'].std()) +
-                     ' ' + str(training_dataset.loc[:, 'entropy_SI_output'].min()) + ' ' + str(
-            training_dataset.loc[:, 'entropy_SI_output'].max()))
-        logging.info("F_S " + str(training_dataset.loc[:, 'f_s_SI_output'].mean()) + ' +- ' + str(
-            training_dataset.loc[:, 'f_s_SI_output'].std()) +
-                     ' ' + str(training_dataset.loc[:, 'f_s_SI_output'].min()) + ' ' + str(
-            training_dataset.loc[:, 'f_s_SI_output'].max()))
-        logging.info("Log10 mass integral " + str(training_dataset.loc[:, 'log10_mass_integral_output'].mean()) + ' +- ' + str(
-            training_dataset.loc[:, 'log10_mass_integral_output'].std()) +
-                     ' ' + str(training_dataset.loc[:, 'log10_mass_integral_output'].min()) + ' ' + str(
-            training_dataset.loc[:, 'log10_mass_integral_output'].max()))
+        scaler.fit(training_dataset.loc[:, 'output_log10_temperature_1000bar_K'])
+        dataset.loc[:, 'output_log10_temperature_1000bar_K_norm'] = scaler.transform(dataset.loc[:, 'output_log10_temperature_1000bar_K'].to_numpy())
+        logging.info("Mass " + str(training_dataset.loc[:, 'input_mass_Mearth'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'input_mass_Mearth'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'input_mass_Mearth'].min()) + ' ' + str(
+            training_dataset.loc[:, 'input_mass_Mearth'].max()))
+        logging.info("CMF " + str(training_dataset.loc[:, 'input_CMF'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'input_CMF'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'input_CMF'].min()) + ' ' + str(
+            training_dataset.loc[:, 'input_CMF'].max()))
+        logging.info("Zenv " + str(training_dataset.loc[:, 'input_Zenv'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'input_Zenv'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'input_Zenv'].min()) + ' ' + str(
+            training_dataset.loc[:, 'input_Zenv'].max()))
+        logging.info("Zwater " + str(training_dataset.loc[:, 'input_Zwater_core'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'input_Zwater_core'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'input_Zwater_core'].min()) + ' ' + str(
+            training_dataset.loc[:, 'input_Zwater_core'].max()))
+        logging.info("Tsurf " + str(training_dataset.loc[:, 'input_Tsurf_K'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'input_Tsurf_K'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'input_Tsurf_K'].min()) + ' ' + str(
+            training_dataset.loc[:, 'input_Tsurf_K'].max()))
+        logging.info("Psurf " + str(training_dataset.loc[:, 'input_Psurf_bar'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'input_Psurf_bar'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'input_Psurf_bar'].min()) + ' ' + str(
+            training_dataset.loc[:, 'input_Psurf_bar'].max()))
+        logging.info("Radius " + str(training_dataset.loc[:, 'output_radius_Rearth'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'output_radius_Rearth'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'output_radius_Rearth'].min()) + ' ' + str(
+            training_dataset.loc[:, 'output_radius_Rearth'].max()))
+        logging.info("Entropy " + str(training_dataset.loc[:, 'output_entropy_log10_1000bar_SI'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'output_entropy_log10_1000bar_SI'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'output_entropy_log10_1000bar_SI'].min()) + ' ' + str(
+            training_dataset.loc[:, 'output_entropy_log10_1000bar_SI'].max()))
+        logging.info("F_S " + str(training_dataset.loc[:, 'output_log10_f_s_SI'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'output_log10_f_s_SI'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'output_log10_f_s_SI'].min()) + ' ' + str(
+            training_dataset.loc[:, 'output_log10_f_s_SI'].max()))
+        logging.info("Log10 Temperature at 1000 bar " + str(training_dataset.loc[:, 'output_log10_temperature_1000bar_K'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'output_log10_temperature_1000bar_K'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'output_log10_temperature_1000bar_K'].min()) + ' ' + str(
+            training_dataset.loc[:, 'output_log10_temperature_1000bar_K'].max()))
         return dataset
 
     def add_destandardized_columns(self, dataset, training_dataset, predictions):
-        logging.info("Mass " + str(training_dataset.loc[:, 'mass_Mearth_input'].mean()) + ' +- ' + str(
-            training_dataset.loc[:, 'mass_Mearth_input'].std()) +
-                     ' ' + str(training_dataset.loc[:, 'mass_Mearth_input'].min()) + ' ' + str(
-            training_dataset.loc[:, 'mass_Mearth_input'].max()))
+        logging.info("Mass " + str(training_dataset.loc[:, 'input_mass_Mearth'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'input_mass_Mearth'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'input_mass_Mearth'].min()) + ' ' + str(
+            training_dataset.loc[:, 'input_mass_Mearth'].max()))
         logging.info(
-            "CMF " + str(training_dataset.loc[:, 'CMF_input'].mean()) + ' +- ' + str(
-                training_dataset.loc[:, 'CMF_input'].std()) +
-            ' ' + str(training_dataset.loc[:, 'CMF_input'].min()) + ' ' + str(
-                training_dataset.loc[:, 'CMF_input'].max()))
+            "CMF " + str(training_dataset.loc[:, 'input_CMF'].mean()) + ' +- ' + str(
+                training_dataset.loc[:, 'input_CMF'].std()) +
+            ' ' + str(training_dataset.loc[:, 'input_CMF'].min()) + ' ' + str(
+                training_dataset.loc[:, 'input_CMF'].max()))
         logging.info(
-            "Zenv " + str(training_dataset.loc[:, 'Zenv_input'].mean()) + ' +- ' + str(
-                training_dataset.loc[:, 'Zenv_input'].std()) +
-            ' ' + str(training_dataset.loc[:, 'Zenv_input'].min()) + ' ' + str(
-                training_dataset.loc[:, 'Zenv_input'].max()))
-        logging.info("Zwater " + str(training_dataset.loc[:, 'Zwater_core_input'].mean()) + ' +- ' + str(
-            training_dataset.loc[:, 'Zwater_core_input'].std()) +
-                     ' ' + str(training_dataset.loc[:, 'Zwater_core_input'].min()) + ' ' + str(
-            training_dataset.loc[:, 'Zwater_core_input'].max()))
-        logging.info("Tsurf " + str(training_dataset.loc[:, 'Tsurf_K_input'].mean()) + ' +- ' + str(
-            training_dataset.loc[:, 'Tsurf_K_input'].std()) +
-                     ' ' + str(training_dataset.loc[:, 'Tsurf_K_input'].min()) + ' ' + str(
-            training_dataset.loc[:, 'Tsurf_K_input'].max()))
-        logging.info("Psurf " + str(training_dataset.loc[:, 'Psurf_bar_input'].mean()) + ' +- ' + str(
-            training_dataset.loc[:, 'Psurf_bar_input'].std()) +
-                     ' ' + str(training_dataset.loc[:, 'Psurf_bar_input'].min()) + ' ' + str(
-            training_dataset.loc[:, 'Psurf_bar_input'].max()))
-        logging.info("Radius " + str(training_dataset.loc[:, 'radius_Rearth_output'].mean()) + ' +- ' + str(
-            training_dataset.loc[:, 'radius_Rearth_output'].std()) +
-                     ' ' + str(training_dataset.loc[:, 'radius_Rearth_output'].min()) + ' ' + str(
-            training_dataset.loc[:, 'radius_Rearth_output'].max()))
-        logging.info("Entropy " + str(training_dataset.loc[:, 'entropy_SI_output'].mean()) + ' +- ' + str(
-            training_dataset.loc[:, 'entropy_SI_output'].std()) +
-                     ' ' + str(training_dataset.loc[:, 'entropy_SI_output'].min()) + ' ' + str(
-            training_dataset.loc[:, 'entropy_SI_output'].max()))
-        # logging.info(
-        #     "F_S " + str(training_dataset.loc[:, 'f_s_SI_output'].mean()) + ' +- ' + str(
-        #         training_dataset.loc[:, 'f_s_SI_output'].std()) +
-        #     ' ' + str(training_dataset.loc[:, 'f_s_SI_output'].min()) + ' ' + str(
-        #         training_dataset.loc[:, 'f_s_SI_output'].max()))
+            "Zenv " + str(training_dataset.loc[:, 'input_Zenv'].mean()) + ' +- ' + str(
+                training_dataset.loc[:, 'input_Zenv'].std()) +
+            ' ' + str(training_dataset.loc[:, 'input_Zenv'].min()) + ' ' + str(
+                training_dataset.loc[:, 'input_Zenv'].max()))
+        logging.info("Zwater " + str(training_dataset.loc[:, 'input_Zwater_core'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'input_Zwater_core'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'input_Zwater_core'].min()) + ' ' + str(
+            training_dataset.loc[:, 'input_Zwater_core'].max()))
+        logging.info("Tsurf " + str(training_dataset.loc[:, 'input_Tsurf_K'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'input_Tsurf_K'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'input_Tsurf_K'].min()) + ' ' + str(
+            training_dataset.loc[:, 'input_Tsurf_K'].max()))
+        logging.info("Psurf " + str(training_dataset.loc[:, 'input_Psurf_bar'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'input_Psurf_bar'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'input_Psurf_bar'].min()) + ' ' + str(
+            training_dataset.loc[:, 'input_Psurf_bar'].max()))
+        logging.info("Radius " + str(training_dataset.loc[:, 'output_radius_Rearth'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'output_radius_Rearth'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'output_radius_Rearth'].min()) + ' ' + str(
+            training_dataset.loc[:, 'output_radius_Rearth'].max()))
+        logging.info("Entropy " + str(training_dataset.loc[:, 'output_entropy_log10_1000bar_SI'].mean()) + ' +- ' + str(
+            training_dataset.loc[:, 'output_entropy_log10_1000bar_SI'].std()) +
+                     ' ' + str(training_dataset.loc[:, 'output_entropy_log10_1000bar_SI'].min()) + ' ' + str(
+            training_dataset.loc[:, 'output_entropy_log10_1000bar_SI'].max()))
         logging.info(
-            "Log10 mass integral " + str(training_dataset.loc[:, 'log10_mass_integral_output'].mean()) + ' +- ' + str(
-                training_dataset.loc[:, 'log10_mass_integral_output'].std()) +
-            ' ' + str(training_dataset.loc[:, 'log10_mass_integral_output'].min()) + ' ' + str(
-                training_dataset.loc[:, 'log10_mass_integral_output'].max()))
+            "F_S " + str(training_dataset.loc[:, 'output_log10_f_s_SI'].mean()) + ' +- ' + str(
+                training_dataset.loc[:, 'output_log10_f_s_SI'].std()) +
+            ' ' + str(training_dataset.loc[:, 'output_log10_f_s_SI'].min()) + ' ' + str(
+                training_dataset.loc[:, 'output_log10_f_s_SI'].max()))
+        logging.info(
+            "Log10 Temperature K at 1000 bar " + str(training_dataset.loc[:, 'output_log10_temperature_1000bar_K'].mean()) + ' +- ' + str(
+                training_dataset.loc[:, 'output_log10_temperature_1000bar_K'].std()) +
+            ' ' + str(training_dataset.loc[:, 'output_log10_temperature_1000bar_K'].min()) + ' ' + str(
+                training_dataset.loc[:, 'output_log10_temperature_1000bar_K'].max()))
         scaler = self.instance_scaler()
-        scaler.fit(training_dataset.loc[:, 'radius_Rearth_output'])
-        dataset.loc[:, 'radius_Rearth_output_pred'] = scaler.inverse_transform(predictions[:, 0])
+        scaler.fit(training_dataset.loc[:, 'output_radius_Rearth'])
+        dataset.loc[:, 'output_radius_Rearth_pred'] = scaler.inverse_transform(predictions[:, 0])
         scaler = self.instance_scaler()
-        scaler.fit(training_dataset.loc[:, 'entropy_SI_output'])
-        dataset.loc[:, 'entropy_SI_output_pred'] = scaler.inverse_transform(predictions[:, 1])
-        # scaler = self.instance_scaler()
-        # scaler.fit(training_dataset.loc[:, 'f_s_SI_output'])
-        # dataset.loc[:, 'f_s_SI_output_pred'] = scaler.inverse_transform(predictions[:, 2])
+        scaler.fit(training_dataset.loc[:, 'output_entropy_log10_1000bar_SI'])
+        dataset.loc[:, 'output_entropy_log10_1000bar_SI_pred'] = scaler.inverse_transform(predictions[:, 1])
         scaler = self.instance_scaler()
-        scaler.fit(training_dataset.loc[:, 'log10_mass_integral_output'])
-        dataset.loc[:, 'log10_mass_integral_output_pred'] = scaler.inverse_transform(predictions[:, 2])
+        scaler.fit(training_dataset.loc[:, 'output_log10_f_s_SI'])
+        dataset.loc[:, 'output_log10_f_s_SI_pred'] = scaler.inverse_transform(predictions[:, 2])
+        scaler = self.instance_scaler()
+        scaler.fit(training_dataset.loc[:, 'output_log10_temperature_1000bar_K'])
+        dataset.loc[:, 'output_log10_temperature_1000bar_K_pred'] = scaler.inverse_transform(predictions[:, 3])
         return dataset
 
     def instance_generator(self, dataset, dir, batch_size, input_sizes, type_to_label, zero_epsilon=1e-7, shuffle=True):
@@ -252,7 +254,7 @@ class Haunter(BaseModel):
         return loss, None
 
     def instance_metrics(self):
-        return [self.mae_radius, self.mae_entropy, self.mae_log10_mass_integral]
+        return [self.mae_radius, self.mae_entropy, self.mae_fs, self.mae_temperature]
 
     def plot_metrics(self, model_dir, steps_per_epoch, with_validation=False):
         return []
@@ -265,95 +267,338 @@ class Haunter(BaseModel):
         custom_objects['mae_radius'] = self.mae_radius
         custom_objects['mae_entropy'] = self.mae_entropy
         custom_objects['mae_fs'] = self.mae_fs
+        custom_objects['mae_temperature'] = self.mae_temperature
         logging.info("Loading model from %s", dir)
         self.set_model(tf.keras.models.load_model(dir, compile=compile, custom_objects=custom_objects))
         return self
 
     def predict_validation(self, model_dir, dir, batch_size=128):
         dataset_training = pd.read_csv(f"{model_dir}/train_dataset.csv")
-        dataset_training['log10_mass_integral_output'] = np.log10(np.abs(dataset_training['f_s_SI_output']) / (M_EARTH * dataset_training['mass_Mearth_input']))
         dataset_validation = pd.read_csv(f"{model_dir}/validation_dataset.csv")
-        dataset_validation['log10_mass_integral_output'] = np.log10(np.abs(dataset_validation['f_s_SI_output']) / (M_EARTH * dataset_validation['mass_Mearth_input']))
         dataset_standardization = pd.concat([dataset_training, dataset_validation])
-        dataset_training = self.add_standardized_columns(dataset_validation, dataset_standardization)
+        dataset_validation = self.add_standardized_columns(dataset_validation, dataset_standardization)
         predict_batch_generator = self.instance_generator(dataset_validation, None, batch_size, self.input_size, None,
                                                           shuffle=False)
         predictions = self.model.predict(predict_batch_generator, batch_size=batch_size)
-        dataset_validation['radius_Rearth_output_norm_pred'] = predictions[:, 0]
-        dataset_validation['entropy_SI_output_norm_pred'] = predictions[:, 1]
-        #dataset_validation['f_s_SI_output_norm_pred'] = predictions[:, 2]
-        dataset_validation['log10_mass_integral_output_norm_pred'] = predictions[:, 2]
-        dataset_validation = self.add_destandardized_columns(dataset_validation, dataset_training, predictions)
-        dataset_validation['radius_Rearth_output_pred_diff'] = np.abs(
-            dataset_validation['radius_Rearth_output_pred'] - dataset_validation['radius_Rearth_output'])
-        dataset_validation['entropy_SI_output_pred_diff'] = np.abs(
-            dataset_validation['entropy_SI_output_pred'] - dataset_validation['entropy_SI_output'])
-        #dataset_validation['f_s_SI_output_pred_diff'] = np.abs(
-        #    dataset_validation['f_s_SI_output_pred'] - dataset_validation['f_s_SI_output'])
-        dataset_validation['log10_mass_integral_output_pred_diff'] = np.abs(
-            dataset_validation['log10_mass_integral_output_pred'] - dataset_validation['log10_mass_integral_output'])
-        dataset_validation['radius_Rearth_output_pred_diff_ratio'] = np.abs(
-            dataset_validation['radius_Rearth_output_pred'] - dataset_validation['radius_Rearth_output']) / \
-                                                                     dataset_validation['radius_Rearth_output']
-        dataset_validation['entropy_SI_output_pred_diff_ratio'] = np.abs(
-            dataset_validation['entropy_SI_output_pred'] - dataset_validation['entropy_SI_output']) / \
-                                                                  dataset_validation['entropy_SI_output']
-        #dataset_validation['f_s_SI_output_pred_diff_ratio'] = np.abs(
-        #    dataset_validation['f_s_SI_output_pred'] - dataset_validation['f_s_SI_output']) / np.abs(
-        #    dataset_validation['f_s_SI_output'])
-        dataset_validation['log10_mass_integral_output_pred_diff_ratio'] = np.abs(
-            dataset_validation['log10_mass_integral_output_pred'] - dataset_validation['log10_mass_integral_output']) / np.abs(
-            dataset_validation['log10_mass_integral_output'])
-        results_df = dataset_validation[['radius_Rearth_output', 'radius_Rearth_output_norm',
-                                         'radius_Rearth_output_pred', 'radius_Rearth_output_norm_pred',
-                                         'radius_Rearth_output_pred_diff', 'radius_Rearth_output_pred_diff_ratio',
-                                         'entropy_SI_output', 'entropy_SI_output_norm',
-                                         'entropy_SI_output_pred', 'entropy_SI_output_norm_pred',
-                                         'entropy_SI_output_pred_diff', 'entropy_SI_output_pred_diff_ratio',
-                                         #'f_s_SI_output', 'f_s_SI_output_norm',
-                                         #'f_s_SI_output_pred', 'f_s_SI_output_norm_pred',
-                                         #'f_s_SI_output_pred_diff', 'f_s_SI_output_pred_diff_ratio',
-                                         'log10_mass_integral_output', 'log10_mass_integral_output_norm',
-                                         'log10_mass_integral_output_pred', 'log10_mass_integral_output_norm_pred',
-                                         'log10_mass_integral_output_pred_diff', 'log10_mass_integral_output_pred_diff_ratio',]]
+        dataset_validation['output_radius_Rearth_norm_pred'] = predictions[:, 0]
+        dataset_validation['output_entropy_log10_1000bar_SI_norm_pred'] = predictions[:, 1]
+        dataset_validation['output_log10_f_s_SI_norm_pred'] = predictions[:, 2]
+        dataset_validation['output_log10_temperature_1000bar_K_norm_pred'] = predictions[:, 3]
+        dataset_validation = self.add_destandardized_columns(dataset_validation, dataset_standardization, predictions)
+        dataset_validation['output_radius_Rearth_pred_diff'] = np.abs(
+            dataset_validation['output_radius_Rearth_pred'] - dataset_validation['output_radius_Rearth'])
+        dataset_validation['output_entropy_log10_1000bar_SI_pred_diff'] = np.abs(
+            dataset_validation['output_entropy_log10_1000bar_SI_pred'] - dataset_validation['output_entropy_log10_1000bar_SI'])
+        dataset_validation['output_log10_f_s_SI_pred_diff'] = np.abs(
+            dataset_validation['output_log10_f_s_SI_pred'] - dataset_validation['output_log10_f_s_SI'])
+        dataset_validation['output_log10_temperature_1000bar_K_pred_diff'] = np.abs(dataset_validation['output_log10_temperature_1000bar_K_pred'] -
+                                                                               dataset_validation['output_log10_temperature_1000bar_K'])
+        dataset_validation['output_radius_Rearth_pred_diff_ratio'] = np.abs(
+            dataset_validation['output_radius_Rearth_pred'] - dataset_validation['output_radius_Rearth']) / \
+                                                                     dataset_validation['output_radius_Rearth']
+        dataset_validation['output_entropy_log10_1000bar_SI_pred_diff_ratio'] = np.abs(
+            dataset_validation['output_entropy_log10_1000bar_SI_pred'] - dataset_validation['output_entropy_log10_1000bar_SI']) / \
+                                                                  dataset_validation['output_entropy_log10_1000bar_SI']
+        dataset_validation['output_log10_f_s_SI_pred_diff_ratio'] = np.abs(
+            dataset_validation['output_log10_f_s_SI_pred'] - dataset_validation['output_log10_f_s_SI']) / np.abs(
+            dataset_validation['output_log10_f_s_SI'])
+        dataset_validation['output_log10_temperature_1000bar_K_pred_diff_ratio'] = np.abs(
+            dataset_validation['output_log10_temperature_1000bar_K_pred'] - dataset_validation['output_log10_temperature_1000bar_K']) / np.abs(
+            dataset_validation['output_log10_temperature_1000bar_K'])
+        results_df = dataset_validation[['output_radius_Rearth', 'output_radius_Rearth_norm',
+                                         'output_radius_Rearth_pred', 'output_radius_Rearth_norm_pred',
+                                         'output_radius_Rearth_pred_diff', 'output_radius_Rearth_pred_diff_ratio',
+                                         'output_entropy_log10_1000bar_SI', 'output_entropy_log10_1000bar_SI_norm',
+                                         'output_entropy_log10_1000bar_SI_pred', 'output_entropy_log10_1000bar_SI_norm_pred',
+                                         'output_entropy_log10_1000bar_SI_pred_diff', 'output_entropy_log10_1000bar_SI_pred_diff_ratio',
+                                         'output_log10_f_s_SI', 'output_log10_f_s_SI_norm',
+                                         'output_log10_f_s_SI_pred', 'output_log10_f_s_SI_norm_pred',
+                                         'output_log10_f_s_SI_pred_diff', 'output_log10_f_s_SI_pred_diff_ratio',
+                                         'output_log10_temperature_1000bar_K', 'output_log10_temperature_1000bar_K_norm',
+                                         'output_log10_temperature_1000bar_K_pred', 'output_log10_temperature_1000bar_K_norm_pred',
+                                         'output_log10_temperature_1000bar_K_pred_diff', 'output_log10_temperature_1000bar_K_pred_diff_ratio',]]
         logging.info("Results validation: \n%s", results_df.to_string())
         logging.info("Validation radius diff mean: " + str(
-            dataset_validation.loc[:, 'radius_Rearth_output_pred_diff'].mean()) + '+-' +
-                     str(dataset_validation.loc[:, 'radius_Rearth_output_pred_diff'].std()))
-        logging.info("Validation entropy_SI diff mean: " + str(
-            dataset_validation.loc[:, 'entropy_SI_output_pred_diff'].mean()) + '+-' +
-                     str(dataset_validation.loc[:, 'entropy_SI_output_pred_diff'].std()))
-        #logging.info("Validation f_s_SI diff mean: " + str(
-        #    dataset_validation.loc[:, 'f_s_SI_output_pred_diff'].mean()) + '+-' +
-        #             str(dataset_validation.loc[:, 'f_s_SI_output_pred_diff'].std()))
-        logging.info("Validation log10_mass_integral diff mean: " + str(
-            dataset_validation.loc[:, 'log10_mass_integral_output_pred_diff'].mean()) + '+-' +
-                     str(dataset_validation.loc[:, 'log10_mass_integral_output_pred_diff'].std()))
+            dataset_validation.loc[:, 'output_radius_Rearth_pred_diff'].mean()) + '+-' +
+                     str(dataset_validation.loc[:, 'output_radius_Rearth_pred_diff'].std()))
+        logging.info("Validation output_entropy_log10_1000bar_SI diff mean: " + str(
+            dataset_validation.loc[:, 'output_entropy_log10_1000bar_SI_pred_diff'].mean()) + '+-' +
+                     str(dataset_validation.loc[:, 'output_entropy_log10_1000bar_SI_pred_diff'].std()))
+        logging.info("Validation F_S diff mean: " + str(
+            dataset_validation.loc[:, 'output_log10_f_s_SI_pred_diff'].mean()) + '+-' +
+                     str(dataset_validation.loc[:, 'output_log10_f_s_SI_pred_diff'].std()))
+        logging.info("Validation Log10 Temperature diff mean: " + str(
+            dataset_validation.loc[:, 'output_log10_temperature_1000bar_K_pred_diff'].mean()) + '+-' +
+                     str(dataset_validation.loc[:, 'output_log10_temperature_1000bar_K_pred_diff'].std()))
         logging.info("Validation radius diff ratio median: " + str(
-            dataset_validation.loc[:, 'radius_Rearth_output_pred_diff_ratio'].median()) + '+-' +
-                     str(dataset_validation.loc[:, 'radius_Rearth_output_pred_diff_ratio'].std()))
-        logging.info("Validation entropy_SI diff ratio median: " + str(
-            dataset_validation.loc[:, 'entropy_SI_output_pred_diff_ratio'].median()) + '+-' +
-                     str(dataset_validation.loc[:, 'entropy_SI_output_pred_diff_ratio'].std()))
-        #logging.info("Validation f_s_SI diff ratio median: " + str(
-        #    dataset_validation.loc[:, 'f_s_SI_output_pred_diff_ratio'].median()) + '+-' +
-        #             str(dataset_validation.loc[:, 'f_s_SI_output_pred_diff_ratio'].std()))
-        logging.info("Validation log10_mass_integral diff ratio median: " + str(
-            dataset_validation.loc[:, 'log10_mass_integral_output_pred_diff_ratio'].median()) + '+-' +
-                     str(dataset_validation.loc[:, 'log10_mass_integral_output_pred_diff_ratio'].std()))
+            dataset_validation.loc[:, 'output_radius_Rearth_pred_diff_ratio'].median()) + '+-' +
+                     str(dataset_validation.loc[:, 'output_radius_Rearth_pred_diff_ratio'].std()))
+        logging.info("Validation output_entropy_log10_1000bar_SI diff ratio median: " + str(
+            dataset_validation.loc[:, 'output_entropy_log10_1000bar_SI_pred_diff_ratio'].median()) + '+-' +
+                     str(dataset_validation.loc[:, 'output_entropy_log10_1000bar_SI_pred_diff_ratio'].std()))
+        logging.info("Validation output_log10_f_s_SI diff ratio median: " + str(
+            dataset_validation.loc[:, 'output_log10_f_s_SI_pred_diff_ratio'].median()) + '+-' +
+                     str(dataset_validation.loc[:, 'output_log10_f_s_SI_pred_diff_ratio'].std()))
+        logging.info("Validation Log10 Temperature diff ratio median: " + str(
+            dataset_validation.loc[:, 'output_log10_temperature_1000bar_K_pred_diff_ratio'].median()) + '+-' +
+                     str(dataset_validation.loc[:, 'output_log10_temperature_1000bar_K_pred_diff_ratio'].std()))
         logging.info("Validation radius diff ratio mean: " + str(
-            dataset_validation.loc[:, 'radius_Rearth_output_pred_diff_ratio'].mean()) + '+-' +
-                     str(dataset_validation.loc[:, 'radius_Rearth_output_pred_diff_ratio'].std()))
-        logging.info("Validation entropy_SI diff ratio mean: " + str(
-            dataset_validation.loc[:, 'entropy_SI_output_pred_diff_ratio'].mean()) + '+-' +
-                     str(dataset_validation.loc[:, 'entropy_SI_output_pred_diff_ratio'].std()))
-        #logging.info("Validation f_s_SI diff ratio mean: " + str(
-        #    dataset_validation.loc[:, 'f_s_SI_output_pred_diff_ratio'].mean()) + '+-' +
-        #             str(dataset_validation.loc[:, 'f_s_SI_output_pred_diff_ratio'].std()))
-        logging.info("Validation log10_mass_integral diff ratio mean: " + str(
-            dataset_validation.loc[:, 'log10_mass_integral_output_pred_diff_ratio'].mean()) + '+-' +
-                     str(dataset_validation.loc[:, 'log10_mass_integral_output_pred_diff_ratio'].std()))
+            dataset_validation.loc[:, 'output_radius_Rearth_pred_diff_ratio'].mean()) + '+-' +
+                     str(dataset_validation.loc[:, 'output_radius_Rearth_pred_diff_ratio'].std()))
+        logging.info("Validation output_entropy_log10_1000bar_SI diff ratio mean: " + str(
+            dataset_validation.loc[:, 'output_entropy_log10_1000bar_SI_pred_diff_ratio'].mean()) + '+-' +
+                     str(dataset_validation.loc[:, 'output_entropy_log10_1000bar_SI_pred_diff_ratio'].std()))
+        logging.info("Validation output_log10_f_s_SI diff ratio mean: " + str(
+           dataset_validation.loc[:, 'output_log10_f_s_SI_pred_diff_ratio'].mean()) + '+-' +
+                    str(dataset_validation.loc[:, 'output_log10_f_s_SI_pred_diff_ratio'].std()))
+        logging.info("Validation Log10 Temperature diff ratio mean: " + str(
+            dataset_validation.loc[:, 'output_log10_temperature_1000bar_K_pred_diff_ratio'].mean()) + '+-' +
+                     str(dataset_validation.loc[:, 'output_log10_temperature_1000bar_K_pred_diff_ratio'].std()))
         return dataset_validation
+
+    def predict_test(self, model_dir, test_csv, batch_size=128):
+        dataset_training = pd.read_csv(f"{model_dir}/train_dataset.csv")
+        dataset_validation = pd.read_csv(f"{model_dir}/validation_dataset.csv")
+        dataset_standardization = pd.concat([dataset_training, dataset_validation])
+        dataset_test = pd.read_csv(test_csv)
+        dataset_test = dataset_test.loc[(dataset_test['flag_physical'] == True) & (dataset_test['flag_convergence'] == 0)]
+        dataset_test.dropna(inplace=True)
+        dataset_test.loc[:, 'output_entropy_log10_1000bar_SI'] = np.log10(dataset_test.loc[:, 'output_entropy_1000bar_SI'])
+        dataset_test.loc[:, 'output_log10_temperature_1000bar_K'] = np.log10(dataset_test.loc[:, 'output_temperature_1000bar_K'])
+        dataset_test = self.add_standardized_columns(dataset_test, dataset_standardization)
+        predict_batch_generator = self.instance_generator(dataset_test, None, batch_size, self.input_size, None,
+                                                          shuffle=False)
+        predictions = self.model.predict(predict_batch_generator, batch_size=batch_size)
+        dataset_test['output_radius_Rearth_norm_pred'] = predictions[:, 0]
+        dataset_test['output_entropy_log10_1000bar_SI_norm_pred'] = predictions[:, 1]
+        dataset_test['output_log10_f_s_SI_norm_pred'] = predictions[:, 2]
+        dataset_test['output_log10_temperature_1000bar_K_norm_pred'] = predictions[:, 3]
+        dataset_test = self.add_destandardized_columns(dataset_test, dataset_standardization, predictions)
+        dataset_test['output_radius_Rearth_pred_diff'] = np.abs(
+            dataset_test['output_radius_Rearth_pred'] - dataset_test['output_radius_Rearth'])
+        dataset_test['output_entropy_log10_1000bar_SI_pred_diff'] = np.abs(
+            dataset_test['output_entropy_log10_1000bar_SI_pred'] - dataset_test['output_entropy_log10_1000bar_SI'])
+        dataset_test['output_log10_f_s_SI_pred_diff'] = np.abs(
+            dataset_test['output_log10_f_s_SI_pred'] - dataset_test['output_log10_f_s_SI'])
+        dataset_test['output_log10_temperature_1000bar_K_pred_diff'] = np.abs(
+            dataset_test['output_log10_temperature_1000bar_K_pred'] - dataset_test['output_log10_temperature_1000bar_K'])
+        dataset_test['output_radius_Rearth_pred_diff_ratio'] = np.abs(
+            dataset_test['output_radius_Rearth_pred'] - dataset_test['output_radius_Rearth']) / \
+            dataset_test['output_radius_Rearth']
+        dataset_test['output_entropy_log10_1000bar_SI_pred_diff_ratio'] = np.abs(
+            dataset_test['output_entropy_log10_1000bar_SI_pred'] - dataset_test['output_entropy_log10_1000bar_SI']) / \
+            dataset_test['output_entropy_log10_1000bar_SI']
+        dataset_test['output_log10_f_s_SI_pred_diff_ratio'] = np.abs(
+            dataset_test['output_log10_f_s_SI_pred'] - dataset_test['output_log10_f_s_SI']) / np.abs(
+            dataset_test['output_log10_f_s_SI'])
+        dataset_test['output_log10_temperature_1000bar_K_pred_diff_ratio'] = np.abs(
+            dataset_test['output_log10_temperature_1000bar_K_pred'] - dataset_test['output_log10_temperature_1000bar_K']) / np.abs(
+            dataset_test['output_log10_temperature_1000bar_K'])
+        logging.info("Test radius diff mean: " + str(
+            dataset_test.loc[:, 'output_radius_Rearth_pred_diff'].mean()) + '+-' +
+                     str(dataset_test.loc[:, 'output_radius_Rearth_pred_diff'].std()))
+        logging.info("Test entropy diff mean: " + str(
+            dataset_test.loc[:, 'output_entropy_log10_1000bar_SI_pred_diff'].mean()) + '+-' +
+                     str(dataset_test.loc[:, 'output_entropy_log10_1000bar_SI_pred_diff'].std()))
+        logging.info("Test f_s diff mean: " + str(
+            dataset_test.loc[:, 'output_log10_f_s_SI_pred_diff'].mean()) + '+-' +
+                     str(dataset_test.loc[:, 'output_log10_f_s_SI_pred_diff'].std()))
+        logging.info("Test temperature diff mean: " + str(
+            dataset_test.loc[:, 'output_log10_temperature_1000bar_K_pred_diff'].mean()) + '+-' +
+                     str(dataset_test.loc[:, 'output_log10_temperature_1000bar_K_pred_diff'].std()))
+        logging.info("Test radius diff ratio median: " + str(
+            dataset_test.loc[:, 'output_radius_Rearth_pred_diff_ratio'].median()) + '+-' +
+                     str(dataset_test.loc[:, 'output_radius_Rearth_pred_diff_ratio'].std()))
+        logging.info("Test entropy diff ratio median: " + str(
+            dataset_test.loc[:, 'output_entropy_log10_1000bar_SI_pred_diff_ratio'].median()) + '+-' +
+                     str(dataset_test.loc[:, 'output_entropy_log10_1000bar_SI_pred_diff_ratio'].std()))
+        logging.info("Test f_s diff ratio median: " + str(
+            dataset_test.loc[:, 'output_log10_f_s_SI_pred_diff_ratio'].median()) + '+-' +
+                     str(dataset_test.loc[:, 'output_log10_f_s_SI_pred_diff_ratio'].std()))
+        logging.info("Test temperature diff ratio median: " + str(
+            dataset_test.loc[:, 'output_log10_temperature_1000bar_K_pred_diff_ratio'].median()) + '+-' +
+                     str(dataset_test.loc[:, 'output_log10_temperature_1000bar_K_pred_diff_ratio'].std()))
+        logging.info("Test radius diff ratio mean: " + str(
+            dataset_test.loc[:, 'output_radius_Rearth_pred_diff_ratio'].mean()) + '+-' +
+                     str(dataset_test.loc[:, 'output_radius_Rearth_pred_diff_ratio'].std()))
+        logging.info("Test entropy diff ratio mean: " + str(
+            dataset_test.loc[:, 'output_entropy_log10_1000bar_SI_pred_diff_ratio'].mean()) + '+-' +
+                     str(dataset_test.loc[:, 'output_entropy_log10_1000bar_SI_pred_diff_ratio'].std()))
+        logging.info("Test f_s diff ratio mean: " + str(
+            dataset_test.loc[:, 'output_log10_f_s_SI_pred_diff_ratio'].mean()) + '+-' +
+                     str(dataset_test.loc[:, 'output_log10_f_s_SI_pred_diff_ratio'].std()))
+        logging.info("Test temperature diff ratio mean: " + str(
+            dataset_test.loc[:, 'output_log10_temperature_1000bar_K_pred_diff_ratio'].mean()) + '+-' +
+                     str(dataset_test.loc[:, 'output_log10_temperature_1000bar_K_pred_diff_ratio'].std()))
+        return dataset_test
+
+    def predict_test_cv(self, model_dir, test_csv, folds=5, batch_size=128):
+        # Load and preprocess test set
+        dataset_test = pd.read_csv(test_csv)
+        dataset_test = dataset_test.loc[(dataset_test['flag_physical'] == True) & (dataset_test['flag_convergence'] == 0)]
+        dataset_test.dropna(inplace=True)
+
+        # Save ground truth before predict_cv replaces the DataFrame
+        truth = dataset_test[['output_radius_Rearth', 'output_entropy_1000bar_SI',
+                               'output_log10_f_s_SI', 'output_temperature_1000bar_K']].copy()
+
+        # Delegate fold ensemble predictions to predict_cv
+        input_cols = ['input_mass_Mearth', 'input_CMF', 'input_Zenv', 'input_Zwater_core',
+                      'input_Tsurf_K', 'input_Psurf_bar']
+        dataset_test = self.predict_cv(dataset_test[input_cols], model_dir, folds=folds, batch_size=batch_size)
+
+        # Reattach ground truth
+        dataset_test = pd.concat([dataset_test, truth], axis=1)
+
+        # Compute diffs against ground truth
+        dataset_test['output_radius_Rearth_pred_diff'] = np.abs(
+            dataset_test['radius_Rearth_pred'] - dataset_test['output_radius_Rearth'])
+        dataset_test['output_radius_Rearth_pred_diff_ratio'] = (
+            dataset_test['output_radius_Rearth_pred_diff'] / dataset_test['output_radius_Rearth'])
+
+        dataset_test['output_entropy_1000bar_SI_pred_diff'] = np.abs(
+            dataset_test['entropy_1000bar_SI_pred'] - dataset_test['output_entropy_1000bar_SI'])
+        dataset_test['output_entropy_1000bar_SI_pred_diff_ratio'] = (
+            dataset_test['output_entropy_1000bar_SI_pred_diff'] / dataset_test['output_entropy_1000bar_SI'])
+
+        dataset_test['output_f_s_SI_pred_diff'] = np.abs(
+            dataset_test['f_s_SI_pred'] - 10 ** dataset_test['output_log10_f_s_SI'])
+        dataset_test['output_f_s_SI_pred_diff_ratio'] = (
+            dataset_test['output_f_s_SI_pred_diff'] / np.maximum(np.abs(10 ** dataset_test['output_log10_f_s_SI']), 1e-30))
+
+        dataset_test['output_temperature_1000bar_K_pred_diff'] = np.abs(
+            dataset_test['temperature_1000bar_K_pred'] - dataset_test['output_temperature_1000bar_K'])
+        dataset_test['output_temperature_1000bar_K_pred_diff_ratio'] = (
+            dataset_test['output_temperature_1000bar_K_pred_diff'] / dataset_test['output_temperature_1000bar_K'])
+
+        logging.info("CV Test radius diff mean: " + str(
+            dataset_test.loc[:, 'output_radius_Rearth_pred_diff'].mean()) + '+-' +
+                     str(dataset_test.loc[:, 'output_radius_Rearth_pred_diff'].std()))
+        logging.info("CV Test entropy diff mean: " + str(
+            dataset_test.loc[:, 'output_entropy_1000bar_SI_pred_diff'].mean()) + '+-' +
+                     str(dataset_test.loc[:, 'output_entropy_1000bar_SI_pred_diff'].std()))
+        logging.info("CV Test f_s diff mean: " + str(
+            dataset_test.loc[:, 'output_f_s_SI_pred_diff'].mean()) + '+-' +
+                     str(dataset_test.loc[:, 'output_f_s_SI_pred_diff'].std()))
+        logging.info("CV Test temperature diff mean: " + str(
+            dataset_test.loc[:, 'output_temperature_1000bar_K_pred_diff'].mean()) + '+-' +
+                     str(dataset_test.loc[:, 'output_temperature_1000bar_K_pred_diff'].std()))
+        logging.info("CV Test radius diff ratio median: " + str(
+            dataset_test.loc[:, 'output_radius_Rearth_pred_diff_ratio'].median()) + '+-' +
+                     str(dataset_test.loc[:, 'output_radius_Rearth_pred_diff_ratio'].std()))
+        logging.info("CV Test entropy diff ratio median (real): " + str(
+            dataset_test.loc[:, 'output_entropy_1000bar_SI_pred_diff_ratio'].median()) + '+-' +
+                     str(dataset_test.loc[:, 'output_entropy_1000bar_SI_pred_diff_ratio'].std()))
+        logging.info("CV Test f_s diff ratio median (real): " + str(
+            dataset_test.loc[:, 'output_f_s_SI_pred_diff_ratio'].median()) + '+-' +
+                     str(dataset_test.loc[:, 'output_f_s_SI_pred_diff_ratio'].std()))
+        logging.info("CV Test temperature diff ratio median (real): " + str(
+            dataset_test.loc[:, 'output_temperature_1000bar_K_pred_diff_ratio'].median()) + '+-' +
+                     str(dataset_test.loc[:, 'output_temperature_1000bar_K_pred_diff_ratio'].std()))
+        logging.info("CV Test radius diff ratio mean: " + str(
+            dataset_test.loc[:, 'output_radius_Rearth_pred_diff_ratio'].mean()) + '+-' +
+                     str(dataset_test.loc[:, 'output_radius_Rearth_pred_diff_ratio'].std()))
+        logging.info("CV Test entropy diff ratio mean (real): " + str(
+            dataset_test.loc[:, 'output_entropy_1000bar_SI_pred_diff_ratio'].mean()) + '+-' +
+                     str(dataset_test.loc[:, 'output_entropy_1000bar_SI_pred_diff_ratio'].std()))
+        logging.info("CV Test f_s diff ratio mean (real): " + str(
+            dataset_test.loc[:, 'output_f_s_SI_pred_diff_ratio'].mean()) + '+-' +
+                     str(dataset_test.loc[:, 'output_f_s_SI_pred_diff_ratio'].std()))
+        logging.info("CV Test temperature diff ratio mean (real): " + str(
+            dataset_test.loc[:, 'output_temperature_1000bar_K_pred_diff_ratio'].mean()) + '+-' +
+                     str(dataset_test.loc[:, 'output_temperature_1000bar_K_pred_diff_ratio'].std()))
+        return dataset_test
+
+    def predict_cv(self, df, model_dir, folds=5, batch_size=128):
+        """
+        Run all CV fold models on a DataFrame of input rows. Returns the DataFrame
+        with added columns for ensemble median predictions and stds (real units).
+
+        Parameters
+        ----------
+        df : pd.DataFrame  Must contain the 6 input columns (input_mass_Mearth, etc.)
+        model_dir : str    Path to CV output (contains Haunter_model_0/, ...)
+        folds : int        Number of CV folds
+        batch_size : int
+
+        Returns
+        -------
+        df : pd.DataFrame  Original df with added columns:
+            radius_Rearth_pred, radius_Rearth_std
+            entropy_1000bar_SI_pred, entropy_1000bar_SI_std
+            f_s_SI_pred, f_s_SI_std
+            temperature_1000bar_K_pred, temperature_1000bar_K_std
+        """
+        fold0_dir = f"{model_dir}/Haunter_model_0"
+        dataset_training = pd.read_csv(f"{fold0_dir}/train_dataset.csv")
+        dataset_validation = pd.read_csv(f"{fold0_dir}/validation_dataset.csv")
+        dataset_standardization = pd.concat([dataset_training, dataset_validation])
+
+        # Standardize inputs only (using training data stats)
+        df_std = df.copy()
+        input_cols = ['input_mass_Mearth', 'input_CMF', 'input_Zenv',
+                      'input_Zwater_core', 'input_Tsurf_K', 'input_Psurf_bar']
+        for col in input_cols:
+            scaler = self.instance_scaler()
+            scaler.fit(dataset_standardization[col])
+            df_std.loc[:, col + '_norm'] = scaler.transform(df_std[col].to_numpy())
+        # Generator needs output _norm columns present (values don't matter for prediction)
+        for col in ['output_radius_Rearth', 'output_entropy_log10_1000bar_SI',
+                     'output_log10_f_s_SI', 'output_log10_temperature_1000bar_K']:
+            if col + '_norm' not in df_std.columns:
+                df_std[col + '_norm'] = 0.0
+        predict_generator = self.instance_generator(df_std, None, batch_size, self.input_size, None,
+                                                    shuffle=False)
+
+        all_preds = []
+        for i in range(folds):
+            model_path = f"{model_dir}/Haunter_model_{i}/model{self.MODEL_SAVE_EXTENSION}"
+            logging.info(f"CV predict: loading fold {i} from {model_path}")
+            self.load_model(model_path, compile=False)
+            preds = self.model.predict(predict_generator, batch_size=batch_size, verbose=0)
+            all_preds.append(preds)
+            del self.model
+            self.model = None
+
+        all_preds = np.stack(all_preds, axis=0)  # (folds, n_samples, 4)
+        pred_median = np.median(all_preds, axis=0)
+        pred_std = all_preds.std(axis=0)
+
+        # Destandardize using the same normalization
+        output_stds = np.array([
+            dataset_standardization['output_radius_Rearth'].std(),
+            dataset_standardization['output_entropy_log10_1000bar_SI'].std(),
+            dataset_standardization['output_log10_f_s_SI'].std(),
+            dataset_standardization['output_log10_temperature_1000bar_K'].std(),
+        ])
+        output_means = np.array([
+            dataset_standardization['output_radius_Rearth'].mean(),
+            dataset_standardization['output_entropy_log10_1000bar_SI'].mean(),
+            dataset_standardization['output_log10_f_s_SI'].mean(),
+            dataset_standardization['output_log10_temperature_1000bar_K'].mean(),
+        ])
+
+        # Destandardize predictions
+        pred_real = pred_median * output_stds + output_means  # (n_samples, 4)
+        pred_real_std = pred_std * output_stds
+
+        # Convert to real units: radius already real; entropy/f_s/temp from log10
+        df['radius_Rearth_pred'] = pred_real[:, 0]
+        df['radius_Rearth_std'] = pred_real_std[:, 0]
+
+        # Exponentiate each fold's predictions then take std — exact, no approximation
+        all_preds_real = all_preds * output_stds + output_means  # (folds, n, 4) in log10/real space
+        all_preds_real_exp = 10 ** all_preds_real  # entropy, f_s, temp in real units, radius unchanged
+
+        df['entropy_1000bar_SI_pred'] = np.median(all_preds_real_exp[:, :, 1], axis=0)
+        df['entropy_1000bar_SI_std'] = all_preds_real_exp[:, :, 1].std(axis=0)
+        df['f_s_SI_pred'] = np.median(all_preds_real_exp[:, :, 2], axis=0)
+        df['f_s_SI_std'] = all_preds_real_exp[:, :, 2].std(axis=0)
+        df['temperature_1000bar_K_pred'] = np.median(all_preds_real_exp[:, :, 3], axis=0)
+        df['temperature_1000bar_K_std'] = all_preds_real_exp[:, :, 3].std(axis=0)
+
+        logging.info(f"CV predict: {folds} folds ensemble on {len(df)} samples complete")
+        return df
 
     def plot_hists(self, df, additional_columns=[]):
         columns = ['mass_Mearth_input', 'mass_Mearth_input_norm',
@@ -363,7 +608,7 @@ class Haunter(BaseModel):
                    'Tsurf_K_input', 'Tsurf_K_input_norm',
                    'Psurf_bar_input', 'Psurf_bar_input_norm',
                    'radius_Rearth_output', 'radius_Rearth_output_norm',
-                   'entropy_SI_output', 'entropy_SI_output_norm',
+                   'output_log10_entropy_1000bar_SI', 'output_entropy_log10_1000bar_SI_norm',
                    'f_s_SI_output', 'f_s_SI_output_norm',
                    'log10_mass_integral_output', 'log10_mass_integral_output_norm'
                    ]
@@ -428,12 +673,12 @@ class Haunter(BaseModel):
         y_true_outputs = y_true_outputs * (self.output_stds + 1e-8) + self.output_means
         return tf.reduce_mean(tf.abs(y_true_outputs[:, 2] - y_pred_outputs[:, 2]))
 
-    def mae_log10_mass_integral(self, y_true, y_pred):
+    def mae_temperature(self, y_true, y_pred):
         y_pred_outputs = y_pred
         y_true_outputs = y_true
         y_pred_outputs = y_pred_outputs * (self.output_stds + 1e-8) + self.output_means
         y_true_outputs = y_true_outputs * (self.output_stds + 1e-8) + self.output_means
-        return tf.reduce_mean(tf.abs(y_true_outputs[:, 2] - y_pred_outputs[:, 2]))
+        return tf.reduce_mean(tf.abs(y_true_outputs[:, 3] - y_pred_outputs[:, 3]))
 
     def combined_loss(self, y_true, y_pred):
         y_pred_outputs = y_pred[:, :3]

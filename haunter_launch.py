@@ -1,45 +1,62 @@
 import os
-
-from exoml.ml.callback.checkpoint import ModelCheckpointCallback
-from exoml.ml.callback.learning_rate import WarmUpAndLinDecreaseCallback
+import json
 
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 from exoml.haunter.haunter import Haunter
-#tf.config.run_functions_eagerly(True)
-# thread_config.setup_threads(1)
-from exoml.ml.model.base_model import HyperParams
+from exoml.ml.model.base_model import HyperParams, BaseModel
 
-training_dir = '/data/scratch/ml/haunter/'
-model_dir = '/home/administrator/exoml/'
+from exoml.ml.callback.checkpoint import ModelCheckpointCallback
+
+training_dir = '/home/martin/workspace/ph/exoml/exoml/resources/haunter/'
+model_dir = '/home/martin/workspace/ph/exoml/exoml/resources/haunter/'
+results_path = f'{model_dir}/hyperparam_search/results.json'
+
+# Try to load best hyperparams from search
+# try:
+#     with open(results_path) as f:
+#         results = json.load(f)
+#     valid = [r for r in results if 'val_mae_radius' in r]
+#     valid.sort(key=lambda r: r['val_mae_radius'])
+#     best = valid[0]
+#     print(f'Loaded best from search: val_mae_radius={best["val_mae_radius"]:.4f}')
+#     batch_size = best['batch_size']
+#     initial_lr = best['initial_learning_rate']
+#     dropout_rate = best['dropout_rate']
+#     learning_rate_decay = best['learning_rate_decay']
+#     white_noise_std = best['white_noise_std']
+# except (FileNotFoundError, json.JSONDecodeError, IndexError, KeyError) as e:
+#     print(f'No search results found ({e}), using defaults')
+batch_size = 512
 initial_lr = 0.001
-final_lr = 0.0001
-warmup_lr = 1e-7
-epochs = 2000
-warmup_epochs = 50
-hp = HyperParams(batch_size=2048,
+dropout_rate = 0.1
+learning_rate_decay = 0.995
+white_noise_std = 0.001
+
+epochs = 500
+hp = HyperParams(batch_size=batch_size,
             epochs=epochs,
             initial_learning_rate=initial_lr,
             train_percent=0.9,
-            gradient_clip_norm=0.5,
-            gradient_clip_value=0.1,
+            gradient_clip_norm=1.0,
+            gradient_clip_value=None,
             dry_run=False,
-            learning_rate_decay=0.98,
+            learning_rate_decay=learning_rate_decay,
             early_stopping_delta=0,
             early_stopping_patience=0,
             custom_loss=None,
-            run_eagerly=True,
-            dropout_rate=0.1,
-            #white_noise_std=0.001,
+            run_eagerly=False,
+            dropout_rate=dropout_rate,
+            white_noise_std=white_noise_std,
                  callbacks=[
-                     # ReduceLROnPlateau(monitor='val_pr_auc', mode='max', factor=0.75, patience=10, min_lr=lr / 100), #, #,
-                     ModelCheckpointCallback(filepath=f"{model_dir}/Haunter_model_chk",
+                     ModelCheckpointCallback(filepath=f"{model_dir}/Haunter_model/Haunter_model_chk" + BaseModel.MODEL_SAVE_EXTENSION,
                                              original_path=f"{model_dir}/Haunter_model",
                                              verbose=0, save_weights_only=False,
-                                             save_best_only=True, monitor='val_r2_total',
-                                             mode='max', save_freq='epoch',
-                                             initial_value_threshold=0.9)
-                     #WarmUpAndLinDecreaseCallback(initial_lr, initial_lr, warmup_lr, warmup_epochs, epochs - warmup_epochs)
+                                             save_best_only=True, monitor='val_mae_radius',
+                                             mode='min', save_freq='epoch',
+                                             initial_value_threshold=0.4)
                  ]
                  )
 haunter = Haunter(hp).build().inform(model_dir)
-haunter.train(training_dir, model_dir, hp)
+#haunter.train(training_dir, model_dir, hp)
+haunter.train_cv(training_dir, model_dir, hp, folds=10)
