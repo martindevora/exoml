@@ -432,10 +432,10 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                 og_df = None
                 if os.path.exists(lc_long_filename):
                     read_df = pd.read_csv(lc_long_filename, usecols=['#time', 'flux_0'], low_memory=True)
-                    lc_df = read_df if lc_df is None else lc_df.append(read_df, ignore_index=True)
+                    lc_df = read_df if lc_df is None else pd.concat([lc_df, read_df], ignore_index=True)
                 if os.path.exists(lc_short_filename):
                     read_df = pd.read_csv(lc_short_filename, usecols=['#time', 'flux_0'], low_memory=True)
-                    lc_df = read_df if lc_df is None else lc_df.append(read_df, ignore_index=True)
+                    lc_df = read_df if lc_df is None else pd.concat([lc_df, read_df], ignore_index=True)
                 if lc_df is None:
                     logging.warning("No curve for target " + file_prefix)
                     raise ValueError("No curve for target " + file_prefix)
@@ -454,12 +454,12 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                             read_centroids_df['centroids_dec'].to_numpy(), duration * 4,
                             check_cadence=True)
                         centroids_df = read_centroids_df if centroids_df is None \
-                            else centroids_df.append(read_centroids_df, ignore_index=True)
+                            else pd.concat([centroids_df, read_centroids_df], ignore_index=True)
                 if os.path.exists(og_long_filename):
                     read_og_df = pd.read_csv(og_long_filename, usecols=['time', 'og_flux', 'halo_flux', 'core_flux'],
                                              low_memory=True)
                     read_og_df = self.compute_og_df(read_og_df, object_id, duration)
-                    og_df = read_og_df if og_df is None else og_df.append(read_og_df, ignore_index=True)
+                    og_df = read_og_df if og_df is None else pd.concat([og_df, read_og_df], ignore_index=True)
                 if os.path.exists(centroids_short_filename):
                     read_centroids_df = pd.read_csv(centroids_short_filename,
                                                     usecols=['time', 'centroids_ra', 'centroids_dec'],
@@ -475,12 +475,12 @@ class IatsonPlanetModelGenerator(Ete6ModelGenerator):
                             read_centroids_df['centroids_dec'].to_numpy(), duration * 4,
                             check_cadence=True)
                     centroids_df = read_centroids_df if centroids_df is None \
-                        else centroids_df.append(read_centroids_df, ignore_index=True)
+                        else pd.concat([centroids_df, read_centroids_df], ignore_index=True)
                 if os.path.exists(og_short_filename):
                     read_og_df = pd.read_csv(og_short_filename, usecols=['time', 'og_flux', 'halo_flux', 'core_flux'],
                                              low_memory=True)
                     read_og_df = self.compute_og_df(read_og_df, object_id, duration)
-                    og_df = read_og_df if og_df is None else og_df.append(read_og_df, ignore_index=True)
+                    og_df = read_og_df if og_df is None else pd.concat([og_df, read_og_df], ignore_index=True)
                 lc_df = lc_df.sort_values(by=['#time'])
                 if self.mask_previous_signals:
                     lc_df = self.mask_other_signals(lc_df, target_row, '#time')
