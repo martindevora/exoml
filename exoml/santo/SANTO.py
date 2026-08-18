@@ -29,7 +29,7 @@ from sklearn.utils import shuffle
 from exoml.ml.callback.early_stopping import ExoMlEarlyStopping
 from exoml.ml.callback.learning_rate import WarmUpAndLinDecreaseCallback, MultiOptimizer
 from exoml.ml.callback.training_data_aware import ModelDirDataAwareCallback, ValidationDataAwareCallback
-from exoml.ml.layers.transformer import TransformerEncoder
+from exoml.ml.layers.transformer_classifier import TransformerClassifier
 from exoml.ml.log.get_weights_logger import ModelWeightsLogger
 from exoml.ml.log.with_logging import WithLogging
 from exoml.ml.model.base_model import HyperParams
@@ -98,38 +98,16 @@ class SANTO(WithLogging):
         input_layer = keras.Input(shape=(input_dim, 1), name="input")
         cadences_layer = keras.Input(shape=(1), name="cadences_input")
         if self.transformer_layers > 0:
-            # outputs = TransformerClassifier(transformer_input_size=input_dim, patch_size=input_dim,
-            #                                 num_heads=self.transformer_heads, mlp_dim=input_dim,
-            #                                 hyperparams=hyperparams, num_blocks=self.transformer_layers,
-            #                                 classes=1)(input_layer)
-            flux_branch: keras.layers.Layer = input_layer
-            for _ in range(self.transformer_layers):
-                flux_branch = TransformerEncoder(
-                    intermediate_dim=input_dim,
-                    num_heads=self.transformer_heads,
-                    dropout=hyperparams.dropout_rate,
-                    activation=LeakyReLU(),
-                    layer_norm_epsilon=1e-05,
-                    kernel_initializer="glorot_uniform",
-                    bias_initializer="zeros",
-                    normalize_first=False
-                )(flux_branch)
-                # flux_branch = keras.layers.MultiHeadAttention(
-                #     key_dim=input_dim, num_heads=self.transformer_heads, dropout=hyperparams.dropout_rate
-                # )(input_layer, input_layer)
-                # flux_branch = keras.layers.Dropout(hyperparams.dropout_rate)(flux_branch)
-                # flux_branch = keras.layers.LayerNormalization(epsilon=1e-6)(flux_branch)
-                # res = flux_branch + input_layer
-                # # Feed Forward Part
-                # flux_branch = keras.layers.Conv1D(filters=input_dim, kernel_size=1, activation="relu")(res)
-                # flux_branch = keras.layers.Dropout(hyperparams.dropout_rate)(flux_branch)
-                # flux_branch = keras.layers.Conv1D(filters=input_layer.shape[-1], kernel_size=1)(flux_branch)
-                # flux_branch = keras.layers.LayerNormalization(epsilon=1e-6)(flux_branch)
-                # flux_branch = flux_branch + res
-            flux_branch = keras.layers.GlobalAveragePooling1D(data_format="channels_last")(flux_branch)
-            flux_branch = keras.layers.Dense(input_dim, activation="relu")(flux_branch)
-            flux_branch = keras.layers.Dropout(hyperparams.dropout_rate)(flux_branch)
-            outputs = keras.layers.Dense(1, activation="sigmoid")(flux_branch)
+            outputs = TransformerClassifier(
+                num_heads=self.transformer_heads,
+                mlp_dim=input_dim,
+                dropout=hyperparams.dropout_rate,
+                layer_norm_epsilon=hyperparams.transformer_layer_norm_epsilon,
+                l1=hyperparams.l1_regularization,
+                l2=hyperparams.l2_regularization,
+                num_blocks=self.transformer_layers,
+                classes=1,
+            )(input_layer)
         else:
             leaky_relu_alpha = 0.01
             flux_branch: keras.layers.Layer = input_layer
