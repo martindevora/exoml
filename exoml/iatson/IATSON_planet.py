@@ -668,7 +668,7 @@ class IATSON_planet(ImbalancedBinaryModel):
                 model_dir = f'{models_dir}/{model}'
                 calibrator = f"{model_dir}/{calibrator_path}" if calibrator_path is not None else None
                 calibrator = self.load_calibrator(calibrator)
-                self.load_model(model_dir + '/' + os.path.basename(model_dir) + '.h5')
+                self.load_model(model_dir + '/' + os.path.basename(model_dir) + self.MODEL_SAVE_EXTENSION)
                 model_dir = f'{models_dir}/'
                 prediction, _ = self.predict(input, batch_size=batch_size)
                 input.plot_inputs = False
@@ -803,7 +803,7 @@ class IATSON_planet(ImbalancedBinaryModel):
         additional_test_fold_df = None
         for index, fold in enumerate(np.arange(0, folds)):
             model_dir = f"{model_dir_prefix}_{fold}"
-            self.load_model(model_dir + '/' + os.path.basename(model_dir) + '.h5')
+            self.load_model(model_dir + '/' + os.path.basename(model_dir) + self.MODEL_SAVE_EXTENSION)
             model_dir = model_dir + '/'
             if fold_indexes is not None:
                 previous_fold_index = fold_indexes[index - 1] if index > 0 else 0
@@ -896,7 +896,7 @@ class IATSON_planet(ImbalancedBinaryModel):
         available_folds = set(available_folds).symmetric_difference(set(skip_folds))
         for fold in available_folds:
             model_dir = f"{model_dir_prefix}_{fold}"
-            self.load_model(model_dir + '/' + os.path.basename(model_dir) + '.h5')
+            self.load_model(model_dir + '/' + os.path.basename(model_dir) + self.MODEL_SAVE_EXTENSION)
             model_dir = f"{model_dir}/"
             calibrator = f"{model_dir}{calibrator_path}" if calibrator_path is not None else None
             prediction_stats_for_folds_thresholds[fold] = \
@@ -1093,8 +1093,8 @@ class IATSON_planet(ImbalancedBinaryModel):
         for fold in np.arange(0, folds):
             sorted_pred_df = predictions_df.loc[predictions_df['fold'] == fold] \
                 .sort_values(by=['prediction_value'], ascending=False)
-            first_fp_thresholds.append(
-                sorted_pred_df.loc[(sorted_pred_df['expected_class'] == 0), 'prediction_value'].iloc[0])
+            fp_series = sorted_pred_df.loc[(sorted_pred_df['expected_class'] == 0), 'prediction_value']
+            first_fp_thresholds.append(fp_series.iloc[0] if len(fp_series) > 0 else 0)
             metric_rp = tf.keras.metrics.RecallAtPrecision(precision=1, num_thresholds=10000)
             metric_rp.update_state(sorted_pred_df['expected_class'].to_numpy(),
                                    sorted_pred_df['prediction_value'].to_numpy())
@@ -1109,9 +1109,9 @@ class IATSON_planet(ImbalancedBinaryModel):
         for fold in np.arange(0, folds):
             sorted_pred_df = predictions_df.loc[predictions_df['fold'] == fold]\
                 .sort_values(by=['prediction_value'], ascending=True)
-            first_fp_thresholds.append(
-                sorted_pred_df.loc[(sorted_pred_df['expected_class'] == 1) & (sorted_pred_df['predicted_class'] == 0),
-                'prediction_value'].iloc[0])
+            first_fp = sorted_pred_df.loc[(sorted_pred_df['expected_class'] == 1) & (sorted_pred_df['predicted_class'] == 0),
+                           'prediction_value']
+            first_fp_thresholds.append(first_fp.iloc[0] if len(first_fp) > 0 else 0)
             metric = SpecificityAtNPV(npv=1, num_thresholds=10000)
             metric.update_state(sorted_pred_df['expected_class'].to_numpy(),
                                 sorted_pred_df['prediction_value'].to_numpy())
@@ -1649,7 +1649,7 @@ class IATSON_planet(ImbalancedBinaryModel):
         val_predictions_df_iso = None
         for fold in np.arange(0, folds):
             model_dir = model_prefix + f'_{fold}'
-            self.load_model(model_dir + '/' + os.path.basename(model_dir) + '.h5')
+            self.load_model(model_dir + '/' + os.path.basename(model_dir) + self.MODEL_SAVE_EXTENSION)
             calibration_df = pd.read_csv(f'{model_dir}/validation_dataset.csv')
             prediction_stats_for_thresholds = self.predict_df(calibration_df, training_dir, batch_size, cores,
                                                               thresholds=thresholds, from_arrays=True)
