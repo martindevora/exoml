@@ -214,8 +214,8 @@ def remove_squeezable_dimensions(
       Tuple of `labels` and `predictions`, possibly with last dim squeezed.
     """
     with backend.name_scope(name or "remove_squeezable_dimensions"):
-        predictions = tf_utils.ensure_tensor(predictions)
-        labels = tf_utils.ensure_tensor(labels)
+        predictions = tf.convert_to_tensor(predictions)
+        labels = tf.convert_to_tensor(labels)
         predictions_shape = predictions.shape
         predictions_rank = predictions_shape.ndims
         labels_shape = labels.shape
@@ -1116,11 +1116,12 @@ class ThresholdAtPrecision(SensitivitySpecificityBase):
         thresholds = tf.convert_to_tensor(self.thresholds, dtype=variable_dtype)
         feasible = tf.where(predicate(constrained, self.value))
         feasible_exists = tf.greater(tf.size(feasible), 0)
-        try:
-            return tf.where(feasible_exists, tf.gather(thresholds, tf.gather(feasible, [0])), 0.0)
-        except Exception as e:
-            print("Error " + str(e))
-            return 0.0 
+        result = tf.cond(
+            feasible_exists,
+            lambda: tf.gather(thresholds, tf.gather(feasible, [0])),
+            lambda: tf.constant([0.0], dtype=variable_dtype),
+        )
+        return tf.squeeze(tf.where(feasible_exists, result, 0.0))
 
     def get_config(self):
         config = {
@@ -1362,16 +1363,12 @@ class ThresholdAtNPV(SensitivitySpecificityBase):
         thresholds = tf.convert_to_tensor(self.thresholds, dtype=variable_dtype)
         feasible = tf.where(predicate(constrained, self.value))
         feasible_exists = tf.greater(tf.size(feasible), 0)
-        index = tf.size(feasible) - 1
-        index = tf.where(tf.greater_equal(index, 0), index, 0)
-        try:
-            return tf.where(feasible_exists,
-                            # tf.gather(thresholds, tf.gather(feasible, [tf.shape(feasible)[0] - 1])),
-                            tf.gather(thresholds, tf.gather(feasible, [index])),
-                            0.0)
-        except Exception as e:
-            print("Unexpected exception in thresholdAtNPV. " + str(e))
-            return 0.0
+        result = tf.cond(
+            feasible_exists,
+            lambda: tf.gather(thresholds, tf.gather(feasible, [tf.shape(feasible)[0] - 1])),
+            lambda: tf.constant([0.0], dtype=variable_dtype),
+        )
+        return tf.squeeze(tf.where(feasible_exists, result, 0.0))
 
     def get_config(self):
         config = {

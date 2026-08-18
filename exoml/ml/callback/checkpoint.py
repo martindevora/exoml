@@ -1,3 +1,4 @@
+import copy
 import warnings
 
 from keras.callbacks import ModelCheckpoint
@@ -60,9 +61,26 @@ class ModelCheckpointCallback(ModelCheckpoint):
         self.filter_metrics = filter_metrics
         self.epochs_since_last_save = 0
 
+    def __deepcopy__(self, memo):
+        cls = self.__class__
+        result = cls.__new__(cls)
+        memo[id(self)] = result
+        for k, v in self.__dict__.items():
+            if k in ('model', '_model'):
+                setattr(result, k, None)
+            elif k == 'params':
+                setattr(result, k, {})
+            elif k == 'monitor_op':
+                setattr(result, k, None)
+            else:
+                setattr(result, k, copy.deepcopy(v, memo))
+        return result
+
     def on_epoch_end(self, epoch, logs=None):
         self.epochs_since_last_save += 1
         if self.save_freq == "epoch":
+            if self.monitor_op is None:
+                self._set_monitor_op()
             self._save_model(epoch=epoch, batch=None, logs=logs)
 
     def _should_save_model(self, epoch, batch, logs, filepath):

@@ -144,6 +144,8 @@ class BaseModel(WithLogging):
     Base class providing standard methods for model building.
     """
 
+    MODEL_SAVE_EXTENSION = '.h5'
+
     model: keras.Model = None
 
     def __init__(self, name, input_size, class_ids, type_to_label, hyperparams) -> None:
@@ -267,8 +269,9 @@ class BaseModel(WithLogging):
         if model_dir is None:
             dest_dir = dir + '/' + self._get_model_dir()
         else:
-            dest_dir = dir + '/' + model_dir
+            dest_dir = dir + '/' + model_dir + '/model' + self.MODEL_SAVE_EXTENSION
         logging.info("Saving model into %s", dest_dir)
+        os.makedirs(os.path.dirname(dest_dir), exist_ok=True)
         self.model.save(dest_dir)
         logging.info("Saved model")
         return dest_dir
@@ -344,9 +347,10 @@ class BaseModel(WithLogging):
         dataset = shuffle(dataset)
         dataset.reset_index(inplace=True, drop=True)
         dataset_len = len(dataset)
-        for labels in self.class_ids.values():
-            class_len = len(dataset[dataset['type'].isin(labels)])
-            logging.info("%s (%s %%) items of class %s", class_len, class_len / len(dataset) * 100, labels)
+        if self.class_ids:
+            for labels in self.class_ids.values():
+                class_len = len(dataset[dataset['type'].isin(labels)])
+                logging.info("%s (%s %%) items of class %s", class_len, class_len / len(dataset) * 100, labels)
         fold_indexes = [int(fold_index) for fold_index in np.linspace(dataset_len // folds, dataset_len, folds)]
         return dataset, fold_indexes
 
@@ -454,18 +458,17 @@ class BaseModel(WithLogging):
             logging.info("Initializing training with (epochs," + str(hyperparams.epochs) +
                          ") (steps_per_epoch," + str(steps_per_epoch) +
                          ")")
-            self.save(output_dir, self._get_model_prefix() + '.h5')
+            self.save(output_dir, self._get_model_prefix() + self.MODEL_SAVE_EXTENSION)
             self.__write_hyperparameters(hyperparams, model_path)
             fit_history = self.fit_model(hyperparams, training_batch_generator, steps_per_epoch, class_weights,
                                          validation_batch_generator, model_validation_steps)
-            self.save(output_dir, self._get_model_prefix() + '.h5')
+            self.save(output_dir, self._get_model_prefix() + self.MODEL_SAVE_EXTENSION)
         else:
             logging.warning("dry_run was activated and 'training' will not be launched")
 
     def fit_model(self, hyperparams, training_batch_generator, steps_per_epoch, class_weights,
                   validation_batch_generator, model_validation_steps):
         fit_history = self.model.fit(x=training_batch_generator,
-                                     steps_per_epoch=steps_per_epoch,
                                      epochs=hyperparams.epochs, verbose=1, class_weight=class_weights,
                                      validation_data=validation_batch_generator,
                                      validation_steps=model_validation_steps,
@@ -529,14 +532,15 @@ class BaseModel(WithLogging):
                      train_dataset_size / dataset_length * 100)
         logging.info("Validation set is of length %s (%s %%)", validation_dataset_size,
                      validation_dataset_size / dataset_length * 100)
-        for labels in class_ids.values():
-            class_len = len(training_set[training_set['type'].isin(labels)])
-            logging.info("Training set contains %s (%s %%) items of class %s", class_len,
-                         class_len / train_dataset_size * 100, labels)
-        for labels in class_ids.values():
-            class_len = len(validation_set[validation_set['type'].isin(labels)])
-            logging.info("Validation set contains %s (%s %%) items of class %s", class_len,
-                         class_len / validation_dataset_size * 100, labels)
+        if class_ids:
+            for labels in class_ids.values():
+                class_len = len(training_set[training_set['type'].isin(labels)])
+                logging.info("Training set contains %s (%s %%) items of class %s", class_len,
+                             class_len / train_dataset_size * 100, labels)
+            for labels in class_ids.values():
+                class_len = len(validation_set[validation_set['type'].isin(labels)])
+                logging.info("Validation set contains %s (%s %%) items of class %s", class_len,
+                             class_len / validation_dataset_size * 100, labels)
 
     def train_cv(self, training_dir, output_dir, hyperparams, folds=10, retry_indexes=[],
                  continue_from=None, plot_metrics=False, devices=None):
@@ -618,13 +622,12 @@ class BaseModel(WithLogging):
                                 logging.info(f"Switched modelCheckpointCallback to {model_path} "
                                              f",{model_chk_path} and {new_callback.best}")
                                 new_callback.original_path = model_path
-                                new_callback.filepath = model_chk_path + '/' + os.path.basename(model_chk_path) + '.keras'
+                                new_callback.filepath = model_chk_path + '/' + os.path.basename(model_chk_path) + self.MODEL_SAVE_EXTENSION
                             callbacks = callbacks + [new_callback]
-                        additional_callbacks = [BatchAwareCsvLogger(model_name + '/training_log.csv', steps_per_epoch)]
+                        additional_callbacks = [BatchAwareCsvLogger(output_dir + '/' + model_name + '/training_log.csv', steps_per_epoch)]
                         if plot_metrics:
                             additional_callbacks = additional_callbacks + [
-                                MetricsPlotCallback(self, model_name, steps_per_epoch)]
-                        hyperparams.callbacks = additional_callbacks + hyperparams.callbacks
+                                MetricsPlotCallback(self, output_dir + '/' + model_name, steps_per_epoch)]
                         callbacks = additional_callbacks + callbacks
                         if hyperparams.early_stopping_patience > 0 and hyperparams.early_stopping_delta > 0:
                             callbacks = callbacks + [ExoMlEarlyStopping(
@@ -645,26 +648,23 @@ class BaseModel(WithLogging):
                                      ") (steps_per_epoch," + str(steps_per_epoch) +
                                      ") (model_validation_steps," + str(model_validation_steps) +
                                      ")")
-                        continue_from_model = continue_from + str(index)
                         if continue_from is not None and os.path.exists(continue_from_model):
+                            continue_from_model = continue_from + str(index)
                             logging.info(f"Continuing model fit from checkpoint {continue_from_model}")
-                            self.load_model(continue_from_model)
+                            self.load_model(output_dir + continue_from_model + '/model' + self.MODEL_SAVE_EXTENSION)
                         else:
                             logging.info(f"Continuing model fit from initial {model_name_initial}")
-                            self.load_model(model_name_initial)
+                            self.load_model(output_dir + model_name_initial + '/model' + self.MODEL_SAVE_EXTENSION)
                         self.compile(optimizer,
                                      hyperparams.custom_loss if hyperparams.custom_loss is not None else loss,
                                      metrics=metrics,
                                      run_eagerly=hyperparams.run_eagerly)
                         self.__write_hyperparameters(hyperparams, model_name)
                         fit_history = self.model.fit(x=training_batch_generator,
-                                       steps_per_epoch=steps_per_epoch,
                                        epochs=hyperparams.epochs, verbose=1, class_weight=class_weights,
                                        validation_data=validation_batch_generator,
                                        validation_steps=model_validation_steps,
-                                       callbacks=callbacks,
-                                       use_multiprocessing=hyperparams.cores > 0, workers=1 if hyperparams.cores <= 0
-                            else hyperparams.cores)
+                                       callbacks=callbacks)
                         self.save(output_dir, model_name)
                     else:
                         logging.warning("dry_run was activated and 'training' will not be launched")
@@ -747,11 +747,10 @@ class BaseModel(WithLogging):
                                 new_callback.original_path = model_path
                                 new_callback.filepath = model_chk_path
                             callbacks = callbacks + [new_callback]
-                        additional_callbacks = [BatchAwareCsvLogger(model_name + '/training_log.csv', steps_per_epoch)]
+                        additional_callbacks = [BatchAwareCsvLogger(output_dir + '/' + model_name + '/training_log.csv', steps_per_epoch)]
                         if plot_metrics:
                             additional_callbacks = additional_callbacks + [
-                                MetricsPlotCallback(self, model_name, steps_per_epoch)]
-                        hyperparams.callbacks = additional_callbacks + hyperparams.callbacks
+                                MetricsPlotCallback(self, output_dir + '/' + model_name, steps_per_epoch)]
                         callbacks = additional_callbacks + callbacks
                         if hyperparams.early_stopping_patience > 0 and hyperparams.early_stopping_delta > 0:
                             callbacks = callbacks + [ExoMlEarlyStopping(
@@ -772,7 +771,7 @@ class BaseModel(WithLogging):
                                      ") (steps_per_epoch," + str(steps_per_epoch) +
                                      ") (model_validation_steps," + str(model_validation_steps) +
                                      ")")
-                        continue_from_model = continue_from + str(index)
+                        continue_from_model = continue_from + str(index) + '/model' + self.MODEL_SAVE_EXTENSION
                         logging.info(f"Continuing model fit from checkpoint {continue_from_model}")
                         self.load_model(continue_from_model)
                         # for layer in self.model.layers:

@@ -1,10 +1,87 @@
 import tensorflow as tf
-#from keras_core.src.layers import LeakyReLU
-from keras.layers import MultiHeadAttention, LeakyReLU
-#from keras.src.layers import Dense
-from keras_hub.layers import TransformerEncoder
+from keras.layers import LeakyReLU
 
 from exoml.ml.layers.dropout import AdaptiveStdDropout
+
+try:
+    from keras_nlp.layers import TransformerEncoder  # type: ignore
+except ImportError:
+    try:
+        from keras_hub.layers import TransformerEncoder  # type: ignore
+    except ImportError:
+
+        @tf.keras.utils.register_keras_serializable()
+        class TransformerEncoder(tf.keras.layers.Layer):
+            def __init__(self, intermediate_dim, num_heads, dropout=0.0,
+                         activation="relu", layer_norm_epsilon=1e-6,
+                         kernel_initializer="glorot_uniform",
+                         bias_initializer="zeros", normalize_first=False, **kwargs):
+                super().__init__(**kwargs)
+                self.intermediate_dim = intermediate_dim
+                self.num_heads = num_heads
+                self.dropout_rate = dropout
+                self.activation = tf.keras.activations.get(activation)
+                self.layer_norm_epsilon = layer_norm_epsilon
+                self.kernel_initializer = kernel_initializer
+                self.bias_initializer = bias_initializer
+                self.normalize_first = normalize_first
+
+            def build(self, input_shape):
+                self.input_dim = input_shape[-1]
+                self.att = tf.keras.layers.MultiHeadAttention(
+                    num_heads=self.num_heads, key_dim=self.input_dim // self.num_heads,
+                    kernel_initializer=self.kernel_initializer,
+                    bias_initializer=self.bias_initializer,
+                )
+                self.ffn = tf.keras.Sequential([
+                    tf.keras.layers.Dense(self.intermediate_dim,
+                                          activation=self.activation,
+                                          kernel_initializer=self.kernel_initializer,
+                                          bias_initializer=self.bias_initializer),
+                    tf.keras.layers.Dense(self.input_dim,
+                                          kernel_initializer=self.kernel_initializer,
+                                          bias_initializer=self.bias_initializer),
+                ])
+                self.att_norm = tf.keras.layers.LayerNormalization(
+                    epsilon=self.layer_norm_epsilon)
+                self.ffn_norm = tf.keras.layers.LayerNormalization(
+                    epsilon=self.layer_norm_epsilon)
+                self.att_dropout = tf.keras.layers.Dropout(self.dropout_rate)
+                self.ffn_dropout = tf.keras.layers.Dropout(self.dropout_rate)
+
+            def call(self, inputs, mask=None, training=None):
+                if self.normalize_first:
+                    normed = self.att_norm(inputs)
+                    attn_output = self.att(normed, normed, normed)
+                    attn_output = self.att_dropout(attn_output)
+                    out1 = inputs + attn_output
+                    ffn_input = self.ffn_norm(out1)
+                    ffn_output = self.ffn(ffn_input)
+                    ffn_output = self.ffn_dropout(ffn_output)
+                    return out1 + ffn_output
+                else:
+                    attn_output = self.att(inputs, inputs, inputs)
+                    attn_output = self.att_dropout(attn_output)
+                    out1 = self.att_norm(inputs + attn_output)
+                    ffn_output = self.ffn(out1)
+                    ffn_output = self.ffn_dropout(ffn_output)
+                    return self.ffn_norm(out1 + ffn_output)
+
+            def get_config(self):
+                config = super().get_config()
+                config.update({
+                    "intermediate_dim": self.intermediate_dim,
+                    "num_heads": self.num_heads,
+                    "dropout": self.dropout_rate,
+                    "activation": tf.keras.activations.serialize(self.activation),
+                    "layer_norm_epsilon": self.layer_norm_epsilon,
+                    "kernel_initializer": tf.keras.initializers.serialize(
+                        tf.keras.initializers.get(self.kernel_initializer)),
+                    "bias_initializer": tf.keras.initializers.serialize(
+                        tf.keras.initializers.get(self.bias_initializer)),
+                    "normalize_first": self.normalize_first,
+                })
+                return config
 
 
 @tf.keras.utils.register_keras_serializable()
@@ -66,124 +143,47 @@ class AddPositionEmbs(tf.keras.layers.Layer):
         return cls(**config)
 
 
-# @tf.keras.utils.register_keras_serializable()
-# class TransformerEncoder(tf.keras.layers.Layer):
-#     """Implements a Transformer block."""
-#
-#     def __init__(self, *args, num_heads, mlp_dim, hyperparams, **kwargs):
-#         super().__init__(*args, **kwargs)
-#         self.num_heads = num_heads
-#         self.mlp_dim = mlp_dim
-#         self.hyperparams = hyperparams
-#         self.regularizer_value = 0.1
-#
-#     def build(self, input_shape):
-#         self.att = MultiHeadAttention(num_heads=self.num_heads,
-#             key_dim=input_shape[-1],
-#             name="MultiHeadDotProductAttention_1"
-#         )
-#         self.mlpblock = tf.keras.Sequential(
-#             [
-#                 tf.keras.layers.Dense(self.mlp_dim, activation=LeakyReLU(), name=f"{self.name}/Dense_0",
-#                                       activity_regularizer=tf.keras.regularizers.L1L2(
-#                                           l1=self.hyperparams.l1_regularization,
-#                                           l2=self.hyperparams.l2_regularization)
-#                                       ),
-#                 AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
-#                                    max_rate=self.hyperparams.dropout_max_rate),
-#                 tf.keras.layers.Dense(input_shape[-1], name=f"{self.name}/Dense_1", activation=LeakyReLU(),
-#                                       activity_regularizer=tf.keras.regularizers.L1L2(
-#                                           l1=self.hyperparams.l1_regularization,
-#                                           l2=self.hyperparams.l2_regularization)
-#                                       )
-#             ],
-#             name="MlpBlock_3",
-#         )
-#         self.layernorm1 = tf.keras.layers.LayerNormalization(
-#             epsilon=1e-6, name="LayerNorm_1"
-#         )
-#         self.layernorm2 = tf.keras.layers.LayerNormalization(
-#             epsilon=1e-6, name="LayerNorm_2"
-#         )
-#         self.layernorm3 = tf.keras.layers.LayerNormalization(
-#             epsilon=1e-6, name="LayerNorm_3"
-#         )
-#         self.dropout_layer = AdaptiveStdDropout(rate=self.hyperparams.dropout_rate,
-#                                          max_rate=self.hyperparams.dropout_max_rate)
-#
-#     def call(self, inputs, training=True, return_attention_scores=True):
-#         x = inputs
-#         #x = self.layernorm1(x)
-#         x = self.att(x, x, training=training, return_attention_scores=return_attention_scores)
-#         x = self.dropout_layer(x, training=training)
-#         x = x + inputs
-#         y = self.layernorm2(x)
-#         y = self.mlpblock(y, training=training)
-#         return self.layernorm3(x + y)
-#
-#     def get_config(self):
-#         config = super().get_config()
-#         config.update(
-#             {
-#                 "num_heads": self.num_heads,
-#                 "mlp_dim": self.mlp_dim,
-#                 "dropout": self.hyperparams.dropout_rate,
-#             }
-#         )
-#         return config
-#
-#     @classmethod
-#     def from_config(cls, config):
-#         return cls(**config)
-
-
 @tf.keras.utils.register_keras_serializable()
 class Transformer(tf.keras.layers.Layer):
-    def __init__(self, *args, num_heads, mlp_dim, hyperparams, num_blocks, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, num_heads, mlp_dim, dropout, layer_norm_epsilon, num_blocks, **kwargs):
+        super().__init__(**kwargs)
         self.num_heads = num_heads
         self.mlp_dim = mlp_dim
-        self.hyperparams = hyperparams
+        self.dropout = dropout
+        self.layer_norm_epsilon = layer_norm_epsilon
         self.num_blocks = num_blocks
-        self.transformer_encoders = []
-        self.regularizer_value = 0.1
 
     def build(self, input_shape):
-        for n in range(self.num_blocks):
-            self.transformer_encoders = self.transformer_encoders + \
-                                         [TransformerEncoder(
-                self.mlp_dim,
-                self.num_heads,
-                dropout=self.hyperparams.dropout_rate,
-                activation=LeakyReLU(),
-                layer_norm_epsilon=self.hyperparams.transformer_layer_norm_epsilon,
-                kernel_initializer="glorot_uniform",
-                bias_initializer="zeros",
-                normalize_first=False
-            )]
-            # self.transformer_encoders = self.transformer_encoders + [TransformerEncoder(
-            #     num_heads=self.num_heads,
-            #     mlp_dim=self.mlp_dim,
-            #     hyperparams=self.hyperparams,
-            #     name=f"Transformer/encoderblock_{n}"
-            # )]
+        self.transformer_encoders = []
+        for _ in range(self.num_blocks):
+            self.transformer_encoders.append(
+                TransformerEncoder(
+                    self.mlp_dim,
+                    self.num_heads,
+                    dropout=self.dropout,
+                    activation=LeakyReLU(),
+                    layer_norm_epsilon=self.layer_norm_epsilon,
+                    kernel_initializer="glorot_uniform",
+                    bias_initializer="zeros",
+                    normalize_first=False
+                )
+            )
 
     def call(self, inputs):
         result = inputs
-        for n in range(self.num_blocks):
-            result = self.transformer_encoders[n](result)
+        for encoder in self.transformer_encoders:
+            result = encoder(result)
         return result
 
     def get_config(self):
         config = super().get_config()
-        config.update(
-            {
-                "num_heads": self.num_heads,
-                "mlp_dim": self.mlp_dim,
-                "dropout": self.hyperparams.dropout_rate,
-                "num_blocks": self.num_blocks,
-            }
-        )
+        config.update({
+            "num_heads": self.num_heads,
+            "mlp_dim": self.mlp_dim,
+            "dropout": self.dropout,
+            "layer_norm_epsilon": self.layer_norm_epsilon,
+            "num_blocks": self.num_blocks,
+        })
         return config
 
     @classmethod
@@ -193,56 +193,72 @@ class Transformer(tf.keras.layers.Layer):
 
 @tf.keras.utils.register_keras_serializable()
 class TransformerClassifier(tf.keras.layers.Layer):
-    def __init__(self, *args, transformer_input_size, patch_size, num_heads, mlp_dim, hyperparams, num_blocks, classes,
-                 **kwargs):
-        super().__init__(*args, **kwargs)
-        self.transformer_input_size = transformer_input_size
-        self.patch_size = patch_size
+    def __init__(self, num_heads, mlp_dim, dropout, layer_norm_epsilon,
+                 l1, l2, num_blocks, classes, **kwargs):
+        super().__init__(**kwargs)
         self.num_heads = num_heads
         self.mlp_dim = mlp_dim
-        self.hyperparams = hyperparams
+        self.dropout = dropout
+        self.layer_norm_epsilon = layer_norm_epsilon
+        self.l1 = l1
+        self.l2 = l2
         self.num_blocks = num_blocks
         self.classes = classes
-        self.regularizer_value = 0.1
 
     def build(self, input_shape):
-        # The linear projection could be a conv1d if the input was an image to be patched in pieces. As it is not,
-        # we don't need a convolutional layer because for us a patch is of kernel=1
-        # self.linear_proj = tf.keras.layers.Conv1D(
-        #     filters=self.transformer_input_size,
-        #     kernel_size=self.patch_size,
-        #     strides=self.patch_size,
-        #     padding="same",
-        #     name="embedding"
-        # )
-        #self.linear_proj = tf.keras.layers.Dense(self.transformer_input_size)
-        # self.linear_proj = tf.keras.layers.Dense(self.transformer_input_size, activation="relu")
-        #self.class_token = ClassToken(name="class_token")
-        #self.add_pos_embedding = AddPositionEmbs(name="add_pos_embedding")
-        self.transformer = Transformer(num_heads=self.num_heads, mlp_dim=self.mlp_dim,
-                                       hyperparams=self.hyperparams, num_blocks=self.num_blocks)
-        self.layer_norm = tf.keras.layers.LayerNormalization(epsilon=self.hyperparams.transformer_layer_norm_epsilon, name="Transformer/encoder_norm")
+        self.input_proj = tf.keras.layers.Dense(
+            self.mlp_dim, activation="relu", name="input_projection"
+        )
+        self.add_pos_embedding = AddPositionEmbs(name="add_pos_embedding")
+        self.transformer = Transformer(
+            num_heads=self.num_heads,
+            mlp_dim=self.mlp_dim,
+            dropout=self.dropout,
+            layer_norm_epsilon=self.layer_norm_epsilon,
+            num_blocks=self.num_blocks,
+        )
+        self.layer_norm = tf.keras.layers.LayerNormalization(
+            epsilon=self.layer_norm_epsilon, name="Transformer/encoder_norm"
+        )
         activation = "softmax" if self.classes > 1 else "sigmoid"
-        self.output_flatten = tf.keras.layers.Flatten()
-        self.head = tf.keras.layers.Dense(self.classes, name="head", activation=activation,
-                                          activity_regularizer=tf.keras.regularizers.L1L2(
-                                              l1=self.hyperparams.l1_regularization,
-                                              l2=self.hyperparams.l2_regularization)
-                                          )
-
+        out_filters = self.classes if self.classes > 1 else 1
+        self.head = tf.keras.layers.Dense(
+            out_filters,
+            activation=activation,
+            name="head",
+            activity_regularizer=tf.keras.regularizers.L1L2(
+                l1=self.l1, l2=self.l2
+            ),
+        )
+        if self.classes == 1:
+            self.reshape = tf.keras.layers.Reshape((-1,), name="reshape_output")
+        else:
+            self.reshape = None
 
     def call(self, inputs):
-        # result = self.linear_proj(inputs)
-        # Assuming we don't need to reshape our data as we don't need to flatten the resulting image of the linear_proj
-        #result = tf.keras.layers.Reshape((result.shape[1] * result.shape[2], self.transformer_input_size))(result)
-        #result = self.class_token(result)
-        #result = self.add_pos_embedding(result)
-        result = self.transformer(inputs)
-        # result = tf.keras.layers.Lambda(
-        #      lambda v: v[:, 0],
-        #      name="ExtractToken")(result)
-        result = self.layer_norm(result)
-        result = self.output_flatten(result)
-        result = self.head(result)
-        #result = self.dropout_layer(result, training=training)
-        return result
+        x = self.input_proj(inputs)
+        x = self.add_pos_embedding(x)
+        x = self.transformer(x)
+        x = self.layer_norm(x)
+        x = self.head(x)
+        if self.reshape is not None:
+            x = self.reshape(x)
+        return x
+
+    def get_config(self):
+        config = super().get_config()
+        config.update({
+            "num_heads": self.num_heads,
+            "mlp_dim": self.mlp_dim,
+            "dropout": self.dropout,
+            "layer_norm_epsilon": self.layer_norm_epsilon,
+            "l1": self.l1,
+            "l2": self.l2,
+            "num_blocks": self.num_blocks,
+            "classes": self.classes,
+        })
+        return config
+
+    @classmethod
+    def from_config(cls, config):
+        return cls(**config)

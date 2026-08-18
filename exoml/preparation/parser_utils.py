@@ -336,13 +336,14 @@ def prepare_lc_data(file_prefix, object_id, lc_data, transit_duration, transit_p
                 offset_ra_err = np.nanstd([source_offset_bls_ra, source_offset_diffimg_ra])
             if np.isnan(offset_dec_err) or offset_dec_err == 0.0:
                 offset_dec_err = np.nanstd([source_offset_bls_dec, source_offset_diffimg_dec])
-            offsets_df = pd.DataFrame(columns=['name', 'ra', 'dec', 'ra_err', 'dec_err'])
-            offsets_df = offsets_df.append({'name': 'diff_img', 'ra': source_offset_diffimg_ra, 'dec': source_offset_diffimg_dec,
-                               'ra_err': source_offset_diffimg_ra_err, 'dec_err': source_offset_diffimg_dec_err}, ignore_index=True)
-            offsets_df = offsets_df.append({'name': 'px_bls', 'ra': source_offset_bls_ra, 'dec': source_offset_bls_dec,
-                               'ra_err': source_offset_bls_ra_err, 'dec_err': source_offset_bls_dec_err}, ignore_index=True)
-            offsets_df = offsets_df.append({'name': 'mean', 'ra': offset_ra, 'dec': offset_dec,
-                               'ra_err': offset_ra_err, 'dec_err': offset_dec_err}, ignore_index=True)
+            offsets_df = pd.DataFrame([
+                {'name': 'diff_img', 'ra': source_offset_diffimg_ra, 'dec': source_offset_diffimg_dec,
+                 'ra_err': source_offset_diffimg_ra_err, 'dec_err': source_offset_diffimg_dec_err},
+                {'name': 'px_bls', 'ra': source_offset_bls_ra, 'dec': source_offset_bls_dec,
+                 'ra_err': source_offset_bls_ra_err, 'dec_err': source_offset_bls_dec_err},
+                {'name': 'mean', 'ra': offset_ra, 'dec': offset_dec,
+                 'ra_err': offset_ra_err, 'dec_err': offset_dec_err},
+            ])
             offsets_df.to_csv(file_prefix + '_offset_' + str(cadence_name) + '.csv')
     if 'all' in modes or 'metrics' in modes:
         logging.info("Computing bootstrap fap for %s", object_id)
