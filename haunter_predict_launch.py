@@ -45,15 +45,3 @@ haunter = Haunter(hp).build().inform(model_dir)
 #dataset = haunter.predict_validation(model_dir + '/Haunter_model', training_dir)
 #dataset = haunter.predict_test(model_dir + '/Haunter_model', model_dir + '/test_set.csv')
 haunter.predict_test_cv(model_dir, model_dir + '/test_set.csv', folds=10)
-# haunter.plot_hists(dataset, additional_columns=['radius_Rearth_output', 'radius_Rearth_output_norm',
-#                                       'radius_Rearth_output_pred', 'radius_Rearth_output_norm_pred',
-#                                       'radius_Rearth_output_pred_diff', 'radius_Rearth_output_pred_diff_ratio',
-#                                       'entropy_SI_output', 'entropy_SI_output_norm',
-#                                       'entropy_SI_output_pred', 'entropy_SI_output_norm_pred',
-#                                       'entropy_SI_output_pred_diff', 'entropy_SI_output_pred_diff_ratio',
-#                                       'f_s_SI_output', 'f_s_SI_output_norm',
-#                                       # 'f_s_SI_output_pred', 'f_s_SI_output_norm_pred',
-#                                       # 'f_s_SI_output_pred_diff', 'f_s_SI_output_pred_diff_ratio',
-#                                       'log10_mass_integral_output', 'log10_mass_integral_output_norm',
-#                                       'log10_mass_integral_output_pred', 'log10_mass_integral_output_norm_pred',
-#                                       'log10_mass_integral_output_pred_diff', 'log10_mass_integral_output_pred_diff_ratio',])

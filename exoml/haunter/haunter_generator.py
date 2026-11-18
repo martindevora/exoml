@@ -1,10 +1,5 @@
-import logging
-
-from exoml.ml.encoding.time_position import value_encode_times
-from sklearn.utils import shuffle
-import tensorflow as tf
 import numpy as np
-import pandas as pd
+import tensorflow as tf
 
 
 class HaunterModelGenerator(tf.keras.utils.Sequence):
@@ -30,21 +25,7 @@ class HaunterModelGenerator(tf.keras.utils.Sequence):
                                               'input_Zwater_core_norm', 'input_Tsurf_K_norm', 'input_Psurf_bar_norm']]
         batch_data_values = batch_rows.loc[:, ['output_radius_Rearth_norm', 'output_entropy_log10_1000bar_SI_norm',
                                                'output_log10_f_s_SI_norm', 'output_log10_temperature_1000bar_K_norm']]
-        #assert np.all((batch_data_array > 0) & (batch_data_array < 1))
-        #assert np.all((batch_data_values > 0) & (batch_data_values < 1))
         return batch_data_array.to_numpy(dtype=np.float32), batch_data_values.to_numpy(dtype=np.float32)
 
     def class_weights(self):
         return None
-
-    def get_dataset(self):
-        x_spec = (
-            tf.TensorSpec(shape=(None, 6, 1), dtype=tf.float32)
-        )
-
-        y_spec = tf.TensorSpec(shape=(None, 4,), dtype=tf.float32)  # Adjust if label shape is different
-
-        return tf.data.Dataset.from_generator(
-            lambda: iter(self),
-            output_signature=(x_spec, y_spec)
-        ).take(len(self)).repeat()

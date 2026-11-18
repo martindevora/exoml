@@ -1,30 +1,16 @@
 import logging
-import os.path
 
 import tensorflow as tf
 import numpy as np
-import matplotlib.pyplot as plt
 import keras
 import pandas as pd
 from keras import Model
 from keras.layers import LeakyReLU
-from keras.src.losses import binary_crossentropy, mean_squared_error
 
 from exoml.haunter.haunter_generator import HaunterModelGenerator
 
 from exoml.ml.model.base_model import BaseModel, HyperParams
 
-
-G = 6.67430e-11  # Constante de gravitación universal en unidades SI (m^3 kg^-1 s^-2)
-M_EARTH = 5.972e24  # Masa de la Tierra en kg
-R_EARTH = 6.371e6   # Radio de la Tierra en metros
-P_PASCAL = 1e5
-RHO_CORE = 13000.0
-RHO_MANTLE = 5000.0
-RHO_WATER = 1000.0
-RHO_GAS = 0.2
-GAMMA_SCALING = 0.5  # Ajustable según calibración
-PI = tf.constant(np.pi, dtype=tf.float32)
 
 
 class Haunter(BaseModel):
@@ -57,34 +43,6 @@ class Haunter(BaseModel):
     def load_training_set(self, **kwargs):
         training_dir = kwargs.get('training_dir')
         dataset = Haunter.load_data(training_dir)
-        self.input_means = tf.constant([
-            dataset['input_mass_Mearth'].mean(),
-            dataset['input_CMF'].mean(),
-            dataset['input_Zenv'].mean(),
-            dataset['input_Zwater_core'].mean(),
-            dataset['input_Tsurf_K'].mean(),
-            dataset['input_Psurf_bar'].mean()], dtype=tf.float32)
-        self.input_stds = tf.constant([
-            dataset['input_mass_Mearth'].std(),
-            dataset['input_CMF'].std(),
-            dataset['input_Zenv'].std(),
-            dataset['input_Zwater_core'].std(),
-            dataset['input_Tsurf_K'].std(),
-            dataset['input_Psurf_bar'].std()], dtype=tf.float32)
-        self.input_mins = tf.constant([
-            dataset['input_mass_Mearth'].min(),
-            dataset['input_CMF'].min(),
-            dataset['input_Zenv'].min(),
-            dataset['input_Zwater_core'].min(),
-            dataset['input_Tsurf_K'].min(),
-            dataset['input_Psurf_bar'].min()], dtype=tf.float32)
-        self.input_maxs = tf.constant([
-            dataset['input_mass_Mearth'].max(),
-            dataset['input_CMF'].max(),
-            dataset['input_Zenv'].max(),
-            dataset['input_Zwater_core'].max(),
-            dataset['input_Tsurf_K'].max(),
-            dataset['input_Psurf_bar'].max()], dtype=tf.float32)
         self.output_means = tf.constant([
             dataset['output_radius_Rearth'].mean(),
             dataset['output_entropy_log10_1000bar_SI'].mean(),
@@ -95,16 +53,6 @@ class Haunter(BaseModel):
             dataset['output_entropy_log10_1000bar_SI'].std(),
             dataset['output_log10_f_s_SI'].std(),
             dataset['output_log10_temperature_1000bar_K'].std()], dtype=tf.float32)
-        self.output_mins = tf.constant([
-            dataset['output_radius_Rearth'].min(),
-            dataset['output_entropy_log10_1000bar_SI'].min(),
-            dataset['output_log10_f_s_SI'].min(),
-            dataset['output_log10_temperature_1000bar_K'].min()], dtype=tf.float32)
-        self.output_maxs = tf.constant([
-            dataset['output_radius_Rearth'].max(),
-            dataset['output_entropy_log10_1000bar_SI'].max(),
-            dataset['output_log10_f_s_SI'].max(),
-            dataset['output_log10_temperature_1000bar_K'].max()], dtype=tf.float32)
         dataset = self.add_standardized_columns(dataset, dataset)
         return dataset
 
@@ -248,9 +196,7 @@ class Haunter(BaseModel):
         return HaunterModelGenerator(dataset, batch_size, input_sizes, zero_epsilon, shuffle=shuffle)
 
     def instance_loss_accuracy(self):
-        # loss = tf.keras.losses.MeanAbsolutePercentageError(reduction=losses_utils.ReductionV2.AUTO)
         loss = tf.keras.losses.MeanSquaredError()
-        #loss = self.combined_loss
         return loss, None
 
     def instance_metrics(self):
@@ -261,9 +207,6 @@ class Haunter(BaseModel):
 
     def load_model(self, dir, custom_objects={}, compile=False):
         custom_objects['LeakyReLU'] = LeakyReLU
-        custom_objects['mse_radius'] = self.mse_radius
-        custom_objects['mse_entropy'] = self.mse_entropy
-        custom_objects['mse_fs'] = self.mse_fs
         custom_objects['mae_radius'] = self.mae_radius
         custom_objects['mae_entropy'] = self.mae_entropy
         custom_objects['mae_fs'] = self.mae_fs
@@ -600,58 +543,6 @@ class Haunter(BaseModel):
         logging.info(f"CV predict: {folds} folds ensemble on {len(df)} samples complete")
         return df
 
-    def plot_hists(self, df, additional_columns=[]):
-        columns = ['mass_Mearth_input', 'mass_Mearth_input_norm',
-                   'CMF_input', 'CMF_input_norm',
-                   'Zenv_input', 'Zenv_input_norm',
-                   'Zwater_core_input', 'Zwater_core_input_norm',
-                   'Tsurf_K_input', 'Tsurf_K_input_norm',
-                   'Psurf_bar_input', 'Psurf_bar_input_norm',
-                   'radius_Rearth_output', 'radius_Rearth_output_norm',
-                   'output_log10_entropy_1000bar_SI', 'output_entropy_log10_1000bar_SI_norm',
-                   'f_s_SI_output', 'f_s_SI_output_norm',
-                   'log10_mass_integral_output', 'log10_mass_integral_output_norm'
-                   ]
-        fig, axs = plt.subplots(10, 2, figsize=(10, 30))
-        for i, col in enumerate(columns):
-            axs[i // 2][i % 2].hist(df[col].dropna(), bins=15, color='lightblue', edgecolor='black')
-            axs[i // 2][i % 2].set_title(f"Distribution of {col}")
-            axs[i // 2][i % 2].set_xlabel(col)
-            axs[i // 2][i % 2].set_ylabel('Frequency')
-        plt.tight_layout()
-        plt.show()
-        if len(additional_columns) > 0:
-            fig, axs = plt.subplots(len(additional_columns) // 2, 2, figsize=(10, 30))
-            for i, col in enumerate(additional_columns):
-                axs[i // 2][i % 2].hist(df[col].dropna(), bins=15, color='lightblue', edgecolor='black')
-                axs[i // 2][i % 2].set_title(f"Distribution of {col}")
-                axs[i // 2][i % 2].set_xlabel(col)
-                axs[i // 2][i % 2].set_ylabel('Frequency')
-            plt.tight_layout()
-            plt.show()
-
-
-    def mse_radius(self, y_true, y_pred):
-        y_pred_outputs = y_pred
-        y_true_outputs = y_true
-        y_pred_outputs = y_pred_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        y_true_outputs = y_true_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        return tf.reduce_mean(tf.square(y_true_outputs[:, 0] - y_pred_outputs[:, 0]))
-
-    def mse_entropy(self, y_true, y_pred):
-        y_pred_outputs = y_pred
-        y_true_outputs = y_true
-        y_pred_outputs = y_pred_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        y_true_outputs = y_true_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        return tf.reduce_mean(tf.square(y_true_outputs[:, 1] - y_pred_outputs[:, 1]))
-
-    def mse_fs(self, y_true, y_pred):
-        y_pred_outputs = y_pred
-        y_true_outputs = y_true
-        y_pred_outputs = y_pred_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        y_true_outputs = y_true_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        return tf.reduce_mean(tf.square(y_true_outputs[:, 2] - y_pred_outputs[:, 2]))
-
     def mae_radius(self, y_true, y_pred):
         y_pred_outputs = y_pred
         y_true_outputs = y_true
@@ -680,143 +571,6 @@ class Haunter(BaseModel):
         y_true_outputs = y_true_outputs * (self.output_stds + 1e-8) + self.output_means
         return tf.reduce_mean(tf.abs(y_true_outputs[:, 3] - y_pred_outputs[:, 3]))
 
-    def combined_loss(self, y_true, y_pred):
-        y_pred_outputs = y_pred[:, :3]
-        y_pred_inputs = y_pred[:, 3:]
-        y_true_outputs = y_true[:, :3]
-        y_pred_inputs = y_pred_inputs * (self.input_maxs - self.input_mins + 1e-8) + self.input_mins
-        y_pred_outputs = y_pred_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        y_true_outputs = y_true_outputs * (self.output_maxs - self.output_mins + 1e-8) + self.output_mins
-        # Original inputs
-        mass = y_pred_inputs[:, 0] * M_EARTH
-        CMF = y_pred_inputs[:, 1]
-        Zenv = y_pred_inputs[:, 2]
-        Zwater = y_pred_inputs[:, 3]
-        Tsurf = y_pred_inputs[:, 4]
-        Psurf = y_pred_inputs[:, 5] * P_PASCAL
-        # Predicted outputs
-        radius_pred = y_pred_outputs[:, 0] * R_EARTH
-        entropy_pred = y_pred_outputs[:, 1]
-        f_s_pred = y_pred_outputs[:, 2]
-        # Original outputs
-        radius_true = y_true_outputs[:, 0] * R_EARTH
-        entropy_true = y_true_outputs[:, 1]
-        f_s_true = y_true_outputs[:, 2]
-        # ---------- Average density by mass/radius ----------
-        rho_mean_pred = mass / (4.0 / 3.0 * tf.constant(PI) * tf.pow(radius_pred, 3))
-        rho_mean_true = mass / (4.0 / 3.0 * tf.constant(PI) * tf.pow(radius_true, 3))
-        # ---------- Composition density ----------
-        rho_comp = (
-            CMF * RHO_CORE +
-            Zwater * RHO_WATER +
-            Zenv * RHO_GAS +
-            (1.0 - CMF - Zwater - Zenv) * RHO_MANTLE
-        )
-        # ---------- Surface gravity ----------
-        g_surface_pred = G * mass / tf.square(radius_pred)
-        g_surface_true = G * mass / tf.square(radius_pred)
-        # ---------- Physical equations (residuals) ----------
-        # Eq1: dP/dr ≈ -rho * g
-        dP_dr_estimate_pred = -rho_mean_pred * g_surface_pred
-        dP_dr_estimate_true = -rho_mean_true * g_surface_true
-        loss_dpdr = tf.reduce_mean(tf.abs((Psurf / radius_pred - dP_dr_estimate_pred) - (Psurf / radius_true - dP_dr_estimate_true)))
-        # Eq2: dg/dr ≈ -4πGρ - 2Gm/r³
-        dg_dr_estimate_pred = -4 * tf.constant(PI) * G * rho_mean_pred - 2 * G * mass / tf.pow(radius_pred, 3)
-        dg_dr_estimate_true = -4 * tf.constant(PI) * G * rho_mean_true - 2 * G * mass / tf.pow(radius_pred, 3)
-        loss_dgdr = tf.reduce_mean(tf.abs(dg_dr_estimate_pred - dg_dr_estimate_true))
-        # Eq3: dT/dr ≈ -g γT/φ, using γ ≈ entropy * escalar
-        gamma_pred = entropy_pred * GAMMA_SCALING
-        gamma_true = entropy_true * GAMMA_SCALING
-        phi_pred = Psurf / (rho_mean_pred + 1e-6)
-        phi_true = Psurf / (rho_mean_true + 1e-6)
-        dT_dr_estimate_pred = -g_surface_pred * gamma_pred * Tsurf / (phi_pred + 1e-6)
-        dT_dr_estimate_true = -g_surface_true * gamma_true * Tsurf / (phi_true + 1e-6)
-        loss_dTdr = tf.reduce_mean(tf.abs(dT_dr_estimate_pred - dT_dr_estimate_true))
-        # Eq6: dm/dr ≈ 4πr²ρ
-        dm_dr_estimate_pred = 4.0 * tf.constant(PI) * tf.square(radius_pred) * rho_mean_pred
-        dm_dr_estimate_true = 4.0 * tf.constant(PI) * tf.square(radius_true) * rho_mean_true
-        loss_dmdr = tf.reduce_mean(tf.abs((mass / radius_pred - dm_dr_estimate_pred) - (mass / radius_true - dm_dr_estimate_true)))
-        # Densities consistency (estimated by percents of composition vs mass/radius densities)
-        loss_rho_match = tf.reduce_mean(tf.abs((rho_mean_pred - rho_comp) - (rho_mean_true - rho_comp)))
-
-
-        # Additional f_s losses
-        f_s_true_abs = tf.abs(f_s_true)
-        f_s_pred_abs = tf.abs(f_s_pred)
-        f_s_true_log = np.log10(f_s_true_abs)  # this is option 1
-        f_s_pred_log = np.log10(f_s_pred_abs)  # this is option 1
-        f_s_true_mass_factor = f_s_true_abs / (mass)
-        f_s_pred_mass_factor = f_s_pred_abs / (mass)
-        log10_mass_integral_true = np.log10(f_s_true_mass_factor)  # this is option 2
-        log10_mass_integral_pred = np.log10(f_s_pred_mass_factor)  # this is option 2
-        log10_mass_integral_loss = tf.reduce_mean(tf.square(log10_mass_integral_true - log10_mass_integral_pred))
-
-
-        # MSE
-        radius_mse_outputs = tf.reduce_mean(tf.square(radius_true - radius_pred))
-        entropy_mse_outputs = tf.reduce_mean(tf.square(entropy_true - entropy_pred))
-        f_s_mae_outputs = tf.reduce_mean(tf.abs(f_s_true - f_s_pred))
-        mse = tf.reduce_mean(mean_squared_error(y_true, y_pred))
-        total_loss = mse + log10_mass_integral_loss
-        # total_loss = (
-        #     total_loss +
-        #     0.2 * loss_dpdr +
-        #     0.2 * loss_dgdr +
-        #     0.2 * loss_dTdr +
-        #     0.2 * loss_dmdr +
-        #     0.2 * loss_rho_match
-        # )
-        return total_loss
-
-class StandardizeMinMaxScaler:
-    def __init__(self):
-        self.mean_ = None
-        self.std_ = None
-        self.min_ = None
-        self.max_ = None
-
-    def fit(self, data):
-        self.mean_ = np.nanmean(data, axis=0)
-        self.std_ = np.nanstd(data, axis=0)
-        standardized = (data - self.mean_) / (self.std_ + 1e-8)
-        self.min_ = np.nanmin(standardized, axis=0)
-        self.max_ = np.nanmax(standardized, axis=0)
-
-    def transform(self, data):
-        standardized = (data - self.mean_) / (self.std_ + 1e-8)
-        scaled = (standardized - self.min_) / (self.max_ - self.min_ + 1e-8)
-        indices = np.argwhere(scaled == 0.0).flatten()
-        scaled[indices] = 1e-8
-        indices = np.argwhere(scaled == 1.0).flatten()
-        scaled[indices] = 1 - 1e-8
-        return scaled
-
-    def inverse_transform(self, data_scaled):
-        standardized = data_scaled * (self.max_ - self.min_ + 1e-8) + self.min_
-        original = standardized * (self.std_ + 1e-8) + self.mean_
-        return original
-
-class MinMaxScaler:
-    def __init__(self):
-        self.mean_ = None
-        self.std_ = None
-        self.min_ = None
-        self.max_ = None
-
-    def fit(self, data):
-        self.min_ = np.nanmin(data, axis=0)
-        self.max_ = np.nanmax(data, axis=0)
-
-    def transform(self, data):
-        scaled = (data - self.min_) / (self.max_ - self.min_ + 1e-8)
-        indices = np.argwhere(scaled == 0.0).flatten()
-        scaled[indices] = 1e-8
-        indices = np.argwhere(scaled == 1.0).flatten()
-        scaled[indices] = 1 - 1e-8
-        return scaled
-
-    def inverse_transform(self, data_scaled):
-        return data_scaled * (self.max_ - self.min_ + 1e-8) + self.min_
 
 class StandardizeScaler:
     def __init__(self):
@@ -832,5 +586,3 @@ class StandardizeScaler:
 
     def inverse_transform(self, data_scaled):
         return data_scaled * (self.std_ + 1e-8) + self.mean_
-
-
