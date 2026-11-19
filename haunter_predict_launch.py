@@ -35,12 +35,12 @@ hp = HyperParams(batch_size=128,
                      ModelCheckpointCallback(filepath=f"{model_dir}/Haunter_model/Haunter_model_chk.keras",
                                              original_path=f"{model_dir}/Haunter_model",
                                              verbose=0, save_weights_only=False,
-                                             save_best_only=True, monitor='val_r2_total',
-                                             mode='max', save_freq='epoch',
-                                             initial_value_threshold=0.9)
+                                             save_best_only=True, monitor='val_mae_radius',
+                                             mode='min', save_freq='epoch',
+                                             initial_value_threshold=0.004)
                      #WarmUpAndLinDecreaseCallback(initial_lr, initial_lr, warmup_lr, warmup_epochs, epochs - warmup_epochs)]
                  ])
-haunter = Haunter(hp).build().inform(model_dir)
+haunter = Haunter(hp, width=384, blocks=3).build().inform(model_dir)
 #haunter.load_model(model_dir + '/Haunter_model/Haunter_model_chk.keras')
 #dataset = haunter.predict_validation(model_dir + '/Haunter_model', training_dir)
 #dataset = haunter.predict_test(model_dir + '/Haunter_model', model_dir + '/test_set.csv')

@@ -27,13 +27,14 @@ results_path = f'{model_dir}/hyperparam_search/results.json'
 #     white_noise_std = best['white_noise_std']
 # except (FileNotFoundError, json.JSONDecodeError, IndexError, KeyError) as e:
 #     print(f'No search results found ({e}), using defaults')
-batch_size = 512
-initial_lr = 0.001
-dropout_rate = 0.1
+# the simulations are deterministic: no dropout or input noise, a wide residual network and a long cosine schedule
+batch_size = 1024
+initial_lr = 0.002
+dropout_rate = 0.0
 learning_rate_decay = 0.995
-white_noise_std = 0.001
+white_noise_std = 0.0
 
-epochs = 500
+epochs = 100
 hp = HyperParams(batch_size=batch_size,
             epochs=epochs,
             initial_learning_rate=initial_lr,
@@ -54,9 +55,9 @@ hp = HyperParams(batch_size=batch_size,
                                              verbose=0, save_weights_only=False,
                                              save_best_only=True, monitor='val_mae_radius',
                                              mode='min', save_freq='epoch',
-                                             initial_value_threshold=0.4)
+                                             initial_value_threshold=0.004)  # dex: 1% of the radius
                  ]
                  )
-haunter = Haunter(hp).build().inform(model_dir)
+haunter = Haunter(hp, width=384, blocks=3).build().inform(model_dir)
 #haunter.train(training_dir, model_dir, hp)
 haunter.train_cv(training_dir, model_dir, hp, folds=10)
