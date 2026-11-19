@@ -25,7 +25,7 @@ class Haunter(BaseModel):
     are learned in log10, so that the relative error is what the network minimizes. The simulations are deterministic,
     so the network is a plain residual perceptron without dropout, noise or batch normalization.
     """
-    def __init__(self, hyperparameters: HyperParams, name='Haunter', input_size=6, width=256, blocks=3):
+    def __init__(self, hyperparameters: HyperParams, name='Haunter', input_size=len(INPUT_FEATURES), width=256, blocks=3):
         super().__init__(name, input_size, None, None, hyperparameters)
         self.width = width
         self.blocks = blocks
@@ -38,6 +38,7 @@ class Haunter(BaseModel):
         dataset = dataset.copy()
         dataset['input_log10_mass_Mearth'] = np.log10(dataset['input_mass_Mearth'])
         dataset['input_log10_Psurf_bar'] = np.log10(dataset['input_Psurf_bar'])
+        dataset['input_log10_distance_to_1000bar'] = np.log10(1000. - dataset['input_Psurf_bar'] + 0.01)
         dataset['output_log10_radius_Rearth'] = np.log10(dataset['output_radius_Rearth'])
         dataset['output_entropy_log10_1000bar_SI'] = np.log10(dataset['output_entropy_1000bar_SI'])
         dataset['output_log10_temperature_1000bar_K'] = np.log10(dataset['output_temperature_1000bar_K'])

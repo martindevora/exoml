@@ -38,6 +38,7 @@ class HaunterTest(unittest.TestCase):
     def test_wide_columns_are_learned_in_log10(self):
         data = Haunter.add_derived_columns(simulations(5))
         np.testing.assert_allclose(data['input_log10_mass_Mearth'], np.log10(data['input_mass_Mearth']))
+        np.testing.assert_allclose(data['input_log10_distance_to_1000bar'], np.log10(1000. - data['input_Psurf_bar'] + 0.01))
         np.testing.assert_allclose(data['output_log10_radius_Rearth'], np.log10(data['output_radius_Rearth']))
         np.testing.assert_allclose(data['output_log10_temperature_1000bar_K'], np.log10(data['output_temperature_1000bar_K']))
 

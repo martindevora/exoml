@@ -1,9 +1,11 @@
 import numpy as np
 import tensorflow as tf
 
-# the six inputs of the interior models, as they are fed to the network (log10 of the mass and the surface pressure)
+# the inputs of the interior models as they are fed to the network: log10 of the mass and the surface pressure, and
+# log10 of the distance of the surface pressure to the 1000 bar level where the entropy is measured (the entropy
+# falls with the logarithm of that distance when the surface approaches the level)
 INPUT_FEATURES = ['input_log10_mass_Mearth', 'input_CMF', 'input_Zenv', 'input_Zwater_core', 'input_Tsurf_K',
-                  'input_log10_Psurf_bar']
+                  'input_log10_Psurf_bar', 'input_log10_distance_to_1000bar']
 # the four outputs, all in the space they are learned in (log10 for the ones that span orders of magnitude)
 OUTPUT_TARGETS = ['output_log10_radius_Rearth', 'output_entropy_log10_1000bar_SI', 'output_log10_f_s_SI',
                   'output_log10_temperature_1000bar_K']
